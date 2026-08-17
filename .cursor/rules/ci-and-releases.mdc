@@ -1,0 +1,18 @@
+---
+description: CI watch, hardening, and release notes
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# CI and releases
+
+After every push, PR update, merge, or tag: wait for GitHub Actions on that ref. Do not declare the work done while CI is queued, running, or red.
+
+On failure: fix the root cause and harden (regression test, pin, timeout, fail-closed guard, diagnostic). Do not retry flakes away. Do not skip or override required checks.
+
+PR chains: watch the last PR in the series, then the `main` push after that last merge. Do not leave `main` red.
+
+Releases: `CHANGELOG.md` must contain every high-level change since the previous tag. Also write `docs/releases/vX.Y.Z.md` from `RELEASE-NOTES-TEMPLATE.md`. Tag only a green SHA. A red tag is a release blocker.
+
+Record hardening in `docs/ci-failure-hardening/` using `CI-FAILURE-HARDENING-TEMPLATE.md`.

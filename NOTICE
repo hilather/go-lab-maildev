@@ -1,0 +1,5 @@
+This product will include the MailDev 3.0 web UI (MIT License),
+Copyright (c) MailDev contributors, https://github.com/maildev/maildev
+
+Full UI vendor copy and copyright headers land in wave 3 (`web/`).
+Apache-2.0 applies to original LabMail Go code.

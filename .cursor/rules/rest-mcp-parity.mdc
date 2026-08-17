@@ -1,0 +1,22 @@
+---
+description: REST and MCP must share application operations
+globs:
+  - "internal/control/**"
+  - "internal/app/**"
+  - "internal/capabilities/**"
+  - "docs/05-*.md"
+  - "docs/06-*.md"
+  - "docs/07-*.md"
+alwaysApply: false
+---
+
+# REST / MCP parity
+
+Every public REST control capability is `PARITY_REQUIRED` unless an ADR marks it `REST_ONLY_PROTOCOL` or `MCP_ONLY_PROTOCOL`.
+
+- Same domain types, validation, authz, side effects, redaction, and error taxonomy.
+- Update the capability registry, OpenAPI, MCP manifest, and parity tests in the same change.
+- Do not ship REST first with MCP "later", or the reverse.
+- Health/live/ready may stay REST-only. MCP prompts may stay MCP-only.
+- MailDev relay is `PARITY_REQUIRED` when outgoing is configured. Do not omit it from MCP.
+- mcp-integration-lab examples keep outgoing off.

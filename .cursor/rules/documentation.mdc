@@ -9,7 +9,7 @@ alwaysApply: true
 
 Stale docs are a defect.
 
-- Update architecture, REST, MCP, parity matrix, config, security, operations, and wave status when the change touches them.
+- Update architecture, REST, MCP, parity matrix, comparison lab, config, security, operations, and wave status when the change touches them.
 - Update `AGENTS.md` if rules or layout change.
 - Land user-visible changes under `CHANGELOG.md` `[Unreleased]`.
 - Do not change an invariant without an ADR.

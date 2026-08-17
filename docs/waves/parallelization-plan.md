@@ -17,10 +17,18 @@ Parallelize around **stable interfaces and exclusive file ownership**, not aroun
 | OpenAPI merge | W3-REST (MCP contributes fixtures, does not rewrite paths) |
 | `web/` fork | W3-UI |
 | Dockerfile | W4-DEP |
+| `deploy/parity-lab/**` | CMP-ORACLE (not W4-DEP) |
+| `test/parity-lab/**` | CMP-REST / CMP-UI |
 
 ## Wave 0
 
 No code parallelism. One documentation PR.
+
+## Wave CMP (parallel with 1–4)
+
+After (or even before) W1-FND, CMP-ORACLE + CMP-REST + CMP-UI can characterize **MailDev only**. Exclusive tree `deploy/parity-lab/**` and `test/parity-lab/**`. Do not edit `internal/**`. CMP-SUT waits for the LabMail image.
+
+See [wave-cmp-comparison-lab.md](wave-cmp-comparison-lab.md).
 
 ## Wave 1
 
@@ -39,10 +47,11 @@ W1-MODEL, W1-ERR, W1-CAP can start as soon as W1-FND lands directory layout. W1-
 All four after `Inbox` interface and `model.Email` exist:
 
 ```text
-W2-SMTP  internal/smtpd/**   (uses Inbox.Insert via a narrow Ingester interface)
+W2-SMTP  internal/smtpd/**
 W2-MIME  internal/mime/** testdata/eml/**
 W2-SAN   internal/sanitize/**
 W2-STORE internal/store/**
+W2-RELAY internal/relay/**
 ```
 
 Do not share files. SMTP may depend on MIME via constructor injection once MIME’s `Parse([]byte) (Email, error)` is on a small interface — SMTP can stub parse in tests until MIME merges.
@@ -67,7 +76,7 @@ UI may mock REST with MSW until W3-REST exists, but must not merge assuming path
 ## Wave 4
 
 ```text
-W4-DEP     deploy/, Dockerfile
+W4-DEP     Dockerfile, deploy/compose/   (not deploy/parity-lab/)
 W4-PARITY  test/parity/**
 W4-OBS     internal/observability/**  (metrics)
 W4-LABDOC  docs/12 + examples for lab flags

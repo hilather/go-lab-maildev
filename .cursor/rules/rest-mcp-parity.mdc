@@ -18,4 +18,5 @@ Every public REST control capability is `PARITY_REQUIRED` unless an ADR marks it
 - Update the capability registry, OpenAPI, MCP manifest, and parity tests in the same change.
 - Do not ship REST first with MCP "later", or the reverse.
 - Health/live/ready may stay REST-only. MCP prompts may stay MCP-only.
-- MailDev relay endpoints are not implemented; do not add them on either transport.
+- MailDev relay is `PARITY_REQUIRED` when outgoing is configured. Do not omit it from MCP.
+- mcp-integration-lab examples keep outgoing off.

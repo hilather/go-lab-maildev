@@ -2,7 +2,7 @@
 
 Status: Proposed normative
 Last reviewed: 2026-08-17
-Related: [00-evaluation.md](00-evaluation.md), [ADR 0009](adr/0009-native-go-smtp.md), [ADR 0002](adr/0002-receive-only-sink.md)
+Related: [00-evaluation.md](00-evaluation.md), [ADR 0009](adr/0009-native-go-smtp.md), [ADR 0013](adr/0013-full-maildev-parity-and-comparison-lab.md)
 
 ## Role
 
@@ -89,7 +89,7 @@ Respond **502** (not implemented). This is a sink, not a directory.
 
 ## Receive-only enforcement at this layer
 
-`internal/smtpd` must not import an SMTP client. There is no `Relay` method on the server type. Compile-time `go/analysis` or a package-test can grep imports for known client packages if useful; the architectural test in wave 1 should fail if `go-smtp` client send APIs or `net/smtp.SendMail` appear outside testdata.
+`internal/smtpd` is ingest-only. Outbound lives in `internal/relay`, invoked from `app` on REST/MCP relay and on auto-relay after ingest. Comparison-lab tests prove both.
 
 ## Error mapping (informative)
 

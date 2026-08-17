@@ -15,7 +15,8 @@ Stable `code` values in `internal/domainerr`. Transports map to HTTP / JSON-RPC 
 | `payload_too_large` | 413 | Attachment/MCP binary cap or body |
 | `resource_exhausted` | 429 / SMTP 452 | Inbox or connection cap |
 | `deadline_exceeded` | 504 | `emails.wait` timeout |
-| `unimplemented` | 501 | Should stay unused; do not use for relay |
+| `failed_precondition` | 500 on `/email` relay (MailDev); 409 or 400 on `/v1` | Outgoing not configured; prefer MailDev status on compat routes |
+| `unimplemented` | 501 | Unused for relay (relay is implemented) |
 | `unavailable` | 503 | Shutting down |
 | `internal` | 500 | Bug |
 

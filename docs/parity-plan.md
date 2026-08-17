@@ -3,15 +3,16 @@
 Status: Normative for implementation waves
 Last reviewed: 2026-08-17
 
-LabMail parity has **three axes**. A capability is not done until every in-scope axis is done and tested.
+LabMail parity has **four axes**. A MailDev capability is not done until Axis A (and D) pass. Lab extras still need Axis C.
 
 ```text
-Axis A  MailDev inspection surface (2.2.1 lab + 3.0 UI/API)
+Axis A  MailDev process behavior (2.2.1 + 3.0) — every feature ported
 Axis B  mcp-integration-lab drop-in + first-class MCP
 Axis C  REST ↔ MCP (and UI where it is an operator workflow)
+Axis D  Side-by-side Docker comparison lab (REST + UI vs live MailDev)
 ```
 
-Outbound relay is **not** on any axis ([ADR 0011](adr/0011-omit-outbound-relay.md)).
+Outgoing/auto-relay **are** on Axis A and D. They stay **off** in Axis B deployments ([ADR 0013](adr/0013-full-maildev-parity-and-comparison-lab.md)).
 
 ## Axis A — MailDev inspection
 
@@ -53,8 +54,9 @@ Implement the union of 2.2.1 and 3.0 inspection routes, on **both** prefixes ([A
 | Config | `GET /config` | `GET /api/config` |
 | Health | `GET /healthz` | `GET /api/healthz` |
 | Reload dir | `GET /reloadMailsFromDirectory` | `GET /api/reloadMailsFromDirectory` |
+| Relay | `POST /email/:id/relay/:relayTo?` | `POST /api/email/:id/relay/:relayTo?` |
 
-**Not implemented:** `POST .../email/:id/relay`. Return **404** (no such capability), not 501-with-relay-semantics. Do not document it as a supported API.
+**Relay** is implemented ([ADR 0013](adr/0013-full-maildev-parity-and-comparison-lab.md)). When outgoing is off, match MailDev’s error (500 “Outgoing mail not configured” class). When on, deliver to the configured host (comparison lab: `relay-sink`).
 
 **Added REST** (lab, must also be MCP):
 
@@ -71,7 +73,7 @@ List search filters (`from`, `to`, `subject`, `query`, `hasAttachment`, `isUnrea
 
 ### A4. UI (wave 3)
 
-Vendor MailDev 3 UI. Operator workflows that exist as buttons today (list, open, delete one, delete all, mark all read, download, attachments, HTML/text/headers/source, search, refresh) must work. Relay must not appear. Live updates via `/ws`.
+Vendor MailDev 3 UI. Operator workflows that exist as buttons today (list, open, delete one, delete all, mark all read, download, attachments, HTML/text/headers/source, search, refresh, **Relay** when outgoing is on) must work. Live updates via `/ws`. Comparison-lab Playwright drives **both** the original UIs and LabMail ([23-behavior-parity-matrix.md](23-behavior-parity-matrix.md)).
 
 ### A5. Real-time (wave 3)
 
@@ -94,7 +96,7 @@ Payload `email` uses the same JSON as REST get (without forcing mark-read on sub
 | Smoke: SMTP + `GET /email` 401 + authed list contains subject | Must pass unchanged |
 | labinfo URLs `/` and `/email` | Keep; add MCP URL when lab registers it |
 | No MCPJungle server JSON | Add `labmail.json` streamable HTTP + bearer |
-| Relay flags rejected in `internal/maildev` | Still rejected; LabMail also rejects if they slip through |
+| Relay flags rejected in `internal/maildev` | **Keep that rejector in the lab repo.** LabMail **accepts** the flags for MailDev parity; integration-lab profiles must not set them |
 | tmpfs, read-only, cap_drop | Same |
 | Healthcheck Node TCP 1025 | `labmaild healthcheck` |
 
@@ -117,37 +119,44 @@ MailDev 3’s five tools become LabMail tools **and** REST. Prompts stay MCP-onl
 
 `mail_emails_search` and `mail_email_get_latest` are not “extra MCP magic”; they are parameterized list operations with REST equivalents. `mail_email_wait` is a lab addition on both transports (timeout bounded, cancellable).
 
+## Axis D — Comparison lab
+
+Normative: [22-comparison-lab.md](22-comparison-lab.md), [23-behavior-parity-matrix.md](23-behavior-parity-matrix.md), wave CMP.
+
+- Oracles: MailDev 2.2.1 + MailDev 3.0 (pinned) + LabMail + `relay-sink`.
+- Every `req` REST and UI cell must pass.
+- Characterization against MailDev can start before LabMail exists.
+
 ## Sequencing
 
 ```text
-Wave 0  contracts (this pack)
-Wave 1  module, schema, capability IDs frozen in code
-Wave 2  SMTP + MIME + store  → Axis A1/A2
-Wave 3  app + REST + MCP + WS + UI  → Axis A3/A4/A5 + Axis C
-Wave 4  image + compose + lab cutover doc + full parity suite  → Axis B
-Wave 5  interop clients, release notes automation, GA
+Wave 0    contracts (this pack)
+Wave CMP  oracle compose + REST/UI harness (parallel with 1–3)
+Wave 1    module, schema, capability IDs frozen in code
+Wave 2    SMTP + MIME + store + relay client
+Wave 3    app + REST + MCP + WS + UI (Relay kept)
+Wave 4    image + compose + lab cutover doc + in-process parity
+Wave 5    interop clients, release notes automation, GA (CMP green required)
 ```
-
-Waves 2 internals (smtp / mime / store) are parallel. Wave 3 REST and MCP are parallel after `internal/app` interfaces exist. UI can start as soon as REST list/get/delete/html/source/attachment and `/ws` are stubbed.
 
 ## Definition of MailDev parity for GA
 
-GA does **not** mean “every MailDev CLI flag including relay.” It means:
+GA **does** mean every MailDev **process** feature in the [behavior matrix](23-behavior-parity-matrix.md) is ported and comparison-lab green:
 
 - Lab smoke would pass against LabMail with the current `GET /email` assertions.
-- MailDev 3 UI (fork) can inspect, search, delete, preview HTML/text/source, and download attachments.
+- MailDev 3 UI (fork) can inspect, search, delete, preview, download, and **relay** when outgoing is configured.
+- Side-by-side REST + UI tests vs live MailDev v2 and v3 pass.
 - Every LabMail REST control capability is callable via MCP with matching structured results.
-- Relay is impossible.
+- mcp-integration-lab deploy still omits outgoing.
 - Container matches lab security posture.
 
 ## Explicit non-parity
 
 | MailDev | Disposition |
 | --- | --- |
-| Outgoing/auto-relay | Forbidden |
 | Node `require('maildev')` | Out of scope |
-| AngularJS UI | Out of scope |
-| Socket.IO protocol | Replaced by `/ws` |
+| AngularJS UI **as LabMail’s UI** | Out of scope (v2 UI is still an **oracle** in the comparison lab) |
+| Socket.IO protocol | Replaced by `/ws`; UX compared in the lab |
 | `maildev init` wizard | Optional later; YAML examples suffice |
 | Homebrew / npm publish | Out of scope |
 | Plugin SDK | Out of scope |

@@ -1,7 +1,7 @@
 # Wave 5 — GA hardening
 
 Status: not-started
-Dependencies: wave 4
+Dependencies: wave 4 **and** wave CMP (`make test-parity-lab` green)
 Parallel: W5-INTEROP-* dirs; serial W5-REL then W5-GA
 
 Read: [19-acceptance-criteria.md](../19-acceptance-criteria.md), [14-release-engineering.md](../14-release-engineering.md), [AGENTS.md](../../AGENTS.md) §2.5–2.6
@@ -62,6 +62,7 @@ Tick [19-acceptance-criteria.md](../19-acceptance-criteria.md) with links to tes
 - [ ] Watch the PR chain’s last PR and `main` ([AGENTS.md](../../AGENTS.md) §2.6)
 - [ ] Hardening records for any CI failures during the train
 - [ ] Complete between-version notes vs repository start
+- [ ] `make test-parity-lab` evidence (REST + UI vs MailDev v2 and v3)
 
 ## Wave 5 definition of done
 

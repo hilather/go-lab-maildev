@@ -17,9 +17,11 @@ SemVer for `labmaild`. Separately visible in `/v1/version`:
 
 Every job required. No `continue-on-error` on merge gates. Actions pinned by commit SHA.
 
-Suggested jobs: `format`, `lint`, `unit`, `race`, `fuzz-smoke`, `generated`, `docs`, `parity`, `config-compat`, `govulncheck`, `gitleaks`, `container`, `changelog`, `ci-gate`.
+Suggested jobs: `format`, `lint`, `unit`, `race`, `fuzz-smoke`, `generated`, `docs`, `parity`, `parity-lab-oracle`, `config-compat`, `govulncheck`, `gitleaks`, `container`, `changelog`, `ci-gate`.
 
-UI jobs: `web-typecheck`, `web-lint`, `web-test`, `web-build`. Playwright on PRs if not too slow; otherwise Playwright on `main` + nightly, with component tests on every PR.
+Once the LabMail image builds in CI, `parity-lab` (`make test-parity-lab`: REST + UI vs MailDev v2/v3) is required on PRs that touch SMTP, store, REST, UI, relay, or sanitizer, and on `main`. A separate matrix cell runs the `relay` / `autorelay` profiles. Oracle-only (`make test-parity-lab-oracle`) runs on every PR after wave CMP compose exists, even before LabMail.
+
+UI jobs: `web-typecheck`, `web-lint`, `web-test`, `web-build`. Product Playwright on PRs if not too slow; comparison-lab Playwright is the `parity-lab` job above.
 
 ## Changelog and notes
 

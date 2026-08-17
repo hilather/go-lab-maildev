@@ -25,7 +25,7 @@ Required lab PR items (not implemented in this documentation-only change):
 5. `profiles/default/mcpjungle/servers/labmail.json` (name matches filename).
 6. labinfo: add MCP URL; keep SMTP + `/email`.
 7. Smoke: existing REST assertions **plus** `mcpjungle invoke` `mail_emails_search` / `mail_email_get`.
-8. Docs/AGENTS: replace “no MCP” with LabMail rules; keep receive-only guard (now belt-and-suspenders with LabMail itself).
+8. Docs/AGENTS: replace “no MCP” with LabMail rules; **keep** the lab orchestrator’s relay-flag rejector (LabMail implements relay for the comparison lab, not for the shared lab profile).
 9. Healthcheck: `labmaild healthcheck` instead of `node -e net.connect`.
 
 ## Compatibility checklist for this repo
@@ -36,7 +36,7 @@ LabMail must pass **before** that lab PR:
 - [ ] Authed `GET /email` JSON array with `subject`
 - [ ] SMTP anonymous on 1025
 - [ ] `--smtp` / `--web` / `--hide-extensions` flags work
-- [ ] Relay flags cause process **exit** with error (so a mis-rendered command does not start a sender)
+- [ ] Relay flags **start** the process (parity); integration-lab profiles still omit them
 - [ ] `/mcp` tools/list with bearer
 - [ ] Read-only rootfs + non-root
 - [ ] No Node in the image
@@ -47,6 +47,6 @@ Short term: keep `maildev/maildev.yaml` flags. LabMail flag overlay consumes the
 
 Long term: `labmail/config.yaml` apiVersion document, like `labdns/bootstrap.yaml`. LabMail should accept both so the lab can migrate in a second PR.
 
-## Receive-only
+## Receive-only (integration lab)
 
-Do not remove mcp-integration-lab’s relay-flag rejector. LabMail’s own rejector is defense in depth.
+Do not remove mcp-integration-lab’s relay-flag rejector. LabMail accepts those flags for MailDev parity; the **profile** still must not set them. Comparison lab lives in this repo (`deploy/parity-lab`), not in mcp-integration-lab.

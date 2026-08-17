@@ -2,7 +2,7 @@
 
 Status: Proposed normative
 Last reviewed: 2026-08-17
-Related ADRs: 0003, 0004, 0006, 0011
+Related ADRs: 0003, 0004, 0006, 0013
 
 ## Problem statement
 
@@ -52,6 +52,7 @@ Scopes: `mail.read`, `mail.write`, `mail.admin`. Health probes: none.
 | `email.source` | `GET /email/{id}/source`, `GET /api/email/{id}/source` | `mail_email_source_get` | mail.read | PARITY_REQUIRED |
 | `email.download` | `GET /email/{id}/download`, `GET /api/email/{id}/download` | `mail_email_download` | mail.read | PARITY_REQUIRED |
 | `email.attachment` | `GET /email/{id}/attachment/{filename}` (+ `/api`) | `mail_attachment_get` | mail.read | PARITY_REQUIRED |
+| `email.relay` | `POST /email/{id}/relay`, `POST /email/{id}/relay/{relayTo}` (+ `/api`) | `mail_email_relay` | mail.write | PARITY_REQUIRED |
 | `store.reload` | `GET /reloadMailsFromDirectory` (+ `/api`) | `mail_store_reload` | mail.admin | PARITY_REQUIRED |
 | `state.reset` | `POST /v1/state:reset` | `mail_state_reset` | mail.admin | PARITY_REQUIRED |
 | `schema.get` | `GET /v1/schema/config` | `mail_schema_get`, `labmail://schema/config` | mail.read | PARITY_REQUIRED |
@@ -65,7 +66,9 @@ Scopes: `mail.read`, `mail.write`, `mail.admin`. Health probes: none.
 
 WebSocket is REST_ONLY_PROTOCOL (framing). MCP may later add `notifications` / subscriptions via ADR; not required for GA if `mail_email_wait` covers agent blocking.
 
-**Forbidden IDs:** `email.relay`, `smtp.send`, anything that delivers mail.
+`mail_email_relay` takes `id` and optional `relayTo`. When outgoing is disabled, both REST and MCP return the same domain error (`failed_precondition` / MailDev-compatible 500 on `/email` routes).
+
+Auto-relay is **configuration**, not a separate tool: ingest side effect when enabled. Status is visible via `config.get`.
 
 ## Side effects that must match
 
@@ -75,6 +78,7 @@ WebSocket is REST_ONLY_PROTOCOL (framing). MCP may later add `notifications` / s
 | `email.delete` / bulk / all | Emits `MailDeleted` / reset events |
 | `emails.read_all` | Returns count of newly marked |
 | `state.reset` | Inbox empty; config unchanged |
+| `email.relay` | Sends to configured outgoing host (and optional `relayTo`) |
 | `emails.wait` | Does **not** mark read until a subsequent get |
 
 ## Binary payloads on MCP
@@ -92,7 +96,7 @@ Domain codes from [17-error-model.md](17-error-model.md). REST: `application/pro
 | Scope | Typical tools |
 | --- | --- |
 | `mail.read` | list, get, search, wait, html, source, download, attachment, stats, config, version |
-| `mail.write` | delete, bulk delete, delete all, mark read all |
+| `mail.write` | delete, bulk delete, delete all, mark read all, relay |
 | `mail.admin` | reset, reload |
 
 When only HTTP basic is configured (lab MailDev mode), successful basic auth grants **all three scopes** (MailDev has no RBAC). When bearer tokens exist, each token has scopes. A token with only `mail.read` cannot delete.

@@ -54,7 +54,7 @@ Config:
 }
 ```
 
-`isOutgoingEnabled` is **always false**. Do not add a working outgoing host field.
+`isOutgoingEnabled` / `outgoingHost` reflect config (MailDev). Default false/null. Comparison-lab `relay` profile sets them.
 
 ## Filtering and pagination
 
@@ -79,6 +79,8 @@ Reserved query keys: `skip`, `limit`, `query`, `hasAttachment`, `isUnread`, `sin
 
 Wait returns `200` with the email(s) or `504` problem+json `deadline_exceeded` if none matched. Does not mark read.
 
+Relay: `POST /email/:id/relay` and `POST /email/:id/relay/:relayTo` (and `/api` twins). Success JSON `true`. Invalid `relayTo`: 400. Outgoing off: 500 with MailDev-style `{ "error": "..." }`.
+
 ## CORS
 
 Configurable. Default: allow the UI origin (same origin when embedded). Lab may set `*`.
@@ -93,3 +95,6 @@ ReadHeader, Read, Write, Idle must be set. Wait endpoint uses a short server-sid
 - Authed list contains a just-sent `Subject`.
 - `/email/{id}` and `/api/email/{id}` return the same body.
 - UI client paths under `/api` succeed without trailing-slash tricks.
+- Relay: 500 MailDev-style error when outgoing is off; 200 JSON `true` and `relay-sink` receives the message when outgoing is configured.
+- Invalid `relayTo` → 400. Unknown id → 404 `{ "error": "Email was not found" }`.
+- Comparison-lab REST cases in [23-behavior-parity-matrix.md](23-behavior-parity-matrix.md) are the live oracle.

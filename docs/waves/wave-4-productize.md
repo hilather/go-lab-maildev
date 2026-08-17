@@ -6,7 +6,7 @@ Parallel: W4-DEP, W4-PARITY, W4-OBS, W4-LABDOC
 
 ## W4-DEP — Container and compose
 
-Exclusive: `Dockerfile`, `deploy/**`, `.dockerignore`
+Exclusive: `Dockerfile`, `deploy/compose/**`, `.dockerignore`. Do **not** edit `deploy/parity-lab/**` (wave CMP).
 
 ### Goal
 
@@ -26,11 +26,11 @@ Exclusive: `test/parity/**`, `internal/capabilities` test helpers if needed
 
 ### Goal
 
-`make test-parity`: registry completeness + for each PARITY_REQUIRED mutating/read tool, REST and MCP agree on domain JSON/bytes.
+`go test ./test/parity/...` in-process REST vs MCP. **Live MailDev comparison** is wave CMP (`test/parity-lab`), not this package.
 
 ### Required tests
 
-- [ ] List, get (read flag), delete, delete all, search, html, attachment, reset, wait (short timeout)
+- [ ] List, get (read flag), delete, delete all, search, html, attachment, reset, wait, **relay**
 - [ ] Fails CI if a new registry row lacks a fixture (or an explicit skip with reason in ADR)
 
 ---

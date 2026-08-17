@@ -2,7 +2,7 @@
 
 Status: Proposed normative
 Last reviewed: 2026-08-17
-Related ADRs: 0008, 0010, 0011
+Related ADRs: 0008, 0010, 0013
 
 ## Two kinds of state
 
@@ -30,6 +30,16 @@ spec:
     maxMessageSize: 52428800
     maxRecipients: 100
     maxConnections: 64
+    outgoing:                    # MailDev relay; default omitted/off
+      host: ""                   # empty = disabled
+      port: 25
+      username: ""
+      passwordFile: ""
+      secure: false
+    autoRelay:
+      enabled: false
+      recipient: ""              # optional override To
+      rulesFile: ""
     auth:
       username: ""          # empty = anonymous
       passwordFile: ""
@@ -66,7 +76,7 @@ spec:
     logMailContents: false  # if true, still redacts AUTH
 ```
 
-Unknown fields: error. Relay-shaped keys (`outgoing`, `autoRelay`, `relay`): error with message that this is a receive-only sink.
+Unknown fields: error. Empty `outgoing.host` means relay disabled (`isOutgoingEnabled: false`).
 
 ## MailDev flag overlay
 
@@ -91,11 +101,12 @@ Accepted (non-exhaustive; wave 1 owns the full table + tests):
 | `-v/--verbose`, `--silent`, `--log-mail-contents` | | log |
 | `--mcp` | | mcp.enabled (LabMail default **true**) |
 | `--config` | | YAML path |
+| `--outgoing-host/port/user/pass` | `MAILDEV_OUTGOING_*` | relay SMTP client |
+| `--outgoing-secure` | | relay TLS |
+| `--auto-relay` | `MAILDEV_AUTO_RELAY` | auto-forward on ingest |
+| `--auto-relay-rules` | | JSON rules file |
 
-Rejected with a clear error (same spirit as mcp-integration-lab `internal/maildev`):
-
-- `--outgoing-host`, `--outgoing-port`, `--outgoing-user`, `--outgoing-pass`, `--outgoing-secure`
-- `--auto-relay`, `--auto-relay-rules`
+mcp-integration-lab **must not** pass the outgoing/auto-relay flags. LabMail **accepts** them for MailDev parity and the comparison lab.
 
 `--web-user` / `--web-pass` remain valid here (the **lab orchestrator** still refuses to put them in profile YAML; it injects env). LabMail itself must accept them for drop-in.
 

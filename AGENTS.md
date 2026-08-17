@@ -8,7 +8,9 @@ These instructions apply to every human or AI agent working in this repository. 
 
 ## 1. Mission
 
-Build **LabMail** (`labmaild`): a Go-native, **receive-only SMTP sink** that is a laboratory-constrained parity rewrite of [MailDev](https://github.com/maildev/maildev). Systems under test send mail here. The sink captures it for inspection through REST, MCP, and an embedded web UI. It **never relays or sends mail outward**.
+Build **LabMail** (`labmaild`): a Go-native **parity rewrite** of [MailDev](https://github.com/maildev/maildev) for laboratory use. Systems under test send mail here. The sink captures it for inspection through REST, MCP, and an embedded web UI.
+
+Default (and mcp-integration-lab) deployment is **receive-only**: outgoing/auto-relay stay unset. The **product** still implements MailDev relay so the [comparison lab](docs/22-comparison-lab.md) can prove REST and UI parity against original MailDev. CI must never point outgoing at a public MTA.
 
 This appliance belongs with:
 
@@ -33,9 +35,11 @@ On conflict, [docs/01-architecture.md](docs/01-architecture.md) and accepted ADR
 
 ## 2. Non-negotiable rules
 
-### 2.1 Receive-only
+### 2.1 Default receive-only; full MailDev features implemented
 
-The process must not open an outbound SMTP client, must not implement working relay or auto-relay, and must reject MailDev `outgoing-*` / `auto-relay*` configuration fail-closed. Captured messages stay in process memory (or a lab tmpfs directory). Restart and `mail_state_reset` wipe them. Do not write captured mail back into the bootstrap YAML.
+Captured messages stay in process memory (or a lab tmpfs directory). Restart and `mail_state_reset` wipe them. Do not write captured mail back into the bootstrap YAML.
+
+Outgoing/auto-relay **must be implemented** (REST, MCP, UI, flags) and proven in the comparison lab ([ADR 0013](docs/adr/0013-full-maildev-parity-and-comparison-lab.md)). Defaults are off. mcp-integration-lab must not enable them. Comparison-lab compose may enable them only with `outgoing-host=relay-sink`. Do not send to the public internet from CI or examples.
 
 ### 2.2 REST and MCP share one application layer
 
@@ -49,6 +53,7 @@ Every behavior change and every defect fix requires automated regression coverag
 
 - A bug fix must begin with or include a test that fails before the fix and passes after it.
 - New SMTP behavior requires protocol-level tests (greeting, MAIL/RCPT/DATA, AUTH, SIZE, hidden extensions, 8BITMIME/SMTPUTF8 as advertised).
+- MailDev-facing REST/UI behavior requires a comparison-lab case ([docs/23-behavior-parity-matrix.md](docs/23-behavior-parity-matrix.md)) once that harness exists.
 - New MIME/HTML behavior requires fixture tests (multipart, attachments, CID, encoding, sanitizer).
 - New REST functionality requires contract tests against OpenAPI.
 - New MCP functionality requires protocol tests and REST/MCP parity tests.
@@ -102,7 +107,7 @@ Record hardening in `docs/ci-failure-hardening/` using [CI-FAILURE-HARDENING-TEM
 - Missing authentication on the management listener is 401 (except documented unauthenticated probes).
 - Missing authorization scope denies the operation.
 - Oversized messages are rejected at SMTP before they are stored.
-- Relay/outbound configuration is rejected at config compile time.
+- Empty outgoing host disables relay. Non-empty outgoing is accepted. Comparison-lab compose may set `outgoing-host` only to `relay-sink`. CI and examples must not use a public MTA.
 - Do not log passwords, bearer tokens, SMTP AUTH secrets, or raw Authorization headers.
 
 ### 2.8 Generated files
@@ -122,9 +127,10 @@ Do not hand-edit generated OpenAPI, JSON Schema, MCP manifests, capability maps,
 |-- internal/
 |   |-- app/            application operations (the only business logic)
 |   |-- model/          canonical mail + config types
-|   |-- config/         YAML, flags, env; reject relay
+|   |-- config/         YAML, flags, env (outgoing optional)
 |   |-- store/          ephemeral inbox
-|   |-- smtpd/          SMTP listener (receive-only)
+|   |-- smtpd/          SMTP listener
+|   |-- relay/          MailDev outgoing / auto-relay client
 |   |-- mime/           parse, CID, attachments
 |   |-- sanitize/       HTML sanitizer adapter
 |   |-- control/rest/   HTTP adapter
@@ -137,8 +143,8 @@ Do not hand-edit generated OpenAPI, JSON Schema, MCP manifests, capability maps,
 |-- api/                OpenAPI, MCP manifest, schemas (generated)
 |-- web/                MailDev 3.0 UI fork (TypeScript/React)
 |-- config/             schema + examples
-|-- deploy/
-|-- test/
+|-- deploy/             product compose + **parity-lab** (MailDev oracles)
+|-- test/               unit plus **test/parity-lab** REST/UI harness
 |-- docs/
 `-- tools/
 ```
@@ -167,6 +173,7 @@ A task is done only when:
 - Public contracts are in typed schemas.
 - Regression and acceptance tests pass.
 - REST/MCP parity checks pass for any control-plane change.
+- Comparison-lab REST and UI cases pass for any MailDev-facing behavior that the [behavior matrix](docs/23-behavior-parity-matrix.md) covers (oracle-only until the LabMail image exists).
 - Secret-redaction tests pass for any auth or logging change.
 - Documentation is current.
 - `CHANGELOG.md` `[Unreleased]` mentions user-visible changes.
@@ -187,6 +194,8 @@ make test-race
 make test-fuzz-smoke
 make test-integration
 make test-parity
+make test-parity-lab
+make test-parity-lab-oracle
 make test-config-compat
 make test-docs
 make test-container

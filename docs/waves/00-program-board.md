@@ -10,17 +10,18 @@ Implementation has **not** started. Agents pick tasks from wave files. Do not st
 | Wave | File | Goal | Parallelism | Status |
 | ---: | --- | --- | --- | --- |
 | 0 | [wave-0-contracts.md](wave-0-contracts.md) | Evaluation, architecture, ADRs, parity, agent rules | Single pack | **this PR** |
+| CMP | [wave-cmp-comparison-lab.md](wave-cmp-comparison-lab.md) | MailDev v2+v3+LabMail Docker lab; REST+UI matrix | **4 lanes**; start with oracles before LabMail | not-started |
 | 1 | [wave-1-foundation.md](wave-1-foundation.md) | Module, Make/CI, schema, errors, empty registry | Mostly serial, then 4 lanes | not-started |
-| 2 | [wave-2-ingest.md](wave-2-ingest.md) | SMTP, MIME, sanitizer, store | **4 parallel lanes** after W1-CFG interfaces | not-started |
-| 3 | [wave-3-control-plane.md](wave-3-control-plane.md) | App, REST, MCP, WS, UI | App first, then **4 parallel adapters** | not-started |
-| 4 | [wave-4-productize.md](wave-4-productize.md) | Image, compose, parity suite, lab cutover docs | **4 parallel lanes** | not-started |
+| 2 | [wave-2-ingest.md](wave-2-ingest.md) | SMTP, MIME, sanitizer, store, relay client | **5 parallel lanes** after W1-CFG interfaces | not-started |
+| 3 | [wave-3-control-plane.md](wave-3-control-plane.md) | App, REST, MCP, WS, UI (Relay kept) | App first, then **4 parallel adapters** | not-started |
+| 4 | [wave-4-productize.md](wave-4-productize.md) | Image, compose, in-process parity, lab cutover docs | **4 parallel lanes** | not-started |
 | 5 | [wave-5-ga.md](wave-5-ga.md) | Interop, release automation, hardening | Mix; GA integrator serial | not-started |
 
 ## Milestones
 
 ### M0 — Contracts exist
 
-Wave 0 merged. Agents have frozen capability names, receive-only rule, dual REST prefix, MCP pin.
+Wave 0 merged. Agents have frozen capability names, dual REST prefix, MCP pin, **full MailDev feature set** (including relay), and the comparison-lab contract.
 
 ### M1 — Module compiles and CI is fail-closed
 
@@ -40,7 +41,7 @@ Wave 4: distroless image, compose, healthcheck, MAILDEV_ARGS mode, documented la
 
 ### M5 — GA candidate
 
-Wave 5: interop clients, changelog/release-diff, acceptance evidence, green tag-gate.
+Wave 5: interop clients, changelog/release-diff, **comparison lab green**, acceptance evidence, green tag-gate.
 
 ## Cross-cutting freeze (do not bikeshed in later waves)
 
@@ -49,7 +50,7 @@ Owned by wave 0/1. Changing these requires an ADR and a board update:
 - Product/binary/MCP names
 - Capability IDs and `mail_*` tool names
 - Dual REST prefixes
-- Receive-only
+- Outgoing **implemented**, default off; comparison lab `relay-sink` only
 - MCP 2026-07-28 + legacy knob
 - Email JSON field names
 - Inbox-full = 452 (no silent eviction)

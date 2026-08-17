@@ -20,21 +20,22 @@ A GA candidate (`v1.0.0` or `v1.0.0-rc.1`) requires all of the following, with t
 - [ ] GET by id marks read on REST **and** MCP.
 - [ ] Dotted filters and skip pagination match documented semantics.
 - [ ] HTML sanitizer strips `script`; CID images resolve.
-- [ ] Config JSON has `isOutgoingEnabled: false`.
+- [ ] Config JSON `isOutgoingEnabled` false by default; true in comparison-lab `relay` profile.
 
 ## Control plane
 
 - [ ] Capability registry has no `PARITY_REQUIRED` holes.
 - [ ] `make test-parity` passes.
-- [ ] MCP `tools/list` + search/get/delete/delete_all/html/source/attachment/reset/wait.
+- [ ] MCP `tools/list` includes `mail_email_relay`.
 - [ ] Bearer and basic both work on REST and MCP.
-- [ ] Relay flags refuse process start.
+- [ ] Comparison lab `make test-parity-lab` green (REST + UI vs MailDev v2 and v3).
+- [ ] Every `req` cell in [23-behavior-parity-matrix.md](23-behavior-parity-matrix.md) is `pass` (including relay Y* and process flags P*).
 
 ## UI
 
 - [ ] Embedded SPA lists mail and live-updates on `/ws`.
-- [ ] No Relay control visible.
-- [ ] Playwright (or equivalent) paths green.
+- [ ] Relay control visible iff outgoing enabled; comparison-lab UI relay case passes.
+- [ ] Playwright (or equivalent) paths green, including side-by-side oracle UIs.
 
 ## Lab
 

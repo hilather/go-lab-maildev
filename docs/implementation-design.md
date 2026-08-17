@@ -8,7 +8,7 @@ Depends on: [01-architecture.md](01-architecture.md), ADRs 0001–0012
 
 `cmd/labmaild` constructs:
 
-1. `config.Load` → validated `model.Config` (relay keys already impossible).
+1. `config.Load` → validated `model.Config` (outgoing optional; empty host disables relay).
 2. `store.New` (memory; optional directory backend implementing the same interface).
 3. `smtpd.Server` with `OnMessage` → `app.Ingest`.
 4. HTTP server mux:
@@ -87,6 +87,7 @@ See the frozen table in [05-control-plane-and-parity.md](05-control-plane-and-pa
 - Email delete / bulk delete / delete all.
 - Mark all read.
 - HTML / source / download / attachment.
+- Relay (when outgoing configured); auto-relay on ingest.
 - Inbox stats / reset.
 - Reload from directory (no-op success on memory backend).
 
@@ -130,9 +131,9 @@ Do not format-only the way MailDev 3 does.
 Delta from upstream MailDev UI (must stay documented in [13-frontend.md](13-frontend.md)):
 
 1. Replace Socket.IO client with `WebSocket` to `/ws`.
-2. Remove Relay commands and buttons.
+2. **Keep Relay** commands and buttons; show them when `config.isOutgoingEnabled` (MailDev 3).
 3. Keep `/api` client paths (server aliases `/email`).
-4. Hide `isOutgoingEnabled` in settings if present.
+4. Surface `isOutgoingEnabled` / `outgoingHost` as MailDev does.
 
 ## CLI
 
@@ -153,6 +154,7 @@ MailDev binary name `maildev` is **not** required; compose `command:` will use `
 - REST/MCP: `httptest` + SDK client against one `app`.
 - Parity: same command → compare REST JSON and MCP structured content.
 - Container: compose smoke SMTP + `/email` + `/mcp` tools/list.
+- Comparison lab: live MailDev v2/v3 vs LabMail REST + UI ([22-comparison-lab.md](22-comparison-lab.md)).
 
 ## Dependency budget (initial)
 
@@ -160,7 +162,8 @@ Allowed with justification in the PR that adds them:
 
 | Library | Use |
 | --- | --- |
-| `github.com/emersion/go-smtp` | SMTP server |
+| `github.com/emersion/go-smtp` | SMTP server **and** optional client for MailDev relay |
+| `github.com/emersion/go-sasl` | SMTP AUTH (server and relay client) |
 | `github.com/emersion/go-message` | MIME |
 | `github.com/modelcontextprotocol/go-sdk` | MCP |
 | `gopkg.in/yaml.v3` | Config |
@@ -168,4 +171,4 @@ Allowed with justification in the PR that adds them:
 | `golang.org/x/crypto` | if needed for TLS helpers |
 | `golang.org/x/sync` | errgroup |
 
-Reject: Node embed, Socket.IO Go ports unless ADR 0012 is reversed, outbound SMTP clients (`go-sasl` for **server AUTH** is OK).
+Reject: Node embed, Socket.IO Go ports unless ADR 0012 is reversed. Outbound SMTP is allowed **only** in `internal/relay` for configured outgoing/auto-relay.

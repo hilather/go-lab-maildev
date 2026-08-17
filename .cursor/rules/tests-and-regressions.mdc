@@ -13,7 +13,8 @@ Every area must have regression tests. A change is incomplete without them.
 - SMTP: greeting, MAIL/RCPT/DATA, AUTH, SIZE, hidden extensions, limits.
 - MIME: fixtures for multipart, encodings, attachments, CID, malformed input.
 - REST: OpenAPI contract tests. MCP: protocol tests plus REST/MCP parity tests.
-- Config: valid, invalid, unknown fields, env/flag overlay, MailDev-flag rejection of relay.
+- Config: valid, invalid, unknown fields, env/flag overlay, MailDev outgoing flags (default off).
+- Comparison lab: REST + UI vs live MailDev when touching ingest, REST, UI, or relay.
 - UI operator paths: Playwright (or equivalent), not screenshot-only.
 - Do not delete or weaken a test to make CI pass unless it is provably wrong; document why.
 - Do not mark a task complete on manual testing alone.

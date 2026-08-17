@@ -16,7 +16,7 @@ Last reviewed: 2026-08-17
 | RFC 3207 | STARTTLS |
 | RFC 4954 | AUTH |
 
-We are not an RFC 5321 **relay**. MUST NOT become one.
+We are not a public RFC 5321 **open relay**. Optional MailDev-style relay sends only to the configured outgoing host (comparison lab: `relay-sink`).
 
 ## MCP
 

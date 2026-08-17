@@ -40,7 +40,8 @@ TODO: three to eight sentences an operator or lab integrator can act on.
 
 ## UI
 
-- TODO: vendored MailDev 3 delta, WebSocket events, relay controls (must remain absent).
+- TODO: vendored MailDev 3 delta, WebSocket events, relay controls (visible iff outgoing enabled).
+- TODO: comparison-lab REST/UI results vs MailDev 2.2.1 and 3.0.
 
 ## Configuration and CLI
 

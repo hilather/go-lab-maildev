@@ -9,11 +9,12 @@ Land changes with an entry under `[Unreleased]`. Cutting a release promotes that
 ### Added
 
 - Architecture, evaluation, parity plan, ADRs, and wave task lists for the LabMail Go rewrite (`docs/`).
+- Side-by-side Docker comparison lab design: original MailDev 2.2.1 + 3.0 vs LabMail, REST and UI behavior matrix, compose overlays for relay/auth/TLS/base-path (`docs/22-comparison-lab.md`, `docs/23-behavior-parity-matrix.md`, wave CMP).
 - Mandatory agent instructions: regression tests, documentation-in-the-same-change, complete between-version release notes, and CI watch/hardening after PRs and PR chains (`AGENTS.md`, `.cursor/rules/`).
 
 ### Changed
 
-- None.
+- Full MailDev process parity (including relay/auto-relay) is in-scope; mcp-integration-lab deploy remains outgoing-off. ADR 0002/0011 superseded by ADR 0013.
 
 ### Fixed
 

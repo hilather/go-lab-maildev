@@ -1,6 +1,6 @@
 # Contributing
 
-This is laboratory software: a receive-only SMTP sink with REST, MCP, and an embedded UI. Runtime captured mail is ephemeral. Desired listen/auth/limits live in YAML (with MailDev-compatible flags for lab cutover).
+This is laboratory software: a MailDev-compatible SMTP sink with REST, MCP, and an embedded UI. Default deploy is receive-only. Runtime captured mail is ephemeral. Desired listen/auth/limits live in YAML (with MailDev-compatible flags for lab cutover).
 
 ## Before you open a PR
 
@@ -17,7 +17,7 @@ Until `make ci` exists, run the equivalent format, lint, test, and docs checks t
 - Every behavior change ships with regression tests.
 - Documentation and `CHANGELOG.md` `[Unreleased]` are updated in the same change.
 - REST and MCP stay at parity for public control capabilities.
-- The sink never sends mail. Relay/outbound configuration is rejected.
+- Outgoing/auto-relay is implemented and default-off. Comparison-lab relay may target only `relay-sink`. Do not send to a public MTA from CI or examples.
 - After push, watch CI until green. Fix root causes and harden; do not retry flakes away.
 
 ## Where things belong
@@ -31,6 +31,7 @@ Until `make ci` exists, run the equivalent format, lint, test, and docs checks t
 | Config schema / examples | `config/` |
 | Normative design | `docs/` and `docs/adr/` |
 | Implementation tasks | `docs/waves/` |
+| Comparison lab compose / harness | `deploy/parity-lab/`, `test/parity-lab/` |
 
 ## Releases
 

@@ -1,41 +1,24 @@
 # ADR 0002: Receive-only sink
 
-Status: Accepted
+Status: **Superseded** by [ADR 0013](0013-full-maildev-parity-and-comparison-lab.md)
 Date: 2026-08-17
+Superseded: 2026-08-17
 
 ## Context
 
-MailDev can relay and auto-relay. mcp-integration-lab forbids that: the mail service exists so systems under test have somewhere to send mail, not so the lab can emit mail to the internet or other tenants.
+MailDev can relay and auto-relay. mcp-integration-lab forbids *enabling* that: the shared lab’s mail service exists so systems under test have somewhere to send mail, not so the lab emits mail to the internet.
 
-## Decision
+## Original decision
 
-LabMail has no outbound SMTP client. Configuration keys and MailDev flags that would enable relay fail closed at compile/startup. Application, REST, MCP, and UI expose no send operation.
+LabMail has no outbound SMTP client. Relay flags fail closed. REST/MCP/UI expose no send operation.
 
-## Alternatives considered
+## Why superseded
 
-- Implement relay behind an explicit enable flag — rejected: too easy to turn on in a shared lab.
-- Stub relay endpoints that 501 — rejected: looks like a feature; 404 and omit from OpenAPI.
+Full MailDev functional parity (REST + UI comparison lab) requires implementing outgoing/auto-relay. The integration-lab constraint remains a **deployment** default (outgoing off; orchestrator still rejects those flags). See ADR 0013.
 
-## Consequences
+## Residual (still true)
 
-Not a MailDev substitute for developers who rely on the Relay button. Perfect for the lab.
-
-## Compatibility impact
-
-Relay REST/UI/CLI are non-goals. Config always reports `isOutgoingEnabled: false`.
-
-## Migration
-
-None; lab already rejected those flags.
-
-## Test impact
-
-Config tests for every relay flag/key. Architectural test: no `net/smtp.SendMail` / client send in production packages.
-
-## Documentation impact
-
-AGENTS.md, parity plan, security, known limitations.
-
-## Review triggers
-
-A product requirement to send mail (would need a new ADR and likely a different binary).
+- Default config: outgoing disabled.
+- mcp-integration-lab must not pass `outgoing-*` / `auto-relay*`.
+- Comparison lab may enable relay only to `relay-sink`.
+- Captured mail stays ephemeral; YAML is not a mailbox.

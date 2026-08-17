@@ -47,6 +47,10 @@ environment:
   MAILDEV_WEB_PASS: ${MAILDEV_WEB_PASS}
 ```
 
+## Comparison lab (this repo)
+
+Side-by-side MailDev oracles live in `deploy/parity-lab/` ([22-comparison-lab.md](22-comparison-lab.md)). That compose is **not** the mcp-integration-lab cutover file. Product examples keep outgoing off. Parity-lab `relay` / `autorelay` profiles may set `outgoing-host=relay-sink` only.
+
 ## Kubernetes
 
 A later example: two Service ports, Secret for passwords, read-only root, drop caps. Not GA-blocking.

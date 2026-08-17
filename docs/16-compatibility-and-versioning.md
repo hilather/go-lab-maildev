@@ -8,10 +8,10 @@ Last reviewed: 2026-08-17
 | Client | Promise |
 | --- | --- |
 | mcp-integration-lab smoke (2.2.1 paths) | `GET /email` array, basic auth, SMTP 1025 |
-| MailDev 3 UI fork | `/api/*` routes it already calls, minus relay |
+| MailDev 3 UI fork | `/api/*` routes it already calls, including relay when enabled |
 | MailDev 3 MCP tool names | **Not** kept; we use `mail_*`. Document mapping in release notes |
 | Node `require('maildev')` | No |
-| Relay REST | No (404) |
+| Relay REST | Yes: `POST /email/:id/relay/:relayTo?` (+ `/api`). Default outgoing off (MailDev-style 500). Comparison lab proves it against `relay-sink`. |
 
 ## Breaking vs compatible
 

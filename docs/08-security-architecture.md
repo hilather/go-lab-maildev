@@ -2,7 +2,7 @@
 
 Status: Proposed normative
 Last reviewed: 2026-08-17
-Related ADRs: 0002, 0007, 0011
+Related ADRs: 0007, 0013
 
 ## Trust boundaries
 
@@ -43,7 +43,11 @@ Never log: basic password, bearer token, SMTP AUTH password, `Authorization` hea
 
 ## Process hardening
 
-Non-root, read-only rootfs, `cap_drop: ALL`, `no-new-privileges`, no Docker socket, no outbound SMTP. Optional HTTP/SMTP TLS with operator-provided certs.
+Non-root, read-only rootfs, `cap_drop: ALL`, `no-new-privileges`, no Docker socket. Outbound SMTP only when outgoing is configured (comparison lab: `relay-sink`). Optional HTTP/SMTP TLS with operator-provided certs.
+
+## Outgoing / relay
+
+Default off. When enabled, LabMail is a **configured** forwarder to one host, not an open relay (still accepts any inbound RCPT, but outbound only to `outgoing.host`). Comparison lab must use `relay-sink`. mcp-integration-lab must not set outgoing. Log relay targets (host:port), never passwords.
 
 ## Abuse
 

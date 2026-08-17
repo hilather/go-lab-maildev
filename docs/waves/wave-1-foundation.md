@@ -74,13 +74,13 @@ Exclusive: `internal/capabilities/**`
 
 ### Goal
 
-Frozen table from [05-control-plane-and-parity.md](../05-control-plane-and-parity.md) as data. Completeness tests: every `PARITY_REQUIRED` row has REST and MCP name fields filled (adapters may still be missing). Fail if `email.relay` exists.
+Frozen table from [05-control-plane-and-parity.md](../05-control-plane-and-parity.md) as data. Completeness tests: every `PARITY_REQUIRED` row has REST and MCP name fields filled. Fail if `email.relay` is **missing**.
 
 ### Required tests
 
-- [ ] `TestNoRelayCapability`
 - [ ] `TestParityRequiredHasBothBindings`
 - [ ] `TestToolNamesMailPrefix`
+- [ ] `TestRelayCapabilityPresent`
 
 ---
 
@@ -91,14 +91,15 @@ Exclusive: `internal/config/**`, `config/schema/**`, `config/examples/**`
 
 ### Goal
 
-Load YAML, env, flags. Reject unknown fields. Reject all relay flags/keys with a message containing `receive-only`. Defaults: SMTP 1025, HTTP 1080, max 50MiB, mcp enabled, allowLegacyClients true in example lab YAML.
+Load YAML, env, flags. Reject unknown fields. **Accept** MailDev outgoing/auto-relay flags (default off). Defaults: SMTP 1025, HTTP 1080, max 50MiB, mcp enabled, allowLegacyClients true in example lab YAML. Lab example YAML omits outgoing.
 
 ### Required tests
 
-- [ ] Each rejected flag (`outgoing-host`, `auto-relay`, …)
+- [ ] All MailDev 2.2.1 flags in [04-state-and-configuration.md](../04-state-and-configuration.md) parse (including outgoing, https, disable-web, base-pathname)
 - [ ] `MAILDEV_SMTP_PORT` overlay
+- [ ] Auto-relay rules file path accepted
 - [ ] Unknown YAML field errors
-- [ ] Example `config/examples/lab.yaml` validates
+- [ ] Example `config/examples/lab.yaml` validates **without** outgoing
 
 ### Docs
 

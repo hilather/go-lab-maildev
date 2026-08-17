@@ -1,6 +1,6 @@
 # ADR 0005: Vendor MailDev 3.0 React UI
 
-Status: Accepted
+Status: Accepted (Relay **kept**; Socket.IO still replaced — [ADR 0013](0013-full-maildev-parity-and-comparison-lab.md) amends the original “remove Relay” delta)
 Date: 2026-08-17
 
 ## Context
@@ -9,7 +9,7 @@ The user allowed keeping MailDev’s frontend. 2.x is AngularJS. 3.0 is a modern
 
 ## Decision
 
-Vendor MailDev 3 UI under `web/`, Apache-2.0 project with MIT attribution, embed the production build in `labmaild`. Required deltas: native WebSocket, remove Relay (ADR 0012, 0011).
+Vendor MailDev 3 UI under `web/`, Apache-2.0 project with MIT attribution, embed the production build in `labmaild`. Required deltas: native WebSocket instead of Socket.IO ([ADR 0012](0012-native-websocket-not-socketio.md)); **keep Relay**, shown when `config.isOutgoingEnabled` ([ADR 0013](0013-full-maildev-parity-and-comparison-lab.md) amends the earlier “remove Relay” intent from superseded ADR 0011).
 
 ## Alternatives considered
 
@@ -31,7 +31,7 @@ Ship SPA in the image.
 
 ## Test impact
 
-Playwright workflows; license/NOTICE check.
+Playwright workflows (product UI + comparison-lab oracle UIs); license/NOTICE check.
 
 ## Documentation impact
 

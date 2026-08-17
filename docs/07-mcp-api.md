@@ -3,7 +3,7 @@
 Status: Proposed normative
 Last reviewed: 2026-08-17
 Target protocol: **2026-07-28**
-Related ADRs: 0003, 0006
+Related ADRs: 0003, 0006, 0013
 
 ## Transport
 
@@ -53,6 +53,17 @@ Search default `limit` 20 (MailDev 3). List tool may return summaries without fu
 
 Bounded; cancellable via context. For agents that just sent SMTP from another tool.
 
+### `mail_email_relay`
+
+```json
+{
+  "id": "abcd1234",
+  "relayTo": "optional@override.test"
+}
+```
+
+`relayTo` omitted ⇒ original envelope recipients (MailDev `POST /email/:id/relay`). Present ⇒ MailDev `POST /email/:id/relay/:relayTo`. Outgoing off ⇒ `failed_precondition` (same domain error as REST). Comparison lab is the behavioral oracle; MailDev 3 MCP does **not** expose relay.
+
 ## Resources
 
 | URI | Body |
@@ -86,7 +97,7 @@ Example server JSON for the lab profile:
 {
   "name": "labmail",
   "transport": "streamable_http",
-  "description": "Receive-only SMTP sink: inspect and delete captured mail. Never relays.",
+  "description": "SMTP sink with MailDev-compatible REST/UI. Inspect, delete, and optionally relay captured mail to a configured outgoing host.",
   "url": "http://labmail:1080/mcp",
   "bearer_token": "${LABMAIL_TOKEN}"
 }
@@ -96,9 +107,9 @@ Compose service name may remain `maildev` during cutover; hostname in the JSON m
 
 ## Explicitly not provided
 
-- Tools that send or relay mail.
-- A generic `http.request` or SMTP client tool.
+- A generic `http.request` tool.
 - Proxying to REST.
+- Outgoing to arbitrary internet hosts in CI (comparison lab: `relay-sink` only).
 
 ## Tests
 

@@ -3,18 +3,19 @@
 Status: Proposed normative
 Owners: Architecture, SMTP, Control plane
 Last reviewed: 2026-08-17
-Related ADRs: 0001–0012
+Related ADRs: 0001–0013
 
 ## Problem statement
 
-mcp-integration-lab needs a receive-only SMTP sink that systems under test can send to, that agents can inspect through the same MCP gateway as DNS/LDAP/TACACS, and that operators can open in a browser. Off-the-shelf MailDev 2.2.1 covers SMTP + REST + UI but has no MCP, is a Node image, and its relay flags have to be externally banned. MailDev 3.0 adds a partial MCP surface that still is not REST-complete and still can send mail.
+mcp-integration-lab needs an SMTP sink that systems under test can send to, that agents can inspect through the same MCP gateway as DNS/LDAP/TACACS, and that operators can open in a browser. Off-the-shelf MailDev 2.2.1 covers SMTP + REST + UI but has no MCP and is a Node image. MailDev 3.0 adds a partial MCP surface.
 
-LabMail is a single Go process that keeps the MailDev inspection experience (including the 3.0 UI) while matching sibling lab appliances: YAML desired state, ephemeral runtime, REST/MCP parity, bearer-friendly MCP, unprivileged containers.
+LabMail is a Go **parity rewrite of MailDev’s process features** (ingest, store, REST, UI, optional outgoing/auto-relay), plus lab extras (YAML, full REST/MCP, bearer). mcp-integration-lab **deploys** it with outgoing off. A [comparison lab](22-comparison-lab.md) runs original MailDev beside LabMail and checks REST and UI behavior.
 
 ## Goals
 
 - Accept SMTP from real clients used in integration tests (Go `net/smtp`, Python `smtplib`, Nodemailer, JavaMail, swaks).
-- Never send or relay mail.
+- Match MailDev 2.2.1 and 3.0 process behavior (REST + UI) in the comparison lab, including optional relay to a configured host.
+- Default outgoing **off**. mcp-integration-lab must not enable it. Comparison lab may enable it only toward `relay-sink`.
 - Expose every public REST control capability on MCP (and the reverse, except documented protocol-only rows).
 - Serve the MailDev 3 UI from the same management listener.
 - Drop-in for lab ports 1025/1080, basic auth, and `GET /email`.
@@ -23,7 +24,7 @@ LabMail is a single Go process that keeps the MailDev inspection experience (inc
 
 ## Non-goals
 
-- Outbound SMTP, smarthost, DKIM/SPF signing, greylisting, queues.
+- Being an open relay or a general MTA (no queue, no MX, no public smarthost in CI).
 - IMAP, POP3, JMAP, milter.
 - Multi-replica shared inbox.
 - Node embedding API.
@@ -32,15 +33,14 @@ LabMail is a single Go process that keeps the MailDev inspection experience (inc
 ## Invariants
 
 1. SMTP ingest does not depend on REST or MCP availability.
-2. No code path opens a client connection to deliver mail.
+2. Outgoing SMTP is used only when configured; comparison-lab compose may point only at `relay-sink`. Default is off.
 3. REST, MCP, WebSocket, and UI call `internal/app` only.
 4. Captured mail is not written to bootstrap YAML.
 5. Unknown configuration fields are errors.
-6. Relay/outbound keys and MailDev relay flags fail closed at config compile.
-7. Management auth is required except documented probes (`/healthz`, `/v1/health/*`).
-8. HTML preview is sanitized before it is stored for UI/HTML routes.
-9. Message size and store cardinality are bounded.
-10. Dual REST prefixes are aliases, not two implementations.
+6. Management auth is required except documented probes (`/healthz`, `/v1/health/*`) and comparison-lab `--insecure-no-auth`.
+7. HTML preview is sanitized before it is stored for UI/HTML routes.
+8. Message size and store cardinality are bounded.
+9. Dual REST prefixes are aliases, not two implementations.
 
 ## Context diagram
 
@@ -85,9 +85,10 @@ No writable persistent volume required. Optional mail-directory is a tmpfs or ex
 cmd/labmaild                 process + cobra/flag wiring
 internal/model               Email, Attachment, Envelope, Config (canonical)
 internal/app                 operations used by all adapters
-internal/config              YAML + MailDev flags + env; reject relay
+internal/config              YAML + MailDev flags + env (outgoing optional)
 internal/store               bounded in-memory inbox (+ optional dir)
 internal/smtpd               go-smtp adapter; no app/REST imports
+internal/relay               outbound SMTP client (MailDev relay/auto-relay)
 internal/mime                parse RFC 5322, decode, split parts
 internal/sanitize            HTML policy adapter (bluemonday or equivalent)
 internal/control/rest        HTTP routes, dual prefix
@@ -103,7 +104,8 @@ internal/observability       slog, metrics, health
 Forbidden imports:
 
 - `control/*` ← must not import each other.
-- `smtpd` ← must not import `control`, `web`, or MCP.
+- `smtpd` ← must not import `control`, `web`, or MCP. May call `relay` only through an interface owned by `app`.
+- `relay` ← must not import `control` or `web`. Only used when outgoing is configured.
 - `capabilities` ← must not import `app`.
 - `store` ← must not import HTTP or MCP.
 
@@ -115,7 +117,8 @@ Forbidden imports:
 4. MIME parse → domain `Email` + attachment blobs.
 5. HTML sanitized; CID map recorded.
 6. Store assign 8-char id, `time=now`, `read=false`.
-7. Emit `MailReceived` to WS subscribers and audit/metrics.
+7. If auto-relay is enabled and the message matches rules, `internal/relay` submits the stored raw message to `outgoing.host` (comparison lab: `relay-sink`). SMTP ingest still succeeded even if relay later fails (match MailDev: characterize the exact error/log behavior in the comparison lab).
+8. Emit `MailReceived` to WS subscribers and audit/metrics.
 
 SMTP success is independent of whether anyone is watching REST/MCP/UI.
 

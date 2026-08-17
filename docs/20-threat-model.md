@@ -23,7 +23,7 @@ Last reviewed: 2026-08-17
 
 | Threat | Mitigation |
 | --- | --- |
-| LabMail used as an open relay | No outbound client; config reject; tests |
+| LabMail used as an open relay | Outgoing off by default; comparison lab isolated to `relay-sink`; integration lab orchestrator rejects flags |
 | XSS via email HTML | Sanitizer + CSP + iframe sandbox in UI |
 | Credential theft via logs | Redaction tests |
 | Inbox DoS | Size and cardinality limits |

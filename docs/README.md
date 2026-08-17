@@ -9,8 +9,8 @@ Status: **design pack for the Go rewrite**. There is no `labmaild` implementatio
 ## How to use this pack
 
 1. Read [00-evaluation.md](00-evaluation.md) to see what MailDev 2.2.1 (lab image) and MailDev 3.0 (upstream main) actually provide.
-2. Read [01-architecture.md](01-architecture.md) and [parity-plan.md](parity-plan.md) for the LabMail target.
-3. Pick a wave from [waves/00-program-board.md](waves/00-program-board.md). Parallel lanes are in [waves/parallelization-plan.md](waves/parallelization-plan.md).
+2. Read [01-architecture.md](01-architecture.md), [parity-plan.md](parity-plan.md), and the [comparison lab](22-comparison-lab.md) / [behavior matrix](23-behavior-parity-matrix.md).
+3. Pick a wave from [waves/00-program-board.md](waves/00-program-board.md). Parallel lanes are in [waves/parallelization-plan.md](waves/parallelization-plan.md). Wave CMP (MailDev side-by-side) can start as soon as the oracle compose exists.
 4. Implement against exclusive file ownership in the wave file. Do not weaken [AGENTS.md](../AGENTS.md).
 
 ## Root
@@ -33,7 +33,9 @@ Status: **design pack for the Go rewrite**. There is no `labmaild` implementatio
 | [00-evaluation.md](00-evaluation.md) | MailDev 2.2.1 / 3.0 evaluation |
 | [01-architecture.md](01-architecture.md) | System model, packages, flows |
 | [implementation-design.md](implementation-design.md) | Implementation design |
-| [parity-plan.md](parity-plan.md) | MailDev + lab + REST/MCP parity |
+| [parity-plan.md](parity-plan.md) | MailDev + lab + REST/MCP + comparison lab |
+| [22-comparison-lab.md](22-comparison-lab.md) | Docker lab: MailDev v2/v3 + LabMail |
+| [23-behavior-parity-matrix.md](23-behavior-parity-matrix.md) | REST + UI cases that define “ported” |
 | [02-smtp-semantics.md](02-smtp-semantics.md) | SMTP ingest contract |
 | [03-mail-model.md](03-mail-model.md) | Captured-mail domain types |
 | [04-state-and-configuration.md](04-state-and-configuration.md) | YAML, flags, env, ephemeral store |
@@ -71,7 +73,7 @@ Status: **design pack for the Go rewrite**. There is no `labmaild` implementatio
 | ADR | Decision |
 | --- | --- |
 | [0001](adr/0001-use-go.md) | Use Go |
-| [0002](adr/0002-receive-only-sink.md) | Receive-only; no outbound SMTP |
+| [0002](adr/0002-receive-only-sink.md) | Receive-only default *(superseded product ban: [0013](adr/0013-full-maildev-parity-and-comparison-lab.md))* |
 | [0003](adr/0003-shared-capability-registry.md) | Shared capability registry |
 | [0004](adr/0004-dual-rest-prefix.md) | Dual REST prefix (`/email` and `/api/email`) |
 | [0005](adr/0005-vendor-maildev-3-ui.md) | Vendor MailDev 3.0 React UI |
@@ -80,8 +82,9 @@ Status: **design pack for the Go rewrite**. There is no `labmaild` implementatio
 | [0008](adr/0008-ephemeral-captured-mail.md) | Ephemeral inbox |
 | [0009](adr/0009-native-go-smtp.md) | Native Go SMTP + MIME adapters |
 | [0010](adr/0010-yaml-plus-maildev-flags.md) | YAML primary, MailDev flags overlay |
-| [0011](adr/0011-omit-outbound-relay.md) | Omit relay from REST, MCP, and UI |
+| [0011](adr/0011-omit-outbound-relay.md) | Omit relay *(superseded by [0013](adr/0013-full-maildev-parity-and-comparison-lab.md))* |
 | [0012](adr/0012-native-websocket-not-socketio.md) | Native WebSocket instead of Socket.IO |
+| [0013](adr/0013-full-maildev-parity-and-comparison-lab.md) | Full MailDev parity + comparison lab |
 
 ## Waves (agent work)
 
@@ -94,7 +97,8 @@ Status: **design pack for the Go rewrite**. There is no `labmaild` implementatio
 | [waves/wave-1-foundation.md](waves/wave-1-foundation.md) | Module, CI, schema, registry |
 | [waves/wave-2-ingest.md](waves/wave-2-ingest.md) | SMTP, MIME, store |
 | [waves/wave-3-control-plane.md](waves/wave-3-control-plane.md) | App, REST, MCP, WS, UI |
-| [waves/wave-4-productize.md](waves/wave-4-productize.md) | Image, lab cutover, parity suite |
+| [waves/wave-4-productize.md](waves/wave-4-productize.md) | Image, lab cutover, in-process parity suite |
+| [waves/wave-cmp-comparison-lab.md](waves/wave-cmp-comparison-lab.md) | Side-by-side MailDev Docker lab (REST + UI) |
 | [waves/wave-5-ga.md](waves/wave-5-ga.md) | Interop, release, hardening |
 
 ## Releases and hardening

@@ -2,7 +2,7 @@
 
 Status: not-started
 Dependencies: wave 1 (`model`, `config`, `Inbox` interface)
-Parallel lanes: W2-STORE, W2-MIME, W2-SAN, W2-SMTP (see [parallelization-plan.md](parallelization-plan.md))
+Parallel lanes: W2-STORE, W2-MIME, W2-SAN, W2-SMTP, W2-RELAY
 
 Read: [02-smtp-semantics.md](../02-smtp-semantics.md), [03-mail-model.md](../03-mail-model.md), [ADR 0008](../adr/0008-ephemeral-captured-mail.md), [ADR 0009](../adr/0009-native-go-smtp.md)
 
@@ -90,7 +90,25 @@ Exclusive: `internal/smtpd/**`
 - [ ] SIZE exceed → 552, store unchanged
 - [ ] Inbox full → 452
 - [ ] hide-extensions STARTTLS: not in EHLO
-- [ ] Production packages do not import `net/smtp` SendMail (test in smtpd or tools)
+- [ ] Production `internal/smtpd` does not send mail (relay is `internal/relay`)
+
+---
+
+## W2-RELAY — MailDev outgoing client
+
+Exclusive: `internal/relay/**`
+
+### Goal
+
+SMTP client: submit a stored raw message to `outgoing.host:port` with optional AUTH/TLS. Auto-relay rules (allow/deny wildcards, default recipient) as MailDev. No-op interface when host empty. Tests use a local `smtpd` sink or net.Pipe fake.
+
+### Required tests
+
+- [ ] Deliver to test sink; bytes contain original subject
+- [ ] `relayTo` override changes RCPT
+- [ ] Auto-relay allow/deny fixtures
+- [ ] Disabled outgoing returns error used by REST 500
+- [ ] Secrets not logged
 
 ---
 

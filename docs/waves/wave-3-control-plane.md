@@ -4,7 +4,7 @@ Status: not-started
 Dependencies: wave 2 ingest integration green
 Serial gate: **W3-APP** then parallel W3-REST, W3-MCP, W3-WS, W3-UI; W3-AUTH parallel with APP; **W3-WIRE** last
 
-Read: [05-control-plane-and-parity.md](../05-control-plane-and-parity.md), [06-rest-api.md](../06-rest-api.md), [07-mcp-api.md](../07-mcp-api.md), [13-frontend.md](../13-frontend.md), ADRs 0003–0007, 0012
+Read: [05-control-plane-and-parity.md](../05-control-plane-and-parity.md), [06-rest-api.md](../06-rest-api.md), [07-mcp-api.md](../07-mcp-api.md), [13-frontend.md](../13-frontend.md), ADRs 0003–0007, 0012, 0013
 
 ## W3-AUTH — Authenticators
 
@@ -30,7 +30,7 @@ Exclusive: `internal/app/**`
 
 ### Goal
 
-All ServiceMethods used by the registry: list/search/latest/wait/get (mark read)/delete/bulk/deleteAll/readAll/html/source/download/attachment/stats/reset/reload/config/version/status. Wait is context-cancellable with cap. HTML uses sanitizer CID rewrite.
+All ServiceMethods used by the registry: list/search/latest/wait/get (mark read)/delete/bulk/deleteAll/readAll/html/source/download/attachment/**relay**/stats/reset/reload/config/version/status. Wait is context-cancellable with cap. HTML uses sanitizer CID rewrite. Relay is a no-op error when outgoing is off.
 
 ### Required tests
 
@@ -38,6 +38,8 @@ All ServiceMethods used by the registry: list/search/latest/wait/get (mark read)
 - [ ] Wait returns on insert; timeout → deadline_exceeded
 - [ ] Reset clears store not config
 - [ ] Delete missing → not_found
+- [ ] Relay with outgoing off → `failed_precondition`
+- [ ] Relay with test sink configured → stored raw delivered
 
 No `net/http` or MCP SDK imports.
 
@@ -57,7 +59,7 @@ All MailDev routes on `/` and `/api`, plus `/v1/*`, problem+json on `/v1`, MailD
 - [ ] `/email` vs `/api/email` same list bytes
 - [ ] Lab smoke trio: 401, SMTP not here (use store fixture), authed list subject
 - [ ] Bulk delete body validation
-- [ ] No relay route registered
+- [ ] Relay route: 500 when outgoing off; 200 when test sink configured
 - [ ] healthz unauthenticated JSON true
 
 ---
@@ -78,7 +80,7 @@ Pin 2026-07-28. Tools/resources/prompts from docs/05–07. Structured content. `
 - [ ] unauthorized
 - [ ] prompt names include verify-signup-email
 - [ ] no maildev_* tool names
-- [ ] no send/relay tool
+- [ ] `mail_email_relay` present; errors when outgoing off
 
 ---
 
@@ -106,7 +108,7 @@ Exclusive: `web/**`, `internal/web/**`, `NOTICE`
 
 ### Goal
 
-Copy MailDev 3 UI, apply ADR 0005/0012 deltas, build, embed. Playwright: list, open, delete, no Relay button, WS refresh.
+Copy MailDev 3 UI, apply ADR 0005/0012 deltas (**keep Relay**), build, embed. Playwright: list, open, delete, Relay visible when config says so, WS refresh.
 
 ### Required tests
 

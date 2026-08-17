@@ -10,10 +10,10 @@ alwaysApply: true
 Read `AGENTS.md` and `docs/01-architecture.md` before changing code.
 
 - Product: LabMail. Binary: `labmaild`. Module: `github.com/hilather/go-lab-maildev`.
-- Receive-only SMTP sink. Never implement working outbound relay or auto-relay.
+- Receive-only **default** for mcp-integration-lab. Implement MailDev outgoing/auto-relay for comparison-lab parity; CI outgoing host must be `relay-sink` only.
 - Domain logic lives in `internal/app`. REST, MCP, WebSocket, and UI are adapters.
 - Do not call REST from MCP or MCP from REST.
 - Captured mail is ephemeral. Bootstrap YAML is read-only desired listen/auth/limits.
-- Unknown config fields are errors. Relay flags/keys are compile-time failures.
+- Unknown config fields are errors. Outgoing/auto-relay flags are accepted (default off). Comparison-lab outgoing host must be `relay-sink`.
 - Prefer Go stdlib and small libraries. Hide third-party SMTP/MIME/MCP types behind adapters.
 - Documentation and `CHANGELOG.md` `[Unreleased]` ship in the same change as the behavior.

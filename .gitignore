@@ -17,3 +17,7 @@ coverage.html
 *.swp
 *.swo
 .DS_Store
+
+# Frontend build (wave 3)
+web/node_modules/
+web/dist/

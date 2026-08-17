@@ -1,0 +1,19 @@
+---
+description: LabMail repository conventions and package boundaries
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# LabMail conventions
+
+Read `AGENTS.md` and `docs/01-architecture.md` before changing code.
+
+- Product: LabMail. Binary: `labmaild`. Module: `github.com/hilather/go-lab-maildev`.
+- Receive-only SMTP sink. Never implement working outbound relay or auto-relay.
+- Domain logic lives in `internal/app`. REST, MCP, WebSocket, and UI are adapters.
+- Do not call REST from MCP or MCP from REST.
+- Captured mail is ephemeral. Bootstrap YAML is read-only desired listen/auth/limits.
+- Unknown config fields are errors. Relay flags/keys are compile-time failures.
+- Prefer Go stdlib and small libraries. Hide third-party SMTP/MIME/MCP types behind adapters.
+- Documentation and `CHANGELOG.md` `[Unreleased]` ship in the same change as the behavior.

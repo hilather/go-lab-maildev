@@ -1,8 +1,19 @@
 # Documentation
 
-Operator front door: [README.md](https://github.com/hilather/go-lab-maildev/blob/main/README.md). Onboarding: [START-HERE.md](https://github.com/hilather/go-lab-maildev/blob/main/START-HERE.md). Agent rules: [AGENTS.md](https://github.com/hilather/go-lab-maildev/blob/main/AGENTS.md).
+Operator front door:
+[README.md](https://github.com/hilather/go-lab-maildev/blob/main/README.md).
+Onboarding:
+[START-HERE.md](https://github.com/hilather/go-lab-maildev/blob/main/START-HERE.md).
+Contributor rules:
+[AGENTS.md](https://github.com/hilather/go-lab-maildev/blob/main/AGENTS.md).
 
-This page is the catalog. Normative design documents win over task summaries. After FND-001 the numbered pack is the source of truth.
+This page is the catalog. Design documents win over task summaries. The
+numbered pack under `docs/` is the source of truth for behavior.
+
+YAML bootstrap, revisions, reset, and the plan/apply envelope:
+[04-state-and-configuration.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/04-state-and-configuration.md).
+Operator curl walkthrough:
+[README — State loading APIs](https://github.com/hilather/go-lab-maildev/blob/main/README.md#state-loading-apis).
 
 ## Root
 
@@ -61,5 +72,5 @@ This page is the catalog. Normative design documents win over task summaries. Af
 
 | Path | Package |
 |---|---|
-| [00-program-board.md](https://github.com/hilather/go-lab-maildev/blob/main/tasks/00-program-board.md) | PRs 1–14 and milestones |
+| [00-program-board.md](https://github.com/hilather/go-lab-maildev/blob/main/tasks/00-program-board.md) | Work packages 1–14 and milestones |
 | [README.md](https://github.com/hilather/go-lab-maildev/blob/main/tasks/README.md) | Task working rules |

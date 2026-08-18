@@ -10,7 +10,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Changed
 
-- None.
+- README and START-HERE rewritten as an operator-facing front door: header art, a YAML bootstrap walkthrough, and curl/MCP examples for the state loading APIs (`GET /v1/state`, `POST /v1/state:validate`, `GET /v1/state:export`, `POST /v1/state:reset`, `POST /v1/changes:plan`, `POST /v1/changes:apply`). Architecture pack, ADRs, and the program board stay linked from the documentation map.
 
 ### Fixed
 

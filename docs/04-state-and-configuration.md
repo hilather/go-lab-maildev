@@ -2,10 +2,33 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-18 (STA-001 + smtp.behavior)
+Last reviewed: 2026-08-18 (STA-001 + smtp.behavior + operator quick start)
 Related ADRs: 0003
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
+
+Operator curl walkthrough (validate / serve / `GET /v1/state` / `:validate` / `:export` / `:reset` / `:plan` / `:apply`): [README — State loading APIs](https://github.com/hilather/go-lab-maildev/blob/main/README.md#state-loading-apis).
+
+## Operator load path
+
+```text
+labmail validate --config path.yaml
+labmail canonicalize --config path.yaml
+labmail serve --config path.yaml [--smtp-listen ADDR] [--management-listen ADDR|off]
+```
+
+`validate` and `canonicalize` stop at compile. `serve` then binds SMTP and management from the compiled snapshot. Live reads and mutations:
+
+| Capability | REST | MCP |
+|---|---|---|
+| Read redacted spec + revisions | `GET /v1/state` | `mail_state_get` |
+| Validate a candidate document | `POST /v1/state:validate` | `mail_state_validate` |
+| Export canonical YAML + drift | `GET /v1/state:export` | `mail_state_export` |
+| Reload bootstrap and wipe inbox | `POST /v1/state:reset` | `mail_state_reset` |
+| Dry-run operations | `POST /v1/changes:plan` | `mail_change_plan` |
+| Apply operations (`expectedRevision` required) | `POST /v1/changes:apply` | `mail_change_apply` |
+
+A failed validate, reset, or apply leaves the running snapshot **and** the inbox unchanged.
 
 ## YAML bootstrap schema
 

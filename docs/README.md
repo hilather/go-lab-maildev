@@ -40,7 +40,7 @@ This page is the catalog. Normative design documents win over task summaries. Af
 | [08-security-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/08-security-architecture.md) | Authn/z, XSS, receive-only |
 | [10-testing-strategy.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/10-testing-strategy.md) | Test layers |
 | [11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md) | Container and process |
-| [13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md) | mcp-integration-lab swap |
+| [13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md) | mcp-integration-lab swap BOM + overlay |
 
 ## Architecture decisions
 

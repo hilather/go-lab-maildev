@@ -1,7 +1,7 @@
 # Program Board
 
-Status: in-progress (SWAP-001 / GA-001 next)
-Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + API-001 + COMPAT-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001 + UI-001)
+Status: in-progress (GA-001 next)
+Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + API-001 + COMPAT-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001 + UI-001 + SWAP-001)
 
 Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs/` is the source of truth.
 
@@ -22,7 +22,7 @@ Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs
 | 10 | Observability | OBS-001 | SMTP-001a, API-001 | slog events, hand-rolled OpenMetrics, ready semantics | done |
 | 11 | CLI completion, Dockerfile, compose | DEP-001 | SMTP-001a, API-001, OBS-001 | Hardened image, compose contract, healthcheck | done |
 | 12 | Embedded inbox UI | UI-001 | API-001, SEC-001 | Sandboxed inbox SPA; **required for GA / 1.0** | done |
-| 13 | Integration-lab swap contract | SWAP-001 | COMPAT-001, MCP-001, SEC-001, DEP-001 | Docs + examples for mcp-integration-lab | not-started |
+| 13 | Integration-lab swap contract | SWAP-001 | COMPAT-001, MCP-001, SEC-001, DEP-001 | Docs + examples for mcp-integration-lab | done |
 | 14 | GA hardening | GA-001 | PRs 1–13 (3b for AUTH/STARTTLS claims) | Fuzz, soak, release notes, known limitations | not-started |
 
 ## Parallelization

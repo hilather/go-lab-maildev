@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-18 (UI-001)
+Last reviewed: 2026-08-18 (UI-001 + SWAP-001)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -200,11 +200,14 @@ Required for GA / 1.0 (D12, PR 12). The UI talks REST only. XSS/CSP/`cid:` rewri
 |   `-- errors/v1.json
 |-- web/                           # Vite app
 |-- docs/                          # normative pack + adr/
-|-- examples/compose.smoke.yaml
+|-- examples/labmail.yaml          # lab overlay (allowLegacyClients: true)
+|-- examples/mcpjungle/            # servers/labmail.json + integration group
+|-- examples/labinfo/              # services-maildev.yaml (id stays maildev)
+|-- examples/compose.smoke.yaml    # DEP-001
 |-- testdata/config/{valid,invalid}/
 |-- testdata/smtp/                 # session transcripts
 |-- testdata/mime/
-|-- testdata/compat/               # TestMaildevScenarioCompat + 2.2.1 goldens
+|-- testdata/compat/               # TestMaildevScenarioCompat goldens (test lives in internal/control/compat)
 |-- scripts/{generate,checkdocs,test-container.sh}
 `-- tasks/                         # program board, one file per PR
 ```

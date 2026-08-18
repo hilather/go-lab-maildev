@@ -61,6 +61,12 @@ func TestHelp(t *testing.T) {
 	if strings.Contains(stdout.String(), "SMTP listener bound") {
 		t.Fatalf("help must not claim an SMTP listener")
 	}
+	if !strings.Contains(stdout.String(), "mcp-stdio") {
+		t.Fatalf("help %q missing mcp-stdio", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "Planned (not implemented)") {
+		t.Fatal("help still lists mcp-stdio as planned")
+	}
 }
 
 func TestUnknownCommand(t *testing.T) {
@@ -68,6 +74,17 @@ func TestUnknownCommand(t *testing.T) {
 	code := run([]string{"labmail", "not-a-command"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("exit %d, want 2", code)
+	}
+}
+
+func TestMCPStdioRequiresConfig(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"labmail", "mcp-stdio"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("exit %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "--config") {
+		t.Fatalf("stderr %q missing --config", stderr.String())
 	}
 }
 

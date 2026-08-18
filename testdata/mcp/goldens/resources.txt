@@ -1,0 +1,7 @@
+labmail://capabilities
+labmail://status
+labmail://schema/config
+labmail://state
+labmail://messages
+labmail://messages/{id}
+labmail://audit/recent

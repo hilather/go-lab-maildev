@@ -9,6 +9,7 @@ Systems under test deliver RFC 5321 SMTP here. LabMail will capture, index, and 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
 Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox + native `/v1` REST + maildev `/email` compat**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, and `serve` (SMTP plus management HTTP). There is **no MCP, auth, UI, or container image** yet.
+Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox + native `/v1` REST + Streamable HTTP MCP**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1` and `POST /mcp`). There is **no auth, UI, maildev `/email` compat, or container image** yet.
 
 Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image (later) `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
@@ -28,6 +29,7 @@ The integration lab currently publishes maildev as:
 |---|---|---|
 | SMTP ingest | 1025 | outbound SMTP target for systems under test |
 | Management / UI / REST | 1080 | inspect captured mail (native `/v1` and `/email` compat now; `/mcp` later) |
+| Management / UI / REST | 1080 | inspect captured mail (native `/v1` and `POST /mcp` now; `/email` compat later) |
 
 Those listeners, the receive-only posture, wipe-on-restart semantics, and HTTP Basic on `/email` are the swap contract. During the swap release the labinfo catalog id stays **`maildev`**.
 
@@ -45,6 +47,7 @@ go build -o bin/labmail ./cmd/labmail
 ```
 
 `serve` binds SMTP from the compiled YAML (override with `--smtp-listen`) and management HTTP from `spec.listeners.management.address` (override with `--management-listen ADDR|off`). Native `/v1` and maildev `/email` (when `compatEnabled`, default true) share that listener; `POST /email/:id/relay` is 403. Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Probe readiness with `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready` or `GET /healthz`.
+`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`) and management HTTP from `spec.listeners.management.address` (override with `--management-listen ADDR|off`). Native `/v1` and Streamable HTTP `POST /mcp` share that listener. Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Probe readiness with `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready`. Developer MCP: `labmail mcp-stdio --config testdata/config/valid/defaults.yaml`.
 
 ## Build and test
 
@@ -54,12 +57,13 @@ make lint
 make generate
 make verify-generated
 make test
+make test-parity
 make test-config-compat
 make test-docs
 make build
 ```
 
-Required CI jobs: format, lint, unit, documentation, generated-file. There is no optional or bypassable job.
+Required CI jobs: format, lint, unit, documentation, generated-file, parity. There is no optional or bypassable job.
 
 ## Documentation
 

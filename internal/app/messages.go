@@ -237,6 +237,16 @@ func (s *App) OnReset(fn func()) {
 	s.mu.Unlock()
 }
 
+// OnApply registers a hook invoked after a successful Apply (auth reload).
+func (s *App) OnApply(fn func()) {
+	if s == nil || fn == nil {
+		return
+	}
+	s.mu.Lock()
+	s.applyHooks = append(s.applyHooks, fn)
+	s.mu.Unlock()
+}
+
 func mapStoreErr(err error) error {
 	if err == nil {
 		return nil

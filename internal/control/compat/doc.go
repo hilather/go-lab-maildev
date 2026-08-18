@@ -2,5 +2,5 @@
 //
 // Handlers call app.Service and contain no store or SMTP mutation logic.
 // They must not import internal/control/rest or internal/control/mcp.
-// Auth is stubbed via Principal (SEC-001); this package does not claim 401.
+// Auth uses the shared verifier. Goldens may inject Principal to stay open.
 package compat

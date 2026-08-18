@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/control/mcp"
+	"github.com/hilather/go-lab-maildev/internal/model"
 )
 
 func mcpStdioCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -16,19 +20,13 @@ func mcpStdioCmd(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	fs := flag.NewFlagSet("mcp-stdio", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	path := fs.String("config", "", "path to bootstrap YAML or JSON")
-	tokenFile := fs.String("token-file", "", "optional bearer token file (verified in SEC-001)")
+	tokenFile := fs.String("token-file", "", "optional bearer token file")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	if *path == "" {
 		_, _ = fmt.Fprintln(stderr, "labmail mcp-stdio: --config is required")
 		return 2
-	}
-	if *tokenFile != "" {
-		if _, err := os.ReadFile(*tokenFile); err != nil {
-			_, _ = fmt.Fprintf(stderr, "labmail mcp-stdio: token-file: %v\n", err)
-			return 1
-		}
 	}
 	svc, err := app.Boot(ctx, app.Options{BootstrapPath: *path})
 	if err != nil {
@@ -37,13 +35,44 @@ func mcpStdioCmd(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	}
 	defer svc.Close()
 	allowLegacy := false
+	var verifier *auth.Verifier
+	var fixed *app.Actor
 	if snap := svc.Active(); snap != nil && snap.Canonical != nil {
 		allowLegacy = snap.Canonical.Spec.Management.MCP.AllowLegacyClients
+		v, vErr := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
+		if vErr != nil {
+			_, _ = fmt.Fprintf(stderr, "labmail mcp-stdio: auth: %v\n", vErr)
+			return 1
+		}
+		verifier = v
+		if *tokenFile != "" {
+			raw, rErr := os.ReadFile(*tokenFile)
+			if rErr != nil {
+				_, _ = fmt.Fprintf(stderr, "labmail mcp-stdio: token-file: %v\n", rErr)
+				return 1
+			}
+			secret := firstSecretLine(raw)
+			p, aErr := verifier.AuthenticateBearer(secret)
+			if aErr != nil {
+				_, _ = fmt.Fprintf(stderr, "labmail mcp-stdio: token-file: %v\n", aErr)
+				return 1
+			}
+			a := app.Actor{ID: p.ID, Class: p.Class, Role: p.Role, Scopes: p.Scopes, Transport: "mcp"}
+			fixed = &a
+		} else if verifier.Mode() == model.MgmtAuthDevLoopbackUnauth {
+			a := app.Actor{ID: "stdio", Class: auth.ClassLoopback, Role: model.RoleAdministrator, Scopes: auth.DefaultScopes(model.RoleAdministrator), Transport: "mcp"}
+			fixed = &a
+		} else {
+			_, _ = fmt.Fprintln(stderr, "labmail mcp-stdio: --token-file is required unless auth.mode is dev-loopback-unauth")
+			return 1
+		}
 	}
 	s, err := mcp.New(mcp.Config{
 		Service:            svc,
 		AllowLegacyClients: allowLegacy,
 		RatePerSec:         -1,
+		Auth:               verifier,
+		FixedActor:         fixed,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "labmail mcp-stdio: %v\n", err)
@@ -54,4 +83,15 @@ func mcpStdioCmd(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return 1
 	}
 	return 0
+}
+
+func firstSecretLine(raw []byte) string {
+	for _, line := range bytes.Split(raw, []byte("\n")) {
+		s := strings.TrimSpace(string(line))
+		if s == "" || strings.HasPrefix(s, "#") {
+			continue
+		}
+		return s
+	}
+	return strings.TrimSpace(string(raw))
 }

@@ -13,6 +13,7 @@ func TestCompatImportDAG(t *testing.T) {
 	fset := token.NewFileSet()
 	allowed := map[string]bool{
 		"github.com/hilather/go-lab-maildev/internal/app":          true,
+		"github.com/hilather/go-lab-maildev/internal/auth":         true,
 		"github.com/hilather/go-lab-maildev/internal/capabilities": true,
 		"github.com/hilather/go-lab-maildev/internal/domainerr":    true,
 		"github.com/hilather/go-lab-maildev/internal/mimeparse":    true,

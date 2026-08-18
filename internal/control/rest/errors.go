@@ -4,14 +4,22 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
 
+func authChallenges(s *Server) []string {
+	basic := s != nil && s.cfg.Auth != nil && s.cfg.Auth.BasicEnabled()
+	return auth.WWWAuthenticate(basic)
+}
+
 func (s *Server) writeProblem(w http.ResponseWriter, r *http.Request, instance string, err error) {
 	p := capabilities.ProblemFrom(err, instance)
 	if p.Status == http.StatusUnauthorized {
-		w.Header().Set("WWW-Authenticate", `Bearer realm="labmail"`)
+		for _, v := range authChallenges(s) {
+			w.Header().Add("WWW-Authenticate", v)
+		}
 	}
 	body, merr := json.Marshal(p)
 	if merr != nil {

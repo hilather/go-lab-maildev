@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
@@ -30,6 +31,12 @@ func (h *Handler) writeBytes(w http.ResponseWriter, status int, contentType stri
 
 func (h *Handler) writeProblem(w http.ResponseWriter, r *http.Request, instance string, err error) {
 	p := capabilities.ProblemFrom(err, instance)
+	if p.Status == http.StatusUnauthorized {
+		basic := h.cfg.Auth != nil && h.cfg.Auth.BasicEnabled()
+		for _, v := range auth.WWWAuthenticate(basic) {
+			w.Header().Add("WWW-Authenticate", v)
+		}
+	}
 	body, merr := json.Marshal(p)
 	if merr != nil {
 		http.Error(w, `{"type":"urn:labmail:error:internal-error","title":"Internal error","status":500,"code":"internal_error"}`, http.StatusInternalServerError)

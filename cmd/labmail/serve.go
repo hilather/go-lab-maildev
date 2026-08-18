@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/control/compat"
 	"github.com/hilather/go-lab-maildev/internal/control/mcp"
@@ -190,6 +191,12 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 	if mcpPath == "" {
 		mcpPath = mcp.DefaultPath
 	}
+	verifier, err := auth.FromSpec(spec.Management.Auth)
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
+	}
+	sessions := auth.NewStore(auth.DefaultSessionConfig())
 	mcpSrv, err := mcp.New(mcp.Config{
 		Service:            svc,
 		AllowedOrigins:     spec.Management.OriginAllowlist,
@@ -198,12 +205,13 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 		MaxConcurrent:      spec.Management.MaxConcurrent,
 		RatePerSec:         float64(spec.Management.RequestsPerSecond),
 		RateBurst:          float64(spec.Management.Burst),
+		Auth:               verifier,
 	})
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
 	}
-	mounts, err := compatMounts(svc, spec, ready)
+	mounts, err := compatMounts(svc, spec, ready, verifier)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
@@ -225,6 +233,9 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 		Logger:         log,
 		Mounts:         mounts,
 		Ready:          ready,
+		Auth:           verifier,
+		Sessions:       sessions,
+		CookieSecure:   spec.Listeners.Management.TLS.Enabled,
 	})
 	if err != nil {
 		_ = ln.Close()
@@ -235,7 +246,7 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 	return hs, nil
 }
 
-func compatMounts(svc *app.App, spec model.Spec, ready func() bool) (map[string]http.Handler, error) {
+func compatMounts(svc *app.App, spec model.Spec, ready func() bool, verifier *auth.Verifier) (map[string]http.Handler, error) {
 	if !spec.Listeners.Management.CompatEnabled {
 		return nil, nil
 	}
@@ -243,6 +254,7 @@ func compatMounts(svc *app.App, spec model.Spec, ready func() bool) (map[string]
 		Service:        svc,
 		AllowedOrigins: spec.Management.OriginAllowlist,
 		Ready:          ready,
+		Auth:           verifier,
 	})
 	if err != nil {
 		return nil, err

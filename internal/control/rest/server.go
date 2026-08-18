@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
@@ -89,6 +90,12 @@ type Config struct {
 	// Mounts are additional handlers (compat /email) served after the shared
 	// timeout, inflight, and rate gates but ahead of native /v1 routing.
 	Mounts map[string]http.Handler
+	// Auth is the shared verifier. Nil keeps unit tests stub-open.
+	Auth *auth.Verifier
+	// Sessions is the REST-only UI session table. Nil becomes an empty store.
+	Sessions *auth.Store
+	// CookieSecure forces the Secure flag (management TLS).
+	CookieSecure bool
 }
 
 // Server is the stdlib net/http management listener.
@@ -140,6 +147,11 @@ func New(cfg Config) (*Server, error) {
 	if hb <= 0 {
 		hb = sseHeartbeat
 	}
+	sessions := cfg.Sessions
+	if sessions == nil {
+		sessions = auth.NewStore(auth.DefaultSessionConfig())
+		cfg.Sessions = sessions
+	}
 	s := &Server{
 		cfg:          cfg,
 		svc:          cfg.Service,
@@ -154,6 +166,8 @@ func New(cfg Config) (*Server, error) {
 		cursorKey:    key,
 	}
 	s.svc.OnReset(s.RotateCursors)
+	s.svc.OnReset(s.reloadAuth)
+	s.svc.OnApply(s.reloadAuth)
 	if len(cfg.Mounts) > 0 {
 		mux := http.NewServeMux()
 		for path, h := range cfg.Mounts {
@@ -349,8 +363,40 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	actor := s.authenticate(r)
+	actor, err := s.authenticate(r, isHealthCap(rt.cap))
+	if err != nil {
+		s.writeProblem(w, r, instance, err)
+		return
+	}
+	if err := s.authorize(r, actor, rt.cap); err != nil {
+		s.writeProblem(w, r, instance, err)
+		return
+	}
 	s.dispatch(w, r, instance, actor, rt, params)
+}
+
+func (s *Server) reloadAuth() {
+	if s.cfg.Auth == nil {
+		return
+	}
+	appSvc, ok := s.svc.(*app.App)
+	if !ok {
+		return
+	}
+	snap := appSvc.Active()
+	if snap == nil || snap.Canonical == nil {
+		return
+	}
+	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
+	if err != nil {
+		// Keep the previous verifier and live UI sessions.
+		return
+	}
+	changed := !s.cfg.Auth.Equivalent(next)
+	s.cfg.Auth.Replace(next)
+	if changed && s.cfg.Sessions != nil {
+		s.cfg.Sessions.Clear()
+	}
 }
 
 func (s *Server) dispatchMount(w http.ResponseWriter, r *http.Request, instance string) bool {

@@ -2,12 +2,12 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-17 (COMPAT-001 + OBS-001)
+Last reviewed: 2026-08-17 (COMPAT-001 + OBS-001 + SEC-001)
 Related ADRs: 0004, 0005, 0007
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
 
-API-001 implements every native `/v1` route except UI session (`POST/GET/DELETE /v1/session` land in SEC-001). Auth is stubbed open; bearer+basic land in SEC-001. COMPAT-001 mounts `/email`, `/healthz`, and `/config` on this same listener (`spec.listeners.management.compatEnabled`, default true). MCP is MCP-001.
+Native `/v1` includes UI session (`POST/GET/DELETE /v1/session`). Auth is lab static bearer; HTTP Basic maps onto the same principal when `mode: bearer_and_basic`. COMPAT-001 mounts `/email`, `/healthz`, and `/config` on this same listener (`spec.listeners.management.compatEnabled`, default true). MCP is bearer-only.
 
 ## Problem details
 
@@ -130,7 +130,10 @@ POST   /v1/session     Authorization: Bearer | Basic
                        Set-Cookie: labmail_session=<opaque>; HttpOnly; SameSite=Lax; Path=/
                                    Secure iff management TLS
                        Body: { "csrf": "<32-byte hex>", "expiresAt": "…" }
-GET    /v1/session     cookie or bearer → { "id", "role", "scopes", "expiresAt" }
+GET    /v1/session     cookie or bearer → { "id", "role", "scopes", "expiresAt", "csrf"? }
+                       csrf is returned for a valid cookie so the UI can recover
+                       after reload; cookie-authenticated POST /v1/session still
+                       requires X-LabMail-CSRF.
 DELETE /v1/session     clears cookie
 ```
 

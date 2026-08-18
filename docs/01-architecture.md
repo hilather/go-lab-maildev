@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-17 (COMPAT-001)
+Last reviewed: 2026-08-17 (SEC-001)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -296,7 +296,7 @@ labmail version
 
 Optional later: `labmail send` is **not** shipped in the production binary (it would look like a sender). Tests use `internal/smtptest`.
 
-STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` and `internal/audit`. API-001 implements `internal/capabilities` and `internal/control/rest`. COMPAT-001 mounts maildev `/email`, `/healthz`, and `/config` on the same management listener (`POST /email/:id/relay` is 403; auth is stubbed). `labmail serve` boots `app.Service`, binds SMTP against the live snapshot (MAIL/RCPT/DATA re-read it), binds native `/v1` plus compat when `compatEnabled` is true, and wipes the inbox on reset/shutdown. Session and MCP are later PRs. STORE-001 added `store.Memory`. SMTP-001a added the in-tree SMTP listener. CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
+STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` and `internal/audit`. API-001 implements `internal/capabilities` and `internal/control/rest`. COMPAT-001 mounts maildev `/email`, `/healthz`, and `/config` on the same management listener (`POST /email/:id/relay` is 403). SEC-001 implements `internal/auth` (lab static bearer, Basic→same principal, CSRF session). `labmail serve` boots `app.Service`, binds SMTP against the live snapshot (MAIL/RCPT/DATA re-read it), binds native `/v1` plus MCP and compat when `compatEnabled` is true, and wipes the inbox on reset/shutdown. STORE-001 added `store.Memory`. SMTP-001a added the in-tree SMTP listener. CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
 
 ## Invariants
 

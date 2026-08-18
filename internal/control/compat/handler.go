@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
 
@@ -24,15 +25,17 @@ const (
 	textPrefixBytes = 2 << 10
 )
 
-// Principal injects the request actor. SEC-001 replaces the stub; PR 7 never 401s.
+// Principal injects the request actor. Tests may override Auth.
 type Principal func(*http.Request) app.Actor
 
 // Config constructs the maildev compat adapter.
 type Config struct {
 	// Service is required. Handlers call it and do not mutate snapshots.
 	Service app.Service
-	// Principal defaults to a stub administrator. Tests inject a fake.
+	// Principal, when set, wins over Auth (unit goldens).
 	Principal Principal
+	// Auth is the shared verifier. Nil keeps goldens stub-open.
+	Auth *auth.Verifier
 	// AllowedOrigins are extra Origins accepted besides loopback.
 	AllowedOrigins []string
 	// Ready overrides readiness for GET /healthz. Nil is app.Status.Ready.
@@ -49,9 +52,6 @@ type Handler struct {
 func New(cfg Config) (*Handler, error) {
 	if cfg.Service == nil {
 		return nil, errors.New("compat: Service is required")
-	}
-	if cfg.Principal == nil {
-		cfg.Principal = stubPrincipal
 	}
 	return &Handler{cfg: cfg, svc: cfg.Service}, nil
 }
@@ -84,8 +84,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	actor := h.cfg.Principal(r)
 	parts := splitPath(r.URL.Path)
+	isHealth := len(parts) == 1 && parts[0] == "healthz"
+	var actor app.Actor
+	if !isHealth {
+		var err error
+		actor, err = h.authenticate(r)
+		if err != nil {
+			h.writeProblem(w, r, instance, err)
+			return
+		}
+		if err := h.authorize(actor, writeMethod(r.Method)); err != nil {
+			h.writeProblem(w, r, instance, err)
+			return
+		}
+	}
 	// Relay is a path segment after /email/{id}/, not a substring. Attachment
 	// names like relay.pdf must still download.
 	if isRelayPath(parts) {

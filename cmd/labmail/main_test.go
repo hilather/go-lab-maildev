@@ -88,6 +88,18 @@ func TestMCPStdioRequiresConfig(t *testing.T) {
 	}
 }
 
+func TestMCPStdioRequiresTokenFile(t *testing.T) {
+	path := testdataConfig(t, "valid", "defaults.yaml")
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"labmail", "mcp-stdio", "--config", path}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d want 1 stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "--token-file") {
+		t.Fatalf("stderr %q missing --token-file", stderr.String())
+	}
+}
+
 func TestServeRequiresConfig(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"labmail", "serve"}, &stdout, &stderr)

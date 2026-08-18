@@ -87,3 +87,14 @@ func TestValidateMissingAPIVersion(t *testing.T) {
 func TestValidateNil(t *testing.T) {
 	_ = requireValidation(t, Validate(nil), violationRequired)
 }
+
+func TestValidateShortTokenSecret(t *testing.T) {
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte("tooshort\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	doc := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n"
+	_, err := Load([]byte(doc))
+	_ = requireValidation(t, err, violationInvalidValue)
+}

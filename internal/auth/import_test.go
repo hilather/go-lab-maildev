@@ -1,4 +1,4 @@
-package rest
+package auth
 
 import (
 	"go/parser"
@@ -9,29 +9,19 @@ import (
 	"testing"
 )
 
-func TestRESTImportDAG(t *testing.T) {
+func TestAuthImportDAG(t *testing.T) {
 	fset := token.NewFileSet()
 	allowed := map[string]bool{
-		"github.com/hilather/go-lab-maildev/internal/app":           true,
-		"github.com/hilather/go-lab-maildev/internal/audit":         true,
-		"github.com/hilather/go-lab-maildev/internal/auth":          true,
-		"github.com/hilather/go-lab-maildev/internal/buildinfo":     true,
-		"github.com/hilather/go-lab-maildev/internal/capabilities":  true,
-		"github.com/hilather/go-lab-maildev/internal/config":        true,
-		"github.com/hilather/go-lab-maildev/internal/domainerr":     true,
-		"github.com/hilather/go-lab-maildev/internal/model":         true,
-		"github.com/hilather/go-lab-maildev/internal/observability": true,
-		"github.com/hilather/go-lab-maildev/internal/preview":       true,
+		"github.com/hilather/go-lab-maildev/internal/domainerr": true,
+		"github.com/hilather/go-lab-maildev/internal/model":     true,
 	}
 	forbiddenPref := []string{
 		"github.com/emersion",
 		"github.com/modelcontextprotocol",
-		"github.com/hilather/go-lab-maildev/internal/compiler",
+		"github.com/hilather/go-lab-maildev/internal/app",
+		"github.com/hilather/go-lab-maildev/internal/control",
 		"github.com/hilather/go-lab-maildev/internal/smtp",
 		"github.com/hilather/go-lab-maildev/internal/store",
-		"github.com/hilather/go-lab-maildev/internal/control/mcp",
-		"github.com/hilather/go-lab-maildev/internal/control/compat",
-		"github.com/hilather/go-lab-maildev/internal/web",
 		"net/smtp",
 	}
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {

@@ -53,7 +53,7 @@ func (s *Server) readResource(ctx context.Context, req *sdk.ReadResourceRequest)
 	if err := ctx.Err(); err != nil {
 		return nil, rpcError(domainerr.Internal("request canceled"))
 	}
-	actor := actorFrom(ctx)
+	actor := s.actorFrom(ctx)
 	uri := ""
 	if req != nil && req.Params != nil {
 		uri = req.Params.URI

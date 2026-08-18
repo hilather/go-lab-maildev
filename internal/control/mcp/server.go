@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/buildinfo"
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
@@ -74,6 +75,10 @@ type Config struct {
 	RequestTimeout time.Duration
 	// MaxConcurrent admits at most this many overlapping requests. Non-positive uses DefaultMaxConcurrent.
 	MaxConcurrent int
+	// Auth is the shared verifier. Nil keeps unit tests stub-open (Basic still rejected).
+	Auth *auth.Verifier
+	// FixedActor is used by mcp-stdio when there is no HTTP Authorization header.
+	FixedActor *app.Actor
 }
 
 // Server is the official-SDK adapter. Third-party MCP types do not escape it.
@@ -156,6 +161,8 @@ func New(cfg Config) (*Server, error) {
 		s.sdk.AddReceivingMiddleware(pinProtocolMiddleware)
 	}
 	s.svc.OnReset(s.RotateCursors)
+	s.svc.OnReset(s.reloadAuth)
+	s.svc.OnApply(s.reloadAuth)
 	s.registerTools()
 	s.registerResources()
 	s.startInboxFanout()
@@ -203,7 +210,7 @@ func (s *Server) onSubscribe(ctx context.Context, req *sdk.SubscribeRequest) err
 	if req != nil && req.Params != nil {
 		uri = req.Params.URI
 	}
-	return s.authorizeResource(actorFrom(ctx), uri)
+	return s.authorizeResource(s.actorFrom(ctx), uri)
 }
 
 func (s *Server) onUnsubscribe(context.Context, *sdk.UnsubscribeRequest) error {
@@ -318,8 +325,21 @@ func withActor(ctx context.Context, a app.Actor) context.Context {
 	return context.WithValue(ctx, ctxActor, a)
 }
 
-func actorFrom(ctx context.Context) app.Actor {
+func (s *Server) actorFrom(ctx context.Context) app.Actor {
 	a, _ := ctx.Value(ctxActor).(app.Actor)
+	if a.ID != "" || a.Class != "" {
+		if a.Transport == "" {
+			a.Transport = "mcp"
+		}
+		return a
+	}
+	if s != nil && s.cfg.FixedActor != nil {
+		out := *s.cfg.FixedActor
+		if out.Transport == "" {
+			out.Transport = "mcp"
+		}
+		return out
+	}
 	if a.Transport == "" {
 		a.Transport = "mcp"
 	}
@@ -328,4 +348,23 @@ func actorFrom(ctx context.Context) app.Actor {
 		a.Class = "administrator"
 	}
 	return a
+}
+
+func (s *Server) reloadAuth() {
+	if s.cfg.Auth == nil {
+		return
+	}
+	appSvc, ok := s.svc.(*app.App)
+	if !ok {
+		return
+	}
+	snap := appSvc.Active()
+	if snap == nil || snap.Canonical == nil {
+		return
+	}
+	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
+	if err != nil {
+		return
+	}
+	s.cfg.Auth.Replace(next)
 }

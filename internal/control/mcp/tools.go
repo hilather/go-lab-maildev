@@ -307,7 +307,7 @@ func addTool[In any](s *Server, name, desc string, mutating, idempotent bool, h 
 		if err := ctx.Err(); err != nil {
 			return toolErrorResult(canceledError(err)), nil, nil
 		}
-		actor := actorFrom(ctx)
+		actor := s.actorFrom(ctx)
 		if err := s.authorizeTool(actor, name); err != nil {
 			return toolErrorResult(err), nil, nil
 		}

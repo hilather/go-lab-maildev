@@ -44,6 +44,7 @@ type App struct {
 	idemp         *idempCache
 	audit         *audit.Fanout
 	resetHooks    []func()
+	applyHooks    []func()
 	metrics       *observability.Registry
 	logger        *observability.Logger
 	healthMu      sync.Mutex

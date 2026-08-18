@@ -23,14 +23,6 @@ func TestRoutesRegisteredFromRegistry(t *testing.T) {
 		seen[rt.method+" "+rt.path] = true
 	}
 	for _, c := range capabilities.All() {
-		if capabilities.SessionCapability(c.ID) {
-			for _, b := range c.REST {
-				if seen[strings.ToUpper(b.Method)+" "+b.Path] {
-					t.Errorf("session route registered early: %s %s", b.Method, b.Path)
-				}
-			}
-			continue
-		}
 		for _, b := range c.REST {
 			ref := strings.ToUpper(b.Method) + " " + b.Path
 			if !seen[ref] {
@@ -211,10 +203,13 @@ func TestRelayForbidden(t *testing.T) {
 	requireProblem(t, got, http.StatusForbidden, "receive_only")
 }
 
-func TestSessionNotImplemented(t *testing.T) {
+func TestSessionRegistered(t *testing.T) {
 	s, _ := newTestServer(t)
 	got := doReq(t, s.Handler(), http.MethodGet, "/v1/session", "")
-	requireProblem(t, got, http.StatusNotFound, "not_found")
+	requireStatus(t, got, http.StatusOK)
+	if decodeJSON(t, got)["id"] == "" {
+		t.Fatalf("session=%s", got.Body.String())
+	}
 }
 
 func TestMarkReadDefaultFalse(t *testing.T) {

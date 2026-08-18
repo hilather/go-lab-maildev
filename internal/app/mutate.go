@@ -61,27 +61,34 @@ func (s *App) Apply(ctx context.Context, actor Actor, in ChangeIn) (*ApplyResult
 		return nil, err
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.applyLocked(ctx, actor, in)
-}
-
-func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*ApplyResult, error) {
-	fp, err := fingerprintChange(in)
+	res, hooks, err := s.applyLocked(ctx, actor, in)
+	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}
+	for _, fn := range hooks {
+		fn()
+	}
+	return res, nil
+}
+
+func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*ApplyResult, []func(), error) {
+	fp, err := fingerprintChange(in)
+	if err != nil {
+		return nil, nil, err
+	}
 	if hit, err := s.idemp.lookup(in.IdempotencyKey, fp); err != nil {
-		return nil, err
+		return nil, nil, err
 	} else if hit != nil && hit.apply != nil {
-		return cloneApply(hit.apply), nil
+		return cloneApply(hit.apply), append([]func(){}, s.applyHooks...), nil
 	}
 	cand, err := s.buildCandidate(ctx, in, true)
 	if err != nil {
 		s.forgetIdempOnConflict(in.IdempotencyKey, err)
-		return nil, err
+		return nil, nil, err
 	}
 	if err := s.checkStoreCaps(cand, in.Force, true); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	prev := s.snaps.Swap(cand.next)
 	res := &ApplyResult{
@@ -110,7 +117,7 @@ func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*Apply
 		Diff:       toAuditDiff(cand.diff),
 	})
 	s.idemp.storeApply(in.IdempotencyKey, fp, res)
-	return cloneApply(res), nil
+	return cloneApply(res), append([]func(){}, s.applyHooks...), nil
 }
 
 // Validate inspects a candidate document and/or operations. It never swaps

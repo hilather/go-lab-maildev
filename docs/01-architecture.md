@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-17 (STORE-001)
+Last reviewed: 2026-08-17 (STA-001)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -295,7 +295,7 @@ labmail version
 
 Optional later: `labmail send` is **not** shipped in the production binary (it would look like a sender). Tests use `internal/smtptest`.
 
-STORE-001 implements `serve` with `store.Memory` (ULID inbox, MIME parse, caps, Wait, Wipe). Management HTTP is not bound. SMTP-001a added the in-tree SMTP listener. CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
+STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` and `internal/audit`. `labmail serve` boots `app.Service`, binds SMTP against the live snapshot (MAIL/RCPT/DATA re-read it), and wipes the inbox on reset/shutdown. Management HTTP is not bound. STORE-001 added `store.Memory`. SMTP-001a added the in-tree SMTP listener. CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
 
 ## Invariants
 
@@ -322,7 +322,7 @@ STORE-001 implements `serve` with `store.Memory` (ULID inbox, MIME parse, caps, 
 - SMTP AUTH is PLAIN/LOGIN only. Implicit SMTPS is 1.1.
 - Healthcheck plane in compose changes from SMTP TCP (`node`) to HTTP `/v1/health/ready` (ready still requires SMTP bound).
 - Worst-case RSS ≈ stored `maxBytes` (256 MiB) + `maxInFlightDataBytes` (64 MiB) + ~64 MiB slack ≈ **384 MiB**. Caps are stacked: in-flight does not reduce inbox capacity. Spill on tmpfs does not add a second disk budget — it is still RAM.
-- SMTP AUTH and STARTTLS are not implemented until SMTP-001b; `serve` fail-closes those YAML modes.
+- SMTP AUTH and STARTTLS are not implemented until SMTP-001b; `serve`, live apply, and reset fail-close those YAML modes.
 - Single replica; no shared inbox.
 - MCP clients requiring OAuth PRM cannot authorize. MCPJungle needs `allowLegacyClients: true` (D17).
 - HTML preview blocks remote `https:` images (no tracking pixels).

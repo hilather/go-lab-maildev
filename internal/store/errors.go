@@ -13,4 +13,7 @@ var (
 	ErrNotFound = errors.New("message not found")
 	// ErrSpill is an unreadable or unwritable spill file.
 	ErrSpill = errors.New("store spill")
+	// ErrOverNewCap is replaceStoreCaps when occupancy exceeds the new
+	// reject caps and force is false.
+	ErrOverNewCap = errors.New("store over new cap")
 )

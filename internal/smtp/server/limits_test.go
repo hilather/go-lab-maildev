@@ -7,6 +7,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtptest"
+	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
 
@@ -166,6 +167,32 @@ func TestSwapSpecAppliesToNextMAIL(t *testing.T) {
 	if err := srv.SwapSpec(blocked); err == nil {
 		t.Fatal("SwapSpec must reject implicit TLS")
 	}
+	mustCmd(t, c, 502, "AUTH PLAIN")
+	mustCmd(t, c, 552, "MAIL FROM:<a@b> SIZE=100")
+}
+
+func TestSnapshotSwapAppliesToNextMAIL(t *testing.T) {
+	spec := defaultSMTPSpec(t)
+	spec.MaxMessageBytes = 10 << 20
+	snaps := snapshot.NewStore()
+	snaps.InstallBootstrap(&snapshot.Snapshot{
+		Canonical: &model.State{Spec: model.Spec{SMTP: spec}},
+	})
+	srv, err := New(Options{Address: "127.0.0.1:0", Spec: spec, Snapshots: snaps})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = srv.Shutdown(nil) })
+	c := dial(t, srv)
+	mustCmd(t, c, 250, "EHLO x")
+	next := spec
+	next.MaxMessageBytes = 50
+	snaps.Swap(&snapshot.Snapshot{
+		Canonical: &model.State{Spec: model.Spec{SMTP: next}},
+	})
 	mustCmd(t, c, 552, "MAIL FROM:<a@b> SIZE=100")
 }
 

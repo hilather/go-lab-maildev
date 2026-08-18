@@ -6,6 +6,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/snapshot"
 )
 
 // CompileOpts controls revision metadata and the compile clock.
@@ -15,17 +16,9 @@ type CompileOpts struct {
 	Generation        model.Generation
 }
 
-// Result is the compiled, hashed desired state. No listeners are bound.
-type Result struct {
-	Canonical         *model.State
-	Revision          model.Revision
-	BootstrapRevision model.Revision
-	Generation        model.Generation
-	CompiledAt        time.Time
-}
-
 // Compile normalizes and validates st (copy-on-write) and hashes canonical JSON.
-func Compile(ctx context.Context, st *model.State, opts CompileOpts) (*Result, error) {
+// The returned Snapshot is immutable; callers must not mutate Canonical.
+func Compile(ctx context.Context, st *model.State, opts CompileOpts) (*snapshot.Snapshot, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -51,7 +44,7 @@ func Compile(ctx context.Context, st *model.State, opts CompileOpts) (*Result, e
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	return &Result{
+	return &snapshot.Snapshot{
 		Canonical:         n,
 		Revision:          rev,
 		BootstrapRevision: bootRev,

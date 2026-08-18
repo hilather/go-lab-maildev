@@ -1,6 +1,6 @@
 // Package compiler compiles a LabMail document into a canonical snapshot.
 //
 // Compile calls config.Normalize + config.Validate and hashes the canonical
-// spec. The returned Result is immutable; callers must not mutate Canonical.
-// STA-001 will wrap this in an atomic snapshot store.
+// spec. The returned Snapshot is immutable; callers must not mutate Canonical.
+// internal/snapshot.Store holds the live pointer that SMTP re-reads.
 package compiler

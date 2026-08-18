@@ -2,12 +2,14 @@
 
 Status: Proposed normative behavior
 Owners: Store, SMTP, Application
-Last reviewed: 2026-08-17 (STORE-001)
+Last reviewed: 2026-08-17 (STA-001)
 Related ADRs: 0003
 
 Package `internal/store`. Captured mail is runtime evidence, not desired state. Restart or reset wipes the inbox.
 
 STORE-001 implements `store.Memory` (ULID ids, MIME parse via `internal/mimeparse`, stacked caps, Wait, Wipe epoch, optional spill). SMTP `Insert` takes the epoch captured at DATA start; a mismatch under the insert lock returns `store.ErrStaleEpoch` (`451 4.3.2`). `fullPolicy: reject` returns `store.ErrFull` (`452 4.3.1`). A single message whose resident size exceeds `maxBytes` returns `store.ErrTooLarge` (`552 5.3.4`). `store.Null` remains a discard Sink for tests.
+
+STA-001 adds `ReplaceCaps` / `Configure` / `ResetTo` for live `replaceStoreCaps` and reset. Shrink + `reject` returns `store.ErrOverNewCap` (`store_over_new_cap`) unless `force` or the new policy is `evict_oldest`. Occupancy is judged against the **compiled** candidate spec (last `replaceStoreCaps` wins). Reset preflights store options (including a creatable spill directory) and then `ResetTo` (Wipe + new options under one lock) so a failed reset cannot empty the inbox under the old snapshot. Wipe/`ResetTo` remain the only epoch bumps. SMTP insert stays on the data plane (`store.Sink`), not `app.Service`. AUTH/STARTTLS apply and reset stay reject until SMTP-001b.
 
 Malformed MIME is still stored: raw bytes are kept and `parseWarning` is set.
 
@@ -27,6 +29,8 @@ type Store interface {
     Epoch() uint64
     Stats() model.StoreStats
     Wipe() // increment epoch, empty index, unlink spill
+    ReplaceCaps(opts Options, force bool) error
+    Configure(opts Options) error // occupancy checked against new caps first
 }
 ```
 

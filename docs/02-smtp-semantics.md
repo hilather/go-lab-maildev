@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: SMTP, Architecture
-Last reviewed: 2026-08-17 (SMTP-001b + STORE-001)
+Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001)
 Related ADRs: 0002
 
 Implementation lives in `internal/smtp/codec` (line IO, reply formatting) and `internal/smtp/server` (session, limits, TLS). No third-party SMTP server library. See [docs/adr/0002-in-tree-smtp-receive-only.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0002-in-tree-smtp-receive-only.md).

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/control/compat"
 	"github.com/hilather/go-lab-maildev/internal/control/rest"
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtp/server"
@@ -139,6 +141,12 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 	if err != nil {
 		return nil, err
 	}
+	ready := func() bool { return smtp.Addr() != nil }
+	mounts, err := compatMounts(svc, spec, ready)
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
+	}
 	hs, err := rest.New(rest.Config{
 		Addr:           addr,
 		Service:        svc,
@@ -148,9 +156,8 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 		RatePerSec:     float64(spec.Management.RequestsPerSecond),
 		RateBurst:      float64(spec.Management.Burst),
 		PublicMetrics:  spec.Observability.Metrics.PublicPath,
-		Ready: func() bool {
-			return smtp.Addr() != nil
-		},
+		Mounts:         mounts,
+		Ready:          ready,
 	})
 	if err != nil {
 		_ = ln.Close()
@@ -159,6 +166,21 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 	hs.Attach(ln)
 	go func() { _ = hs.Serve(ln) }()
 	return hs, nil
+}
+
+func compatMounts(svc *app.App, spec model.Spec, ready func() bool) (map[string]http.Handler, error) {
+	if !spec.Listeners.Management.CompatEnabled {
+		return nil, nil
+	}
+	h, err := compat.New(compat.Config{
+		Service:        svc,
+		AllowedOrigins: spec.Management.OriginAllowlist,
+		Ready:          ready,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return h.Mounts(), nil
 }
 
 func managementListen(flagAddr, yamlAddr string) (addr string, unbound bool) {

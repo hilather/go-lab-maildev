@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001)
+Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001) + incoming
 Related ADRs: 0002, 0004
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -15,7 +15,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | SMTP protocol | 3a: greeting–DATA, SIZE, limits, 452/451 epoch; 3b: AUTH LOGIN/PLAIN transcripts, STARTTLS optional/required + handshake | `internal/smtp/server` with `internal/smtptest`; transcripts in `testdata/smtp` |
 | MIME | multipart/alternative, attachments, base64, quoted-printable, broken MIME still stored | `internal/mimeparse` + `testdata/mime` |
 | REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json | `internal/control/rest` |
-| Compat | PR 7: array + relay 403 + `/healthz` (fake principal). PR 9: `TestMaildevScenarioCompat` (401 + Basic + subject) | `internal/control/compat` |
+| Compat | COMPAT-001: array + relay 403 + `/healthz` (fake principal) + `testdata/compat` goldens. PR 9: `TestMaildevScenarioCompat` (401 + Basic + subject) | `internal/control/compat` |
 | MCP | 2026-07-28 initialize, tools/list, tool call, origin, bearer | `internal/control/mcp` |
 | Parity | every `PARITY_REQUIRED` capability: same input types, scopes, errors, side effects | `internal/capabilities` + rest/mcp tests (`make test-parity`) |
 | Receive-only | reserved YAML; no relay; import boundary | `internal/config`, `internal/smtp/import_test.go`, `internal/store/import_test.go`, `internal/smtptest/isolation_test.go` |

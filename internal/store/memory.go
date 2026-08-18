@@ -41,6 +41,8 @@ func OptionsFromSpec(spec model.StoreSpec) Options {
 	}
 }
 
+var _ Store = (*Memory)(nil)
+
 // Memory is a process-local, mutex-protected inbox.
 type Memory struct {
 	maxMessages    int
@@ -67,23 +69,31 @@ type record struct {
 	attSpill []string
 }
 
-// New builds an empty inbox and wipes any leftover spill files.
-func New(opts Options) (*Memory, error) {
+func normalizeOptions(opts Options) (Options, error) {
 	if opts.MaxMessages <= 0 {
-		return nil, errors.New("store: maxMessages must be > 0")
+		return opts, errors.New("store: maxMessages must be > 0")
 	}
 	if opts.MaxBytes <= 0 {
-		return nil, errors.New("store: maxBytes must be > 0")
+		return opts, errors.New("store: maxBytes must be > 0")
 	}
 	switch opts.FullPolicy {
 	case "", model.FullPolicyReject:
 		opts.FullPolicy = model.FullPolicyReject
 	case model.FullPolicyEvictOldest:
 	default:
-		return nil, fmt.Errorf("store: unknown fullPolicy %q", opts.FullPolicy)
+		return opts, fmt.Errorf("store: unknown fullPolicy %q", opts.FullPolicy)
 	}
 	if opts.SpillDirectory != "" && opts.SpillThreshold <= 0 {
 		opts.SpillThreshold = 256 << 10
+	}
+	return opts, nil
+}
+
+// New builds an empty inbox and wipes any leftover spill files.
+func New(opts Options) (*Memory, error) {
+	opts, err := normalizeOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 	m := &Memory{
 		maxMessages:    opts.MaxMessages,
@@ -226,6 +236,20 @@ func (m *Memory) evictUntilFitsLocked(candidate int64) error {
 	}
 	if !m.fitsLocked(candidate) {
 		return ErrFull
+	}
+	return nil
+}
+
+func (m *Memory) occupancyOKLocked() bool {
+	return len(m.byID) <= m.maxMessages && m.bytes <= m.maxBytes
+}
+
+func (m *Memory) evictUntilUnderCapsLocked() error {
+	for len(m.order) > 0 && !m.occupancyOKLocked() {
+		m.removeLocked(m.order[0], true)
+	}
+	if !m.occupancyOKLocked() {
+		return ErrOverNewCap
 	}
 	return nil
 }
@@ -518,6 +542,66 @@ func (m *Memory) Stats() model.StoreStats {
 		Epoch:        m.epoch,
 		Evictions:    m.evictions,
 	}
+}
+
+// ReplaceCaps applies the three replaceStoreCaps fields.
+func (m *Memory) ReplaceCaps(opts Options, force bool) error {
+	if m == nil {
+		return errors.New("store: nil Memory")
+	}
+	opts, err := normalizeOptions(opts)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	over := len(m.byID) > opts.MaxMessages || m.bytes > opts.MaxBytes
+	if over && opts.FullPolicy != model.FullPolicyEvictOldest && !force {
+		return ErrOverNewCap
+	}
+	m.maxMessages = opts.MaxMessages
+	m.maxBytes = opts.MaxBytes
+	m.fullPolicy = opts.FullPolicy
+	if over {
+		if err := m.evictUntilUnderCapsLocked(); err != nil {
+			return ErrOverNewCap
+		}
+	}
+	return nil
+}
+
+// Configure replaces all store options. Call after Wipe on reset.
+func (m *Memory) Configure(opts Options) error {
+	if m == nil {
+		return errors.New("store: nil Memory")
+	}
+	opts, err := normalizeOptions(opts)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.maxMessages = opts.MaxMessages
+	m.maxBytes = opts.MaxBytes
+	m.fullPolicy = opts.FullPolicy
+	m.maxWait = opts.MaxWait
+	spillChanged := m.spillDir != opts.SpillDirectory || m.spillThreshold != opts.SpillThreshold
+	m.spillDir = opts.SpillDirectory
+	m.spillThreshold = opts.SpillThreshold
+	if spillChanged && m.spillDir != "" {
+		if err := m.prepareSpill(); err != nil {
+			return err
+		}
+	}
+	if len(m.byID) > m.maxMessages || m.bytes > m.maxBytes {
+		if m.fullPolicy != model.FullPolicyEvictOldest {
+			return ErrOverNewCap
+		}
+		if err := m.evictUntilUnderCapsLocked(); err != nil {
+			return ErrOverNewCap
+		}
+	}
+	return nil
 }
 
 // Wipe increments epoch, empties the index, and unlinks spill.

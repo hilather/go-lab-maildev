@@ -12,6 +12,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtp/codec"
+	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
 
@@ -40,12 +41,15 @@ type Options struct {
 	Address string
 	Spec    model.SMTPSpec
 	Store   store.Sink
+	// Snapshots, when set, is re-read on every MAIL, RCPT, and DATA.
+	Snapshots *snapshot.Store
 }
 
 // Server is a plain SMTP receive listener.
 type Server struct {
 	addr  string
 	spec  atomic.Pointer[model.SMTPSpec]
+	snaps *snapshot.Store
 	store store.Sink
 	gate  *gate
 
@@ -78,6 +82,7 @@ func New(opts Options) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
 		addr:   opts.Address,
+		snaps:  opts.Snapshots,
 		store:  sink,
 		gate:   newGate(),
 		ctx:    ctx,
@@ -88,17 +93,20 @@ func New(opts Options) (*Server, error) {
 	return s, nil
 }
 
-// SwapSpec replaces the snapshot used by the next MAIL, RCPT, and DATA.
+// SwapSpec replaces the fallback spec used when no snapshot store is attached.
+// Live apply prefers Snapshots.Load on the next MAIL, RCPT, and DATA.
 func (s *Server) SwapSpec(spec model.SMTPSpec) error {
-	if err := rejectUnimplemented(spec); err != nil {
-		return err
-	}
 	spec = withSpecDefaults(spec)
 	s.spec.Store(&spec)
 	return nil
 }
 
 func (s *Server) specNow() model.SMTPSpec {
+	if s.snaps != nil {
+		if snap := s.snaps.Load(); snap != nil && snap.Canonical != nil {
+			return withSpecDefaults(snap.Canonical.Spec.SMTP)
+		}
+	}
 	p := s.spec.Load()
 	if p == nil {
 		return withSpecDefaults(model.SMTPSpec{})

@@ -11,10 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hilather/go-lab-maildev/internal/compiler"
-	"github.com/hilather/go-lab-maildev/internal/config"
+	"github.com/hilather/go-lab-maildev/internal/app"
 	"github.com/hilather/go-lab-maildev/internal/smtp/server"
-	"github.com/hilather/go-lab-maildev/internal/store"
 )
 
 type serveFlags struct {
@@ -79,44 +77,42 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 
 type serveRuntime struct {
 	smtp    *server.Server
-	inbox   *store.Memory
+	svc     *app.App
 	pidPath string
 }
 
 func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, error) {
-	st, err := config.LoadFile(flags.Config)
+	svc, err := app.Boot(ctx, app.Options{BootstrapPath: flags.Config})
 	if err != nil {
 		return nil, fmt.Errorf("load %s: %w", flags.Config, err)
 	}
-	res, err := compiler.Compile(ctx, st, compiler.CompileOpts{})
-	if err != nil {
-		return nil, fmt.Errorf("compile: %w", err)
+	snap := svc.Active()
+	if snap == nil || snap.Canonical == nil {
+		svc.Close()
+		return nil, fmt.Errorf("compile: no snapshot")
 	}
-	addr := res.Canonical.Spec.Listeners.SMTP.Address
+	addr := snap.Canonical.Spec.Listeners.SMTP.Address
 	if flags.SMTPListen != "" {
 		addr = flags.SMTPListen
 	}
-	inbox, err := store.New(store.OptionsFromSpec(res.Canonical.Spec.Store))
-	if err != nil {
-		return nil, err
-	}
 	srv, err := server.New(server.Options{
-		Address: addr,
-		Spec:    res.Canonical.Spec.SMTP,
-		Store:   inbox,
+		Address:   addr,
+		Spec:      snap.Canonical.Spec.SMTP,
+		Store:     svc.Inbox(),
+		Snapshots: svc.Snapshots(),
 	})
 	if err != nil {
-		inbox.Wipe()
+		svc.Close()
 		return nil, err
 	}
 	if err := srv.Start(); err != nil {
-		inbox.Wipe()
+		svc.Close()
 		return nil, err
 	}
-	rt := &serveRuntime{smtp: srv, inbox: inbox, pidPath: flags.PIDFile}
+	rt := &serveRuntime{smtp: srv, svc: svc, pidPath: flags.PIDFile}
 	if err := writePIDFile(flags.PIDFile); err != nil {
 		_ = srv.Shutdown(context.Background())
-		inbox.Wipe()
+		svc.Close()
 		return nil, fmt.Errorf("pid-file: %w", err)
 	}
 	return rt, nil
@@ -132,8 +128,8 @@ func (r *serveRuntime) shutdown(ctx context.Context) error {
 			first = err
 		}
 	}
-	if r.inbox != nil {
-		r.inbox.Wipe()
+	if r.svc != nil {
+		r.svc.Close()
 	}
 	if r.pidPath != "" {
 		_ = os.Remove(r.pidPath)

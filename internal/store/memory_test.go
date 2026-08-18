@@ -534,6 +534,60 @@ func TestMemoryInsertCanceled(t *testing.T) {
 	}
 }
 
+func TestReplaceCapsRejectOverWithoutForce(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("a", "one")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("b", "two")); err != nil {
+		t.Fatal(err)
+	}
+	err := s.ReplaceCaps(Options{MaxMessages: 1, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject}, false)
+	if !errors.Is(err, ErrOverNewCap) {
+		t.Fatalf("err=%v", err)
+	}
+	if s.Stats().MessageCount != 2 {
+		t.Fatal("reject shrink must not evict")
+	}
+}
+
+func TestReplaceCapsForceEvictsOldest(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	first, err := s.Insert(context.Background(), s.Epoch(), rawMsg("a", "one"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("b", "two")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceCaps(Options{MaxMessages: 1, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject}, true); err != nil {
+		t.Fatal(err)
+	}
+	st := s.Stats()
+	if st.MessageCount != 1 {
+		t.Fatalf("count=%d", st.MessageCount)
+	}
+	if _, err := s.Get(first.ID, false); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("oldest should be evicted: %v", err)
+	}
+}
+
+func TestReplaceCapsEvictOldestPolicy(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("a", "one")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("b", "two")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceCaps(Options{MaxMessages: 1, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyEvictOldest}, false); err != nil {
+		t.Fatal(err)
+	}
+	if s.Stats().MessageCount != 1 {
+		t.Fatalf("count=%d", s.Stats().MessageCount)
+	}
+}
+
 func TestNewRejectsBadCaps(t *testing.T) {
 	if _, err := New(Options{}); err == nil {
 		t.Fatal("empty options")

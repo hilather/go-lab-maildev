@@ -81,7 +81,7 @@ These are closed. Implementers do not re-litigate them without an ADR.
 | **D9** | **MIME parsing is adapted**, not invented. `internal/mimeparse` is the only package that may import `github.com/emersion/go-message` (and charset helpers). Types never leak. | MIME is too large to write safely in 1.0. |
 | **D10** | **Default SMTP posture matches the lab profile:** no AUTH, no TLS required, any MAIL FROM / RCPT TO accepted, SIZE advertised. AUTH and STARTTLS are YAML-optional. | Preserves `labinfo` note and smoke `smtp.SendMail(..., nil, ...)`. |
 | **D11** | **Store is memory-first** with **stacked** caps. Stored `resident + candidate ≤ maxBytes`. Independently, `reservedInFlight ≤ maxInFlightDataBytes`. Default `fullPolicy: reject` (SMTP `452`). | Prevents OOM. Two knobs so in-flight DATA does not shrink the inbox budget. |
-| **D12** | **Embedded inbox UI ships in 1.0.** React/TS + Vite, embedded like TacLab/LabLDAP. Calls generated REST only. No Relay button. | Replacement contract includes a web UI on 1080. GA is not done without PR 12. |
+| **D12** | **Embedded inbox UI ships in 1.0.** React/TS + Vite (Node **22.14.0**), embedded like TacLab/LabLDAP. Calls generated REST only. No Relay button. Frozen table: [Embedded operator UI](#embedded-operator-ui). | Replacement contract includes a web UI on 1080. GA is not done without PR 12. |
 | **D13** | **Container ports stay 1025 / 1080.** Management default bind is `:1080`, not LabDNS’s `:8080`. | Compose map `${MAILDEV_WEB_PORT:-1080}:1080` does not change. |
 | **D14** | **Go 1.26, official MCP SDK `v1.7.0`, protocol `2026-07-28`, Apache-2.0.** `gopkg.in/yaml.v3` with `KnownFields(true)`. | Family pins (LabDNS/LabLDAP go 1.26). |
 | **D15** | **Compat catalog id stays `maildev` during the swap release.** Product name in docs/UI is LabMail. labinfo `name` becomes `Mail sink (LabMail, receive-only)`. | Avoids breaking agent prompts and `services.yaml` id references. A later lab release may rename the id. |
@@ -138,6 +138,22 @@ UI (static) -----> REST only
 ```
 
 **Invariant:** `internal/smtp` must not import `internal/control` (including `internal/control/mcp` and `internal/control/rest`), `internal/web`, or `internal/control/compat`. Management failure must not stop SMTP. SMTP must not block on MCP clients.
+
+## Embedded operator UI
+
+Required for GA / 1.0 (D12, PR 12). The UI talks REST only. XSS/CSP/`cid:` rewrite: [docs/06-rest-api.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/06-rest-api.md) and [docs/08-security-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/08-security-architecture.md).
+
+| Item | Choice |
+|---|---|
+| Stack | React + TypeScript + Vite (Node 22.14.0), TacLab/LabLDAP pattern |
+| Embed | `internal/web` `go:embed` of `web/dist` (copy step; `web/` has its own `go.mod` if needed like TacLab) |
+| Auth | Login page: paste bearer **or** basic username/password. `POST /v1/session`. Cookie `labmail_session` + `X-LabMail-CSRF`. Cookie is REST-only. |
+| Pages | Inbox list, message view (text / HTML preview / headers / raw / attachments), status (revisions, store stats), audit (if scoped), gated reset |
+| Live update | `EventSource` `GET /v1/events/stream` (SSE). Fallback: 3s poll of `GET /v1/messages`. **No** maildev WebSocket. |
+| HTML preview | `<iframe src="/v1/messages/{id}/preview" sandbox>` — **no** `allow-scripts`, **no** `allow-same-origin`, **no** `allow-popups-to-escape-sandbox`. Not `srcdoc`. Never parent `innerHTML`. |
+| Missing on purpose | Relay button, “send”, outgoing settings, compose-new-mail |
+
+`spec.ui.enabled: false` serves 404 for `/` but keeps REST/MCP (`--disable-web` is **not** “disable management”).
 
 ## Package layout
 
@@ -318,3 +334,4 @@ FND-001 implements `version` and `help` only.
 - Store: [docs/03-message-store.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/03-message-store.md)
 - YAML: [docs/04-state-and-configuration.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/04-state-and-configuration.md)
 - Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md)
+- Preview CSP / iframe sandbox: [docs/06-rest-api.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/06-rest-api.md), [docs/08-security-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/08-security-architecture.md)

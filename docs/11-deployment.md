@@ -39,7 +39,7 @@ CMD ["serve", "--config=/etc/labmail/config.yaml"]
 HEALTHCHECK CMD ["/labmail", "healthcheck", "--url=http://127.0.0.1:1080/v1/health/ready"]
 ```
 
-If the UI stage is present, add a Node 22 build stage (TacLab) that copies `web/dist` into `internal/web` before `go build`.
+If the UI stage is present, add a Node **22.14.0** build stage (TacLab) that copies `web/dist` into `internal/web` before `go build`. UI contract (pages, EventSource + 3s poll, no Relay/send/compose): [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#embedded-operator-ui).
 
 Posture:
 

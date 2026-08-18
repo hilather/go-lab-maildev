@@ -10,10 +10,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
 	"github.com/hilather/go-lab-maildev/internal/control/rest"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/preview"
 )
 
 var ulidRe = regexp.MustCompile(`^[0-7][0-9A-HJKMNP-TV-Z]{25}$`)
@@ -100,6 +102,30 @@ func TestRelayAlways403(t *testing.T) {
 	still := doReq(t, h, http.MethodGet, "/email", "")
 	if len(decodeArray(t, still)) != 1 {
 		t.Fatal("relay must be a no-op")
+	}
+}
+
+func TestAttachmentNamedRelayDownloads(t *testing.T) {
+	h, svc := newTestHandler(t)
+	res, err := svc.Inbox().Insert(context.Background(), svc.Inbox().Epoch(), &model.Message{
+		Subject: "relay-name",
+		Attachments: []model.Attachment{{
+			Filename:    "relay.pdf",
+			ContentType: "application/pdf",
+			Data:        []byte("%PDF-1.4"),
+		}},
+		Raw: []byte("Subject: relay-name\r\n\r\n"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := doReq(t, h, http.MethodGet, "/email/"+res.ID+"/attachment/relay.pdf", "")
+	requireStatus(t, got, http.StatusOK)
+	if got.Body.String() != "%PDF-1.4" {
+		t.Fatalf("body=%q", got.Body.String())
+	}
+	if strings.Contains(got.Header().Get("Content-Type"), "problem") {
+		t.Fatal("filename relay.pdf must not be receive_only")
 	}
 }
 
@@ -203,6 +229,16 @@ func TestFilterAndSkip(t *testing.T) {
 	if none.Body.String() != "[]" {
 		t.Fatalf("skip past end=%s", none.Body.String())
 	}
+
+	unread := doReq(t, h, http.MethodGet, "/email?read=false", "")
+	requireStatus(t, unread, http.StatusOK)
+	if len(decodeArray(t, unread)) != 2 {
+		t.Fatalf("read=false=%s", unread.Body.String())
+	}
+	seen := doReq(t, h, http.MethodGet, "/email?read=true", "")
+	if seen.Body.String() != "[]" {
+		t.Fatalf("read=true before get=%s", seen.Body.String())
+	}
 }
 
 func TestDeleteAndHTMLAndAttachment(t *testing.T) {
@@ -211,7 +247,7 @@ func TestDeleteAndHTMLAndAttachment(t *testing.T) {
 
 	html := doReq(t, h, http.MethodGet, "/email/"+id+"/html", "")
 	requireStatus(t, html, http.StatusOK)
-	if html.Header().Get("Content-Security-Policy") != previewCSP {
+	if html.Header().Get("Content-Security-Policy") != preview.CSP {
 		t.Fatalf("csp=%q", html.Header().Get("Content-Security-Policy"))
 	}
 
@@ -315,6 +351,21 @@ func TestWiredOnManagementListener(t *testing.T) {
 		t.Fatalf("email=%s", list.Body.String())
 	}
 	requireProblem(t, doReq(t, h, http.MethodPost, "/email/x/relay", `{}`), http.StatusForbidden, "receive_only")
+
+	res, err := svc.Inbox().Insert(context.Background(), svc.Inbox().Epoch(), &model.Message{
+		Subject: "wired-relay-name",
+		Attachments: []model.Attachment{{
+			Filename:    "relay.pdf",
+			ContentType: "application/pdf",
+			Data:        []byte("%PDF"),
+		}},
+		Raw: []byte("Subject: wired-relay-name\r\n\r\n"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	att := doReq(t, h, http.MethodGet, "/email/"+res.ID+"/attachment/relay.pdf", "")
+	requireStatus(t, att, http.StatusOK)
 }
 
 func TestOriginAndMethod(t *testing.T) {
@@ -327,6 +378,33 @@ func TestOriginAndMethod(t *testing.T) {
 
 	got := doReq(t, h, http.MethodPost, "/email", "")
 	requireProblem(t, got, http.StatusMethodNotAllowed, "method_not_allowed")
+}
+
+func TestHTMLRewritesCIDAndMarksRead(t *testing.T) {
+	h, svc := newTestHandler(t)
+	id := insertMIME(t, svc, "html-inline-cid.eml", model.Envelope{}, fixtureTime())
+	got := doReq(t, h, http.MethodGet, "/email/"+id+"/html", "")
+	requireStatus(t, got, http.StatusOK)
+	if got.Header().Get("Content-Security-Policy") != preview.CSP {
+		t.Fatalf("csp=%q", got.Header().Get("Content-Security-Policy"))
+	}
+	if strings.Contains(got.Body.String(), "cid:") {
+		t.Fatalf("cid not rewritten: %s", got.Body.String())
+	}
+	if !strings.Contains(got.Body.String(), "data:image/png;base64,") {
+		t.Fatalf("missing data url: %s", got.Body.String())
+	}
+	again, err := svc.GetMessage(context.Background(), app.Actor{ID: "t"}, id, false)
+	if err != nil || !again.Read {
+		t.Fatalf("html get must mark read: read=%v err=%v", again, err)
+	}
+}
+
+func TestTextPrefixRuneBoundary(t *testing.T) {
+	got := prefixBytes("éééé", 3)
+	if !utf8.ValidString(got) || got != "é" {
+		t.Fatalf("prefix=%q", got)
+	}
 }
 
 func TestMissingMessage(t *testing.T) {

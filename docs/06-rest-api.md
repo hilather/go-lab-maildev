@@ -155,7 +155,7 @@ Content-Disposition: inline
 
 **`cid:` rewrite (option a, the only rule that works):** the preview document inlines matching parts as `data:<contentType>;base64,…` URLs before it is served. Do **not** rewrite `cid:` to HTTP attachment paths. The iframe is a unique origin (no `allow-same-origin`, no `allow-scripts`), so it cannot mint `blob:` URLs and CSP `'self'` would not match LabMail’s host. `img-src data:` is therefore the only legal image source. Remote `http(s):` images stay broken (no tracking pixels). Parts larger than 2 MiB decoded, or missing `Content-ID`, are omitted (broken image), not fetched at runtime.
 
-`GET /v1/messages/{id}/attachments/{attId}` (and compat `/email/:id/attachment/:filename`) remains **download**: `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff`. It is not used by the preview document.
+`GET /v1/messages/{id}/attachments/{attId}` (and compat `/email/:id/attachment/:filename`) remains **download**: `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff`. It is not used by the preview document. Compat `GET /email/:id/html` uses the same CSP and `cid:` rewrite (`internal/preview`).
 
 ## Config plan/apply
 

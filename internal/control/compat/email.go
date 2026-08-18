@@ -3,17 +3,18 @@ package compat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"path"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
+	"github.com/hilather/go-lab-maildev/internal/mimeparse"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/preview"
 )
-
-const previewCSP = "default-src 'none'; img-src data:; style-src 'unsafe-inline'"
 
 type emailJSON struct {
 	ID          string            `json:"id"`
@@ -118,16 +119,18 @@ func (h *Handler) handleClear(w http.ResponseWriter, r *http.Request, instance s
 }
 
 func (h *Handler) handleHTML(w http.ResponseWriter, r *http.Request, instance string, actor app.Actor, id string) {
-	msg, err := h.svc.GetMessage(r.Context(), actor, id, false)
+	// maildev getEmailHtml goes through getEmailById, which marks read.
+	msg, err := h.svc.GetMessage(r.Context(), actor, id, true)
 	if err != nil {
 		h.writeProblem(w, r, instance, asDomain(err))
 		return
 	}
-	// Served as a document (maildev UI iframe), so apply the preview CSP.
-	w.Header().Set("Content-Security-Policy", previewCSP)
+	// Same document posture as /v1/.../preview: CSP plus cid: → data: rewrite.
+	body := preview.RewriteCID(msg.HTML, msg.Attachments)
+	w.Header().Set("Content-Security-Policy", preview.CSP)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", "inline")
-	h.writeBytes(w, http.StatusOK, "text/html; charset=utf-8", []byte(msg.HTML))
+	h.writeBytes(w, http.StatusOK, "text/html; charset=utf-8", []byte(body))
 }
 
 func (h *Handler) handleAttachment(w http.ResponseWriter, r *http.Request, instance string, actor app.Actor, id, filename string) {
@@ -136,7 +139,7 @@ func (h *Handler) handleAttachment(w http.ResponseWriter, r *http.Request, insta
 		h.writeProblem(w, r, instance, asDomain(err))
 		return
 	}
-	want := sanitizeDownloadName(filename)
+	want := mimeparse.SanitizeFilename(filename)
 	var att *model.Attachment
 	for i := range msg.Attachments {
 		if msg.Attachments[i].Filename == want {
@@ -152,8 +155,9 @@ func (h *Handler) handleAttachment(w http.ResponseWriter, r *http.Request, insta
 	if ct == "" {
 		ct = "application/octet-stream"
 	}
+	name := mimeparse.SanitizeFilename(att.Filename)
 	w.Header().Set("Content-Type", ct)
-	w.Header().Set("Content-Disposition", `attachment; filename="`+sanitizeDownloadName(att.Filename)+`"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(att.Data)
@@ -184,9 +188,13 @@ func (h *Handler) handleConfig(w http.ResponseWriter, r *http.Request, instance 
 }
 
 func (h *Handler) listAll(ctx context.Context, actor app.Actor, filter model.MessageFilter) ([]*model.Message, error) {
+	maxPages := listPageBudget(0)
+	if view, err := h.svc.GetState(ctx, actor); err == nil && view != nil && view.Canonical != nil {
+		maxPages = listPageBudget(view.Canonical.Spec.Store.MaxMessages)
+	}
 	var out []*model.Message
 	cursor := ""
-	for {
+	for page := 0; page < maxPages; page++ {
 		res, err := h.svc.ListMessages(ctx, actor, model.ListQuery{
 			Filter: filter,
 			Cursor: cursor,
@@ -201,6 +209,14 @@ func (h *Handler) listAll(ctx context.Context, actor app.Actor, filter model.Mes
 		}
 		cursor = res.NextCursor
 	}
+	return out, nil
+}
+
+func listPageBudget(maxMessages int) int {
+	if maxMessages <= 0 {
+		maxMessages = 1000
+	}
+	return (maxMessages+listPage-1)/listPage + 1
 }
 
 func fromEmail(m *model.Message, list bool, textPrefix bool) emailJSON {
@@ -295,6 +311,10 @@ func prefixBytes(s string, n int) string {
 	if n <= 0 || len(s) <= n {
 		return s
 	}
+	// Cut at a rune start so ?text=1 does not emit invalid UTF-8.
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
 	return s[:n]
 }
 
@@ -368,6 +388,12 @@ func valueMatches(got any, want string) bool {
 		return false
 	case string:
 		return g == want
+	case bool:
+		return strconv.FormatBool(g) == want
+	case json.Number:
+		return g.String() == want
+	case float64:
+		return strconv.FormatFloat(g, 'f', -1, 64) == want
 	case []any:
 		for _, el := range g {
 			if valueMatches(el, want) {
@@ -376,17 +402,6 @@ func valueMatches(got any, want string) bool {
 		}
 		return false
 	default:
-		return false
+		return fmt.Sprint(g) == want
 	}
-}
-
-func sanitizeDownloadName(name string) string {
-	name = strings.TrimSpace(name)
-	name = strings.ReplaceAll(name, "\\", "/")
-	name = path.Base(name)
-	name = strings.ReplaceAll(name, `"`, "")
-	if name == "" || name == "." || name == ".." {
-		return "attachment"
-	}
-	return name
 }

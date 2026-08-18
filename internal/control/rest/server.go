@@ -81,7 +81,8 @@ type Config struct {
 	PublicMetrics bool
 	// SSEHeartbeat is the events stream comment interval. Non-positive uses 15s.
 	SSEHeartbeat time.Duration
-	// Mounts are additional handlers served ahead of REST routing.
+	// Mounts are additional handlers (compat /email) served after the shared
+	// timeout, inflight, and rate gates but ahead of native /v1 routing.
 	Mounts map[string]http.Handler
 }
 
@@ -96,6 +97,7 @@ type Server struct {
 	inflight     chan struct{}
 	rate         *limiter
 	sseHeartbeat time.Duration
+	mounts       *http.ServeMux
 
 	cursorMu  sync.Mutex
 	cursorKey []byte
@@ -143,15 +145,14 @@ func New(cfg Config) (*Server, error) {
 		cursorKey:    key,
 	}
 	s.svc.OnReset(s.RotateCursors)
-	s.handler = http.HandlerFunc(s.serveHTTP)
 	if len(cfg.Mounts) > 0 {
 		mux := http.NewServeMux()
 		for path, h := range cfg.Mounts {
 			mux.Handle(path, h)
 		}
-		mux.Handle("/", http.HandlerFunc(s.serveHTTP))
-		s.handler = mux
+		s.mounts = mux
 	}
+	s.handler = http.HandlerFunc(s.serveHTTP)
 	return s, nil
 }
 
@@ -277,11 +278,6 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.Contains(strings.ToLower(r.URL.Path), "/relay") {
-		s.writeProblem(w, r, instance, domainerr.ReceiveOnly("LabMail is receive-only; relay is not implemented"))
-		return
-	}
-
 	select {
 	case s.inflight <- struct{}{}:
 		defer func() { <-s.inflight }()
@@ -304,6 +300,18 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Compat mounts run after the shared gates so GET /email cannot bypass
+	// inflight/timeout/rate. Dispatch before the /v1 /relay substring check so
+	// attachment names like relay.pdf are not false receive_only hits.
+	if s.dispatchMount(w, r, instance) {
+		return
+	}
+
+	if strings.Contains(strings.ToLower(r.URL.Path), "/relay") {
+		s.writeProblem(w, r, instance, domainerr.ReceiveOnly("LabMail is receive-only; relay is not implemented"))
+		return
+	}
+
 	rt, params, pathOK, methodOK := matchRoute(s.routes, r.Method, r.URL.Path)
 	if !pathOK {
 		s.writeProblem(w, r, instance, domainerr.NotFound("not found"))
@@ -324,6 +332,28 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 
 	actor := s.authenticate(r)
 	s.dispatch(w, r, instance, actor, rt, params)
+}
+
+func (s *Server) dispatchMount(w http.ResponseWriter, r *http.Request, instance string) bool {
+	if s.mounts == nil {
+		return false
+	}
+	h, pattern := s.mounts.Handler(r)
+	if pattern == "" {
+		return false
+	}
+	if !isMountHealthPath(r.URL.Path) {
+		if err := s.rate.allow(r.RemoteAddr); err != nil {
+			s.writeProblem(w, r, instance, err)
+			return true
+		}
+	}
+	h.ServeHTTP(w, r)
+	return true
+}
+
+func isMountHealthPath(path string) bool {
+	return strings.TrimSuffix(path, "/") == "/healthz"
 }
 
 func isHealthCap(cap capabilities.Capability) bool {

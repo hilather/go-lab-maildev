@@ -83,14 +83,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.writeProblem(w, r, instance, domainerr.Forbidden("CORS is disabled"))
 		return
 	}
-	// Any /relay path is unimplementable. A 2xx here would look like a send.
-	if strings.Contains(strings.ToLower(r.URL.Path), "/relay") {
-		h.writeProblem(w, r, instance, domainerr.ReceiveOnly("LabMail is receive-only; relay is not implemented"))
-		return
-	}
 
 	actor := h.cfg.Principal(r)
 	parts := splitPath(r.URL.Path)
+	// Relay is a path segment after /email/{id}/, not a substring. Attachment
+	// names like relay.pdf must still download.
+	if isRelayPath(parts) {
+		h.writeProblem(w, r, instance, domainerr.ReceiveOnly("LabMail is receive-only; relay is not implemented"))
+		return
+	}
 	switch {
 	case len(parts) == 1 && parts[0] == "healthz":
 		h.requireMethod(w, r, instance, http.MethodGet, func() { h.handleHealthz(w, r, instance) })
@@ -144,6 +145,10 @@ func (h *Handler) isReady(ctx context.Context) bool {
 	}
 	st, err := h.svc.Status(ctx, app.Actor{ID: "ready", Class: "startup", Transport: "compat"})
 	return err == nil && st != nil && st.Ready
+}
+
+func isRelayPath(parts []string) bool {
+	return len(parts) >= 3 && parts[0] == "email" && strings.EqualFold(parts[2], "relay")
 }
 
 func splitPath(path string) []string {

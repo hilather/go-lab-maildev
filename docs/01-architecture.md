@@ -178,6 +178,7 @@ Required for GA / 1.0 (D12, PR 12). The UI talks REST only. XSS/CSP/`cid:` rewri
 |   |   |-- codec/                 # lines, replies
 |   |   `-- server/                # listener + session
 |   |-- mimeparse/                 # only importer of emersion/go-message
+|   |-- preview/                   # cid: → data: rewrite for HTML documents
 |   |-- app/                       # Service (no HTTP/MCP types)
 |   |-- capabilities/              # registry
 |   |-- control/rest/

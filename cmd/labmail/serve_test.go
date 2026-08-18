@@ -227,6 +227,17 @@ func TestServeCompatDisabled(t *testing.T) {
 		t.Fatalf("compatEnabled false: GET /email status=%d", email.StatusCode)
 	}
 	_ = email.Body.Close()
+	for _, path := range []string{"/healthz", "/config"} {
+		resp, err := http.Get("http://" + mgmt + path)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		if resp.StatusCode != http.StatusNotFound {
+			_ = resp.Body.Close()
+			t.Fatalf("compatEnabled false: GET %s status=%d", path, resp.StatusCode)
+		}
+		_ = resp.Body.Close()
+	}
 	cancel()
 	select {
 	case code := <-done:

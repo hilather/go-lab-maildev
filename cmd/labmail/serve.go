@@ -22,6 +22,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/smtp/server"
+	"github.com/hilather/go-lab-maildev/internal/web"
 )
 
 type serveFlags struct {
@@ -236,6 +237,14 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 		Auth:           verifier,
 		Sessions:       sessions,
 		CookieSecure:   spec.Listeners.Management.TLS.Enabled,
+		UI:             web.NewHandler(nil),
+		UIEnabled: func() bool {
+			snap := svc.Active()
+			if snap == nil || snap.Canonical == nil {
+				return spec.UI.Enabled
+			}
+			return snap.Canonical.Spec.UI.Enabled
+		},
 	})
 	if err != nil {
 		_ = ln.Close()

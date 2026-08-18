@@ -2,13 +2,13 @@
 
 **Receive-only SMTP lab appliance** in the LabDNS / LabLDAP / TacLab family.
 
-Systems under test deliver RFC 5321 SMTP here. LabMail will capture, index, and expose every accepted message over REST, MCP, and an embedded inbox UI. It **never** opens an outbound SMTP session, **never** relays, and **never** implements `POST /email/:id/relay`. Desired state is a fail-closed `labmail.dev/v1alpha1` YAML file. Captured mail is ephemeral: restart or reset returns the process to the mounted bootstrap and an empty inbox.
+Systems under test deliver RFC 5321 SMTP here. LabMail captures, indexes, and exposes every accepted message over REST, MCP, and an embedded inbox UI. It **never** opens an outbound SMTP session, **never** relays, and **never** implements `POST /email/:id/relay`. Desired state is a fail-closed `labmail.dev/v1alpha1` YAML file. Captured mail is ephemeral: restart or reset returns the process to the mounted bootstrap and an empty inbox.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/hilather/go-lab-maildev/ci.yml?branch=main&label=CI)](https://github.com/hilather/go-lab-maildev/actions/workflows/ci.yml)
 [![Go](https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
-Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox + native `/v1` REST + maildev `/email` compat + Streamable HTTP MCP + observability + lab static bearer + hardened image**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1`, `/email` compat, `POST /mcp`, slog JSON, OpenMetrics). There is **no inbox UI** yet.
+Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox + native `/v1` REST + maildev `/email` compat + Streamable HTTP MCP + observability + lab static bearer + hardened image + sandboxed inbox UI**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1`, `/email` compat, `POST /mcp`, slog JSON, OpenMetrics, and the SPA at `/`).
 
 Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
@@ -44,7 +44,7 @@ go build -o bin/labmail ./cmd/labmail
 ./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025 --management-listen 127.0.0.1:1080
 ```
 
-`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`) and management HTTP from `spec.listeners.management.address` (override with `--management-listen ADDR|off`). `--shutdown-timeout` (default 5s) and `--pid-file` are optional. Native `/v1`, maildev `/email` (when `compatEnabled`, default true), and Streamable HTTP `POST /mcp` share that listener; `POST /email/:id/relay` is 403. Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Ready is SMTP bound + store up. Probe readiness with `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready` or `GET /healthz`. Metrics are hand-rolled OpenMetrics on `spec.observability.metrics.listen` (default `127.0.0.1:9090`; empty disables); `publicPath: true` also serves `GET /v1/metrics`. Developer MCP: `labmail mcp-stdio --config testdata/config/valid/defaults.yaml --token-file /path/to/token` (required unless `auth.mode` is `dev-loopback-unauth`).
+`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`) and management HTTP from `spec.listeners.management.address` (override with `--management-listen ADDR|off`). `--shutdown-timeout` (default 5s) and `--pid-file` are optional. Native `/v1`, the inbox SPA at `/`, maildev `/email` (when `compatEnabled`, default true), and Streamable HTTP `POST /mcp` share that listener; `POST /email/:id/relay` is 403. Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Ready is SMTP bound + store up. Probe readiness with `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready` or `GET /healthz`. Metrics are hand-rolled OpenMetrics on `spec.observability.metrics.listen` (default `127.0.0.1:9090`; empty disables); `publicPath: true` also serves `GET /v1/metrics`. Developer MCP: `labmail mcp-stdio --config testdata/config/valid/defaults.yaml --token-file /path/to/token` (required unless `auth.mode` is `dev-loopback-unauth`). Production UI assets: `make web-build` (Node **22.14.0**) copies `web/dist` into `internal/web/dist`.
 
 Hardened image: non-root UID `65532`, scratch, read-only root, `cap_drop: ALL`. Healthcheck is HTTP ready (not SMTP/`node`). Compose smoke: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml).
 
@@ -60,10 +60,12 @@ make test-parity
 make test-config-compat
 make test-docs
 make test-container
+make web-test
+make web-build
 make build
 ```
 
-Required CI jobs: format, lint, unit, documentation, generated-file, parity, container-test. There is no optional or bypassable job. `make test-container` needs Docker.
+Required CI jobs: format, lint, unit, documentation, generated-file, parity, container-test, web. There is no optional or bypassable job. `make test-container` needs Docker.
 
 ## Documentation
 

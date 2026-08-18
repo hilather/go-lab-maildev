@@ -1,7 +1,7 @@
 # LabMail continuous integration (FND-001).
 #
 # Required jobs: format, lint, unit, documentation, generated-file,
-# parity, container-test.
+# parity, container-test, web.
 # There is no optional or bypassable job.
 #
 # Later PRs add race, fuzz-smoke, security-scan,
@@ -121,3 +121,20 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: Container contract
         run: make test-container
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22.14.0"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Inbox SPA tests
+        run: |
+          make web-install
+          make web-test
+          make web-build

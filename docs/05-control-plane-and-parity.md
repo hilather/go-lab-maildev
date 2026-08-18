@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Application, REST, MCP
-Last reviewed: 2026-08-17 (COMPAT-001 + MCP-001 + SEC-001)
+Last reviewed: 2026-08-18 (COMPAT-001 + MCP-001 + SEC-001 + UI-001)
 Related ADRs: 0004, 0005, 0006, 0007
 
 REST and MCP are two protocol adapters over one capability model. Adapters never call each other and never contain store/SMTP business logic. See [docs/adr/0004-shared-capability-registry.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0004-shared-capability-registry.md).

@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001)
+Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001 + UI-001)
 Related ADRs: 0002, 0004
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -25,6 +25,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Docs | required files, links, example YAML validates | `make test-docs` |
 | Config compat | `testdata/config/valid` + `invalid` | `make test-config-compat` |
 | Changelog | user-visible paths require `CHANGELOG.md` | `make test-changelog` |
+| Inbox UI | SPA fallback, `ui.enabled: false` 404, CSRF header, empty preview sandbox, no Relay/innerHTML | `internal/web`, `internal/control/rest/spa_test.go`, `make web-test` |
 
 ## Required Make targets
 
@@ -37,11 +38,11 @@ make test-parity test-config-compat test-docs
 make test-container security-scan test-changelog
 ```
 
-FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. SMTP-001a adds `testdata/smtp` transcripts, `net/smtp.SendMail` interop, the receive-only import-boundary test, and `FuzzReadLine` on `internal/smtp/codec`. SMTP-001b adds AUTH LOGIN/PLAIN transcripts (`testdata/smtp/auth-login.txt`, `auth-plain.txt`), STARTTLS optional/required fixtures, and `net/smtp` STARTTLS interop. STORE-001 adds `testdata/mime`, store insert/delete/wait/wipe race tests, and `FuzzParse` on `internal/mimeparse`. STA-001 adds snapshot swap, reset-wipes-inbox, in-flight Insert → 451, `replaceStoreCaps` shrink, and audit-on-reset/delete/apply tests. API-001 implements `make generate` / `make verify-generated` (`api/capabilities/v1.json`, `api/openapi/v1.json`) and REST contract tests in `internal/control/rest`. MCP-001 implements Streamable HTTP MCP, `api/mcp/v1.json`, and `make test-parity` (`internal/capabilities` + REST + MCP). COMPAT-001 adds `internal/control/compat` contract tests (array list, relay 403, `/healthz`/`/config`, goldens). OBS-001 adds `api/metrics/v1alpha1.json`, hand-rolled OpenMetrics/label-policy tests, ready-semantics tests, and `labmail healthcheck` tests. SEC-001 adds `internal/auth`, CSRF session, and `TestMaildevScenarioCompat`. DEP-001 implements `make test-container` (`scripts/test-container.sh`) and CI job `container-test`. `test-changelog` fails closed until its owning PR.
+FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. SMTP-001a adds `testdata/smtp` transcripts, `net/smtp.SendMail` interop, the receive-only import-boundary test, and `FuzzReadLine` on `internal/smtp/codec`. SMTP-001b adds AUTH LOGIN/PLAIN transcripts (`testdata/smtp/auth-login.txt`, `auth-plain.txt`), STARTTLS optional/required fixtures, and `net/smtp` STARTTLS interop. STORE-001 adds `testdata/mime`, store insert/delete/wait/wipe race tests, and `FuzzParse` on `internal/mimeparse`. STA-001 adds snapshot swap, reset-wipes-inbox, in-flight Insert → 451, `replaceStoreCaps` shrink, and audit-on-reset/delete/apply tests. API-001 implements `make generate` / `make verify-generated` (`api/capabilities/v1.json`, `api/openapi/v1.json`) and REST contract tests in `internal/control/rest`. MCP-001 implements Streamable HTTP MCP, `api/mcp/v1.json`, and `make test-parity` (`internal/capabilities` + REST + MCP). COMPAT-001 adds `internal/control/compat` contract tests (array list, relay 403, `/healthz`/`/config`, goldens). OBS-001 adds `api/metrics/v1alpha1.json`, hand-rolled OpenMetrics/label-policy tests, ready-semantics tests, and `labmail healthcheck` tests. SEC-001 adds `internal/auth`, CSRF session, and `TestMaildevScenarioCompat`. DEP-001 implements `make test-container` (`scripts/test-container.sh`) and CI job `container-test`. UI-001 adds `make web-test` / `make web-build` (Node **22.14.0**) and `internal/web` embed tests. `test-changelog` fails closed until its owning PR.
 
 ## Required CI (FND-001)
 
-Jobs: format, lint, unit, documentation, generated-file, parity, container-test. There is no optional or bypassable job. Later PRs add race, fuzz-smoke, security-scan, changelog, and config-compat when those targets first exist.
+Jobs: format, lint, unit, documentation, generated-file, parity, container-test, web. There is no optional or bypassable job. Later PRs add race, fuzz-smoke, security-scan, changelog, and config-compat when those targets first exist.
 
 ## Frozen fixtures to add later
 

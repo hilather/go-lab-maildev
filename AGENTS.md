@@ -124,8 +124,10 @@ make test-docs
 make test-container
 make security-scan
 make test-changelog
+make web-test
+make web-build
 ```
 
 If a target does not yet exist, the task that first needs it must add it rather than silently omitting the check. Placeholders must fail closed, not succeed as no-ops.
 
-FND-001 required CI jobs: `format`, `lint`, `unit`, `documentation`. API-001 adds `generated-file`. DEP-001 adds `container-test`.
+FND-001 required CI jobs: `format`, `lint`, `unit`, `documentation`. API-001 adds `generated-file`. MCP-001 adds `parity`. DEP-001 adds `container-test`. UI-001 adds `web`.

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -227,6 +228,18 @@ func TestServeBindsManagement(t *testing.T) {
 	if !strings.Contains(hcOut.String(), "ok") {
 		t.Fatalf("healthcheck stdout=%q", hcOut.String())
 	}
+	ui, err := http.Get("http://" + mgmt + "/")
+	if err != nil {
+		t.Fatalf("ui: %v", err)
+	}
+	raw, err := io.ReadAll(ui.Body)
+	_ = ui.Body.Close()
+	if err != nil {
+		t.Fatalf("ui body: %v", err)
+	}
+	if ui.StatusCode != 200 || !strings.Contains(string(raw), "LabMail") {
+		t.Fatalf("GET / status=%d body=%s", ui.StatusCode, raw)
+	}
 	cancel()
 	select {
 	case code := <-done:
@@ -290,6 +303,15 @@ func TestServeCompatDisabled(t *testing.T) {
 		}
 		_ = resp.Body.Close()
 	}
+	ui, err := http.Get("http://" + mgmt + "/")
+	if err != nil {
+		t.Fatalf("ui: %v", err)
+	}
+	if ui.StatusCode != http.StatusNotFound {
+		_ = ui.Body.Close()
+		t.Fatalf("ui.enabled false: GET / status=%d", ui.StatusCode)
+	}
+	_ = ui.Body.Close()
 	cancel()
 	select {
 	case code := <-done:

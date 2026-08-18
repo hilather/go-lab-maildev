@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-17 (DEP-001)
+Last reviewed: 2026-08-18 (DEP-001 + UI-001)
 Related ADRs: 0001, 0003
 
 DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here.
@@ -39,7 +39,7 @@ CMD ["serve", "--config=/etc/labmail/config.yaml"]
 HEALTHCHECK CMD ["/labmail", "healthcheck", "--url=http://127.0.0.1:1080/v1/health/ready"]
 ```
 
-If the UI stage is present, add a Node **22.14.0** build stage (TacLab) that copies `web/dist` into `internal/web` before `go build`. UI contract (pages, EventSource + 3s poll, no Relay/send/compose): [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#embedded-operator-ui).
+UI-001 added `make web-build` (Node **22.14.0**) which copies `web/dist` into `internal/web/dist` for `go:embed`. DEP-001 should add a Node **22.14.0** image stage that runs that copy before `go build`. UI contract (pages, EventSource + 3s poll, no Relay/send/compose): [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#embedded-operator-ui). `spec.ui.enabled: false` 404s `/` and keeps REST/MCP.
 
 Posture:
 

@@ -77,7 +77,7 @@ func Check(root string) error {
 		}
 		if d.IsDir() {
 			base := d.Name()
-			if base == ".git" || base == "testdata" || base == "vendor" {
+			if base == ".git" || base == "testdata" || base == "vendor" || base == "node_modules" || base == "dist" {
 				return filepath.SkipDir
 			}
 			return nil

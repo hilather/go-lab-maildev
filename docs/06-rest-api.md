@@ -2,12 +2,14 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-17 (COMPAT-001 + OBS-001 + SEC-001)
+Last reviewed: 2026-08-18 (COMPAT-001 + OBS-001 + SEC-001 + UI-001)
 Related ADRs: 0004, 0005, 0007
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
 
 Native `/v1` includes UI session (`POST/GET/DELETE /v1/session`). Auth is lab static bearer; HTTP Basic maps onto the same principal when `mode: bearer_and_basic`. COMPAT-001 mounts `/email`, `/healthz`, and `/config` on this same listener (`spec.listeners.management.compatEnabled`, default true). MCP is bearer-only.
+
+When `spec.ui.enabled` is true (default), unmatched non-API GET/HEAD paths on this listener serve the embedded inbox SPA (`internal/web`). `/v1`, `/mcp`, `/email`, `/healthz`, `/config`, and `/.well-known` stay problem+json. `spec.ui.enabled: false` returns 404 for `/` and keeps REST/MCP up.
 
 ## Problem details
 

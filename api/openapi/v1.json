@@ -175,7 +175,7 @@
     "securitySchemes": {
       "bearerAuth": {
         "bearerFormat": "token",
-        "description": "Lab static bearer. Auth is stubbed open in API-001; SEC-001 adds bearer + basic.",
+        "description": "Lab static bearer. HTTP Basic is accepted on REST when mode is bearer_and_basic and maps onto the same token principal.",
         "scheme": "bearer",
         "type": "http"
       }
@@ -1193,7 +1193,7 @@
     },
     "/v1/session": {
       "delete": {
-        "description": "Clear the inbox UI session cookie. Implemented in SEC-001.",
+        "description": "Clear the inbox UI session cookie.",
         "operationId": "delete_v1_session",
         "parameters": [],
         "responses": {
@@ -1227,7 +1227,7 @@
         "x-mutating": true
       },
       "get": {
-        "description": "Current session principal. Implemented in SEC-001.",
+        "description": "Current session principal (cookie or bearer).",
         "operationId": "get_v1_session",
         "parameters": [],
         "responses": {
@@ -1261,7 +1261,7 @@
         "x-mutating": false
       },
       "post": {
-        "description": "Cookie + CSRF session for the inbox UI. Implemented in SEC-001.",
+        "description": "Cookie + CSRF session for the inbox UI. Accepts bearer or basic.",
         "operationId": "post_v1_session",
         "parameters": [],
         "responses": {
@@ -1611,7 +1611,7 @@
       "name": "changes"
     },
     {
-      "description": "Cookie + CSRF session for the inbox UI. Implemented in SEC-001.",
+      "description": "Cookie + CSRF session for the inbox UI. Accepts bearer or basic.",
       "name": "session"
     },
     {

@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001)
+Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001 + SEC-001)
 Related ADRs: 0002, 0004
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -15,7 +15,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | SMTP protocol | 3a: greeting–DATA, SIZE, limits, 452/451 epoch; 3b: AUTH LOGIN/PLAIN transcripts, STARTTLS optional/required + handshake | `internal/smtp/server` with `internal/smtptest`; transcripts in `testdata/smtp` |
 | MIME | multipart/alternative, attachments, base64, quoted-printable, broken MIME still stored | `internal/mimeparse` + `testdata/mime` |
 | REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json | `internal/control/rest` |
-| Compat | COMPAT-001: array + relay 403 + `/healthz` (fake principal) + `testdata/compat` goldens. PR 9: `TestMaildevScenarioCompat` (401 + Basic + subject) | `internal/control/compat` |
+| Compat | Array + relay 403 + `/healthz` + `testdata/compat` goldens. `TestMaildevScenarioCompat` (401 + Basic + subject + SendMail) | `internal/control/compat` |
 | MCP | 2026-07-28 initialize, tools/list, tool call, origin, bearer | `internal/control/mcp` |
 | Parity | every `PARITY_REQUIRED` capability: same input types, scopes, errors, side effects | `internal/capabilities` + rest/mcp tests (`make test-parity`) |
 | Receive-only | reserved YAML; no relay; import boundary | `internal/config`, `internal/smtp/import_test.go`, `internal/store/import_test.go`, `internal/smtptest/isolation_test.go` |
@@ -37,7 +37,7 @@ make test-parity test-config-compat test-docs
 make test-container security-scan test-changelog
 ```
 
-FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. SMTP-001a adds `testdata/smtp` transcripts, `net/smtp.SendMail` interop, the receive-only import-boundary test, and `FuzzReadLine` on `internal/smtp/codec`. SMTP-001b adds AUTH LOGIN/PLAIN transcripts (`testdata/smtp/auth-login.txt`, `auth-plain.txt`), STARTTLS optional/required fixtures, and `net/smtp` STARTTLS interop. STORE-001 adds `testdata/mime`, store insert/delete/wait/wipe race tests, and `FuzzParse` on `internal/mimeparse`. STA-001 adds snapshot swap, reset-wipes-inbox, in-flight Insert → 451, `replaceStoreCaps` shrink, and audit-on-reset/delete/apply tests. API-001 implements `make generate` / `make verify-generated` (`api/capabilities/v1.json`, `api/openapi/v1.json`) and REST contract tests in `internal/control/rest`. MCP-001 implements Streamable HTTP MCP, `api/mcp/v1.json`, and `make test-parity` (`internal/capabilities` + REST + MCP). OBS-001 adds `api/metrics/v1alpha1.json`, hand-rolled OpenMetrics/label-policy tests, ready-semantics tests, and `labmail healthcheck` tests. `test-container` and `test-changelog` fail closed until their owning PR.
+FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. SMTP-001a adds `testdata/smtp` transcripts, `net/smtp.SendMail` interop, the receive-only import-boundary test, and `FuzzReadLine` on `internal/smtp/codec`. SMTP-001b adds AUTH LOGIN/PLAIN transcripts (`testdata/smtp/auth-login.txt`, `auth-plain.txt`), STARTTLS optional/required fixtures, and `net/smtp` STARTTLS interop. STORE-001 adds `testdata/mime`, store insert/delete/wait/wipe race tests, and `FuzzParse` on `internal/mimeparse`. STA-001 adds snapshot swap, reset-wipes-inbox, in-flight Insert → 451, `replaceStoreCaps` shrink, and audit-on-reset/delete/apply tests. API-001 implements `make generate` / `make verify-generated` (`api/capabilities/v1.json`, `api/openapi/v1.json`) and REST contract tests in `internal/control/rest`. MCP-001 implements Streamable HTTP MCP, `api/mcp/v1.json`, and `make test-parity` (`internal/capabilities` + REST + MCP). COMPAT-001 adds `internal/control/compat` contract tests (array list, relay 403, `/healthz`/`/config`, goldens). OBS-001 adds `api/metrics/v1alpha1.json`, hand-rolled OpenMetrics/label-policy tests, ready-semantics tests, and `labmail healthcheck` tests. SEC-001 adds `internal/auth`, CSRF session, and `TestMaildevScenarioCompat`. `test-container` and `test-changelog` fail closed until their owning PR.
 
 ## Required CI (FND-001)
 

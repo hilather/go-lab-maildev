@@ -85,6 +85,18 @@ type resetRequest struct {
 	Reason string `json:"reason"`
 }
 
+type sessionCreateJSON struct {
+	CSRF      string `json:"csrf"`
+	ExpiresAt string `json:"expiresAt"`
+}
+
+type sessionViewJSON struct {
+	ID        string   `json:"id"`
+	Role      string   `json:"role"`
+	Scopes    []string `json:"scopes"`
+	ExpiresAt string   `json:"expiresAt,omitempty"`
+}
+
 type deleteRequest struct {
 	ExpectedStoreGeneration *uint64 `json:"expectedStoreGeneration"`
 }

@@ -1,6 +1,6 @@
 package capabilities
 
-// Frozen first-GA scopes. Role binding lands in SEC-001; adapters must not
+// Frozen first-GA scopes. Role binding is in internal/auth; adapters must not
 // invent synonyms.
 const (
 	ScopeMailRead      = "mail.read"

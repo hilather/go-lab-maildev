@@ -14,6 +14,7 @@ func TestMCPImportDAG(t *testing.T) {
 	allowed := map[string]bool{
 		"github.com/hilather/go-lab-maildev/internal/app":          true,
 		"github.com/hilather/go-lab-maildev/internal/audit":        true,
+		"github.com/hilather/go-lab-maildev/internal/auth":         true,
 		"github.com/hilather/go-lab-maildev/internal/buildinfo":    true,
 		"github.com/hilather/go-lab-maildev/internal/capabilities": true,
 		"github.com/hilather/go-lab-maildev/internal/config":       true,

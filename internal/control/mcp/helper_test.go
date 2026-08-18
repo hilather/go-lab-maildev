@@ -12,9 +12,36 @@ import (
 	"testing"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/model"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+const testBearerToken = "0123456789abcdef0123456789abcdef"
+
+func testVerifier(t *testing.T) (*auth.Verifier, string) {
+	t.Helper()
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte(testBearerToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pw := filepath.Join(dir, "pass")
+	if err := os.WriteFile(pw, []byte("lab-web-pass\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v, err := auth.FromSpec(model.MgmtAuthSpec{
+		Mode: model.MgmtAuthBearerAndBasic,
+		Tokens: []model.TokenSpec{{
+			ID: "admin", SecretFile: tok, Role: model.RoleAdministrator,
+		}},
+		Basic: model.BasicSpec{Username: "admin", PasswordFile: pw, TokenRef: "admin"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v, testBearerToken
+}
 
 func repoRoot(t *testing.T) string {
 	t.Helper()

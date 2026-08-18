@@ -2,7 +2,7 @@
 
 Status: Implemented (MCP-001)
 Owners: MCP, Application
-Last reviewed: 2026-08-17 (MCP-001)
+Last reviewed: 2026-08-17 (SEC-001)
 Related ADRs: 0004, 0006
 
 Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are frozen in [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Protocol pin: [docs/adr/0006-pin-mcp-protocol-versions.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md).

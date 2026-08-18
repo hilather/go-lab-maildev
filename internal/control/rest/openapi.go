@@ -313,7 +313,7 @@ func openAPIComponents() map[string]any {
 				"type":         "http",
 				"scheme":       "bearer",
 				"bearerFormat": "token",
-				"description":  "Lab static bearer. Auth is stubbed open in API-001; SEC-001 adds bearer + basic.",
+				"description":  "Lab static bearer. HTTP Basic is accepted on REST when mode is bearer_and_basic and maps onto the same token principal.",
 			},
 		},
 		"schemas": schemas,

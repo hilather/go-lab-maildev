@@ -57,7 +57,7 @@ const usageText = `usage: labmail <command>
 
 LabMail is a receive-only SMTP lab appliance. validate and canonicalize
 load a fail-closed labmail.dev/v1alpha1 document. serve binds SMTP and
-native /v1 and POST /mcp. Session and /email compat are later PRs.
+native /v1, POST /mcp, and /email compat. Auth is lab static bearer (Basic maps onto the same principal).
 
 Commands:
   version         print build and protocol metadata

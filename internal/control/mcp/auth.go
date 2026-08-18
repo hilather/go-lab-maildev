@@ -8,14 +8,23 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
 
-// Auth is stubbed open in MCP-001. SEC-001 adds bearer verification.
-// MCP is bearer-only: Basic is rejected even while the stub is open.
-func (s *Server) authenticate(r *http.Request) (app.Actor, error) {
+func actorOf(p auth.Principal) app.Actor {
+	return app.Actor{
+		ID:        p.ID,
+		Class:     p.Class,
+		Role:      p.Role,
+		Scopes:    append([]string(nil), p.Scopes...),
+		Transport: "mcp",
+	}
+}
+
+func stubMCPActor(r *http.Request) (app.Actor, error) {
 	actor := app.Actor{ID: "anonymous", Class: "administrator", Transport: "mcp"}
 	h := strings.TrimSpace(r.Header.Get(headerAuthorization))
 	if h == "" {
@@ -32,7 +41,29 @@ func (s *Server) authenticate(r *http.Request) (app.Actor, error) {
 	return actor, domainerr.Unauthenticated("MCP accepts bearer tokens only")
 }
 
+func (s *Server) authenticate(r *http.Request) (app.Actor, error) {
+	if s.cfg.Auth == nil {
+		return stubMCPActor(r)
+	}
+	h := strings.TrimSpace(r.Header.Get(headerAuthorization))
+	if h != "" && strings.HasPrefix(strings.ToLower(h), "basic ") {
+		return app.Actor{}, domainerr.Unauthenticated("MCP accepts bearer tokens only")
+	}
+	p, err := s.cfg.Auth.Authenticate(auth.Request{
+		Authorization: h,
+		RemoteAddr:    r.RemoteAddr,
+		AllowBasic:    false,
+	})
+	if err != nil {
+		return app.Actor{}, err
+	}
+	return actorOf(p), nil
+}
+
 func (s *Server) authorizeResource(actor app.Actor, uri string) error {
+	if s.cfg.Auth == nil {
+		return nil
+	}
 	cap, ok := capabilities.LookupResource(uri)
 	if !ok {
 		switch {
@@ -40,19 +71,21 @@ func (s *Server) authorizeResource(actor app.Actor, uri string) error {
 			cap, ok = capabilities.Lookup(capabilities.MessagesGet)
 		}
 		if !ok {
-			return nil
+			return domainerr.NotFound("not found")
 		}
 	}
-	_ = actor
-	_ = cap
-	return nil
+	return auth.AuthorizeScopes(actor.Scopes, cap.RequiredScopes)
 }
 
 func (s *Server) authorizeTool(actor app.Actor, name string) error {
-	_ = actor
-	_ = name
-	// Scope enforcement lands in SEC-001.
-	return nil
+	if s.cfg.Auth == nil {
+		return nil
+	}
+	caps := capabilities.LookupTool(name)
+	if len(caps) == 0 {
+		return nil
+	}
+	return auth.AuthorizeScopes(actor.Scopes, caps[0].RequiredScopes)
 }
 
 type limiter struct {

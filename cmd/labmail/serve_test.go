@@ -185,9 +185,9 @@ func TestServeBindsManagement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("email: %v", err)
 	}
-	if email.StatusCode != 200 {
+	if email.StatusCode != http.StatusUnauthorized {
 		_ = email.Body.Close()
-		t.Fatalf("email status=%d", email.StatusCode)
+		t.Fatalf("email status=%d want 401 (default YAML is bearer_and_basic)", email.StatusCode)
 	}
 	_ = email.Body.Close()
 	mcpReq, reqErr := http.NewRequest(http.MethodGet, "http://"+mgmt+"/mcp", nil)

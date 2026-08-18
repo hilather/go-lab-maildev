@@ -221,7 +221,7 @@ func DiscoveryList() []Discovery {
 	return out
 }
 
-// SessionCapability reports whether id is a UI session row (SEC-001).
+// SessionCapability reports whether id is a UI session row.
 func SessionCapability(id ID) bool {
 	switch id {
 	case SessionCreate, SessionDelete, SessionGet:

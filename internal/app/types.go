@@ -8,10 +8,12 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/model"
 )
 
-// Actor is the caller identity recorded on audit. Authorization lands in SEC-001.
+// Actor is the caller identity recorded on audit and used for scope checks.
 type Actor struct {
 	ID        string
 	Class     string
+	Role      string
+	Scopes    []string
 	Transport string
 }
 

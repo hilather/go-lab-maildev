@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("From: Alice <alice@lab.test>\r\nTo: Bob <bob@lab.test>\r\nSubject: hello lab\r\n\r\nplain body line\r\n")

@@ -34,7 +34,7 @@ help:
 		'  web-build           production Vite build + copy into internal/web/dist' \
 		'  web-embed           copy web/dist into internal/web/dist' \
 		'  test-container      build ghcr.io/hilather/labmail and check non-root/read-only/no-caps' \
-		'  test-changelog      unimplemented until REL/GA; fail-closed'
+		'  test-changelog      observable paths require a CHANGELOG.md entry'
 
 fmt: format
 
@@ -63,6 +63,7 @@ test-race:
 	$(GO) test -race ./...
 
 test-fuzz-smoke:
+	$(GO) test ./scripts/checkdocs -run TestFuzzCorporaPresent -count=1
 	$(GO) test ./internal/buildinfo -fuzz=FuzzInfoString -fuzztime=5s -count=1
 	$(GO) test ./internal/config -fuzz=FuzzDecode -fuzztime=5s -count=1
 	$(GO) test ./internal/smtp/codec -fuzz=FuzzReadLine -fuzztime=5s -count=1
@@ -100,4 +101,4 @@ test-container:
 	bash scripts/test-container.sh
 
 test-changelog:
-	@echo 'test-changelog: unimplemented until a checkchangelog script lands' >&2; exit 1
+	$(GO) run ./scripts/checkchangelog

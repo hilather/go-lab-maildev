@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("From: <not-an-address\r\nSubject: broken\r\nContent-Type: multipart/mixed; boundary=\"abc\"\r\n\r\n--not-the-boundary\r\nthis is not valid MIME\r\n")

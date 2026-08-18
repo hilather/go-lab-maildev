@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-18 (UI-001 + SWAP-001)
+Last reviewed: 2026-08-18 (UI-001 + SWAP-001 + GA-001)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -314,6 +314,8 @@ STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` a
 
 ## Residual limitations (1.0)
 
+Operator-facing copy of this list: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). rc.1 notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md). LabMail is a lab sink, not a public MTA.
+
 - Not a complete MTA. No DSN, CHUNKING, PIPELINING, Sieve, quotas per recipient, or greylisting.
 - MIME parse of pathological messages may yield empty text/html with `parseWarning`; raw is still stored.
 - Default `maxMessageBytes` is **10 MiB** (maildev implicit ~50 MiB; 2.2.1 has no `--max-message-size` flag).
@@ -323,7 +325,7 @@ STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` a
 - Compat `/email` ids are ULIDs; list omits `text`/`html`; checksum is sha256 not md5; `GET /config` is a redacted LabMail shape.
 - Compat does not implement maildev WebSocket.
 - `POST /email/:id/relay` never works (intentional).
-- SMTP AUTH is PLAIN/LOGIN only. Implicit SMTPS is 1.1.
+- SMTP AUTH is PLAIN/LOGIN only **when SMTP-001b lands**. This tree fail-closes `smtp.auth.mode != none` and `smtp.tls.mode != off`. Implicit SMTPS is 1.1.
 - Healthcheck plane in compose changes from SMTP TCP (`node`) to HTTP `/v1/health/ready` (ready still requires SMTP bound).
 - Worst-case RSS ≈ stored `maxBytes` (256 MiB) + `maxInFlightDataBytes` (64 MiB) + ~64 MiB slack ≈ **384 MiB**. Caps are stacked: in-flight does not reduce inbox capacity. Spill on tmpfs does not add a second disk budget — it is still RAM.
 - SMTP AUTH and STARTTLS are not implemented until SMTP-001b; `serve`, live apply, and reset fail-close those YAML modes.

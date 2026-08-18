@@ -2,10 +2,10 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-18 (DEP-001 + UI-001 + SWAP-001)
+Last reviewed: 2026-08-18 (DEP-001 + UI-001 + SWAP-001 + GA-001)
 Related ADRs: 0001, 0003
 
-DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here.
+DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here. A `v*` tag is refused unless [`.github/workflows/release.yml`](https://github.com/hilather/go-lab-maildev/blob/main/.github/workflows/release.yml) `tag-gate` sees required CI green on that SHA. rc.1 notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md).
 
 ## CLI
 
@@ -25,7 +25,7 @@ labmail version
 
 `labmail send` is **not** shipped.
 
-CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. SMTP-001a implements `serve` for the SMTP listener. API-001 binds management HTTP. OBS-001 implements `labmail healthcheck --url=…` against `GET /v1/health/ready` (ready = SMTP bound + store initialized + management bound or explicitly off), slog JSON events, and hand-rolled OpenMetrics (`spec.observability.metrics.listen` / `publicPath`). DEP-001 wires `--smtp-listen`, `--management-listen ADDR|off`, `--shutdown-timeout` (default 5s), and `--pid-file` (written after both requested listeners bind).
+This tree: `serve` binds SMTP (Memory inbox, not Null) and management HTTP (`/v1`, `/mcp`, `/email` when enabled, inbox SPA). CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. OBS-001 implements `labmail healthcheck --url=…` against `GET /v1/health/ready` (ready = SMTP bound + store initialized + management bound or explicitly off), slog JSON events, and hand-rolled OpenMetrics (`spec.observability.metrics.listen` / `publicPath`). DEP-001 wires `--smtp-listen`, `--management-listen ADDR|off`, `--shutdown-timeout` (default 5s), and `--pid-file`, plus the hardened image, compose smoke, and `scripts/test-container.sh`.
 
 ## Hardened container
 

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"apiVersion\":\"labmail.dev/v1alpha1\",\"kind\":\"LabMail\",\"metadata\":{\"name\":\"x\"},\"spec\":{}}")

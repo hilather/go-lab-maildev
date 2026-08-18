@@ -41,6 +41,8 @@ This page is the catalog. Normative design documents win over task summaries. Af
 | [10-testing-strategy.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/10-testing-strategy.md) | Test layers |
 | [11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md) | Container and process |
 | [13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md) | mcp-integration-lab swap BOM + overlay |
+| [known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md) | 1.0 residuals (not a public MTA) |
+| [releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md) | First candidate notes; tag only on green CI |
 
 ## Architecture decisions
 

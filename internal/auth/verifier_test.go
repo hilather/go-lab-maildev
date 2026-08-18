@@ -174,6 +174,39 @@ func TestMailAdminSatisfiesRead(t *testing.T) {
 	}
 }
 
+func TestEquivalentIncludesRoleAndScopes(t *testing.T) {
+	spec, _ := testSpec(t, model.MgmtAuthBearerAndBasic)
+	a, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !a.Equivalent(b) {
+		t.Fatal("identical verifiers must be equivalent")
+	}
+	spec.Tokens[0].Role = model.RoleViewer
+	spec.Tokens[0].Scopes = nil
+	view, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Equivalent(view) {
+		t.Fatal("role demotion must not be equivalent")
+	}
+	spec.Tokens[0].Role = model.RoleAdministrator
+	spec.Tokens[0].Scopes = []string{model.ScopeMailRead}
+	limited, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Equivalent(limited) {
+		t.Fatal("scope shrink must not be equivalent")
+	}
+}
+
 func TestFromSpecRejectsUnknownRole(t *testing.T) {
 	dir := t.TempDir()
 	tok := writeSecret(t, dir, "token", testToken)

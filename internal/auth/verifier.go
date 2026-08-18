@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,7 +144,9 @@ func (v *Verifier) Replace(next *Verifier) {
 	v.basic = next.basic
 }
 
-// Equivalent reports whether the compiled identity (mode, token digests, Basic) matches.
+// Equivalent reports whether the compiled identity matches: mode, token
+// id+digest+role+scopes, and Basic mapping. Session rows snapshot role/scopes
+// at Create, so a demotion must count as a change.
 func (v *Verifier) Equivalent(other *Verifier) bool {
 	if v == nil || other == nil {
 		return v == other
@@ -153,13 +156,13 @@ func (v *Verifier) Equivalent(other *Verifier) bool {
 	if modeA != modeB || len(toksA) != len(toksB) {
 		return false
 	}
-	byID := make(map[string][sha256.Size]byte, len(toksA))
+	byID := make(map[string]storedToken, len(toksA))
 	for _, t := range toksA {
-		byID[t.id] = t.digest
+		byID[t.id] = t
 	}
 	for _, t := range toksB {
-		d, ok := byID[t.id]
-		if !ok || !EqualDigest(d, t.digest) {
+		got, ok := byID[t.id]
+		if !ok || !EqualDigest(got.digest, t.digest) || got.role != t.role || !sameScopes(got.scopes, t.scopes) {
 			return false
 		}
 	}
@@ -170,6 +173,14 @@ func (v *Verifier) Equivalent(other *Verifier) bool {
 		return false
 	}
 	return true
+}
+
+func sameScopes(a, b []string) bool {
+	aa := append([]string(nil), a...)
+	bb := append([]string(nil), b...)
+	slices.Sort(aa)
+	slices.Sort(bb)
+	return slices.Equal(aa, bb)
 }
 
 func (v *Verifier) snapshot() (string, []storedToken, *basicCred) {

@@ -493,6 +493,13 @@ func TestMemoryGetUnreadableSpill(t *testing.T) {
 	if time.Since(start) > 100*time.Millisecond {
 		t.Fatalf("wait spun until timeout: %s", time.Since(start))
 	}
+	_, err = s.List(model.ListQuery{Limit: 10})
+	if !errors.Is(err, ErrSpill) {
+		t.Fatalf("list err=%v", err)
+	}
+	if s.Stats().MessageCount != 1 {
+		t.Fatalf("list spill must not drop the index: count=%d", s.Stats().MessageCount)
+	}
 }
 
 func TestNewFailsIfSpillCannotClear(t *testing.T) {

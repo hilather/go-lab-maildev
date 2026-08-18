@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { POLL_INTERVAL_MS, useInboxLive } from "./useInboxLive";
+import { POLL_INTERVAL_MS, SSE_WATCHDOG_MS, useInboxLive } from "./useInboxLive";
 
 class FakeEventSource {
   static fail = false;
@@ -47,6 +47,22 @@ describe("useInboxLive", () => {
     });
     expect(result.current).toBe("sse");
     expect(FakeEventSource.instances[0]?.url).toBe("/v1/events/stream");
+    expect(FakeEventSource.instances[0]?.closed).toBe(false);
+  });
+
+  it("keeps a slow watchdog poll while EventSource is open", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { result } = renderHook(() => useInboxLive(onChange, true));
+    act(() => {
+      FakeEventSource.instances[0]?.onopen?.(new Event("open"));
+    });
+    expect(result.current).toBe("sse");
+    act(() => {
+      vi.advanceTimersByTime(SSE_WATCHDOG_MS);
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
     expect(FakeEventSource.instances[0]?.closed).toBe(false);
   });
 

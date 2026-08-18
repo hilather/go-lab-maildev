@@ -317,7 +317,7 @@ func (s *session) cmdData() bool {
 		case errors.Is(err, codec.ErrLineTooLong):
 			_ = s.reply(500, "5.5.2 Line too long")
 			s.resetToHelloed()
-			return false
+			return true
 		case isTimeout(err):
 			_ = s.reply(451, "4.4.2 Timeout")
 			s.endResult = "timeout"

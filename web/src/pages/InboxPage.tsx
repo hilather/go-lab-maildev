@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { APIError, clearMessages, listAllMessages } from "../api/client";
 import type { Message } from "../api/types";
@@ -13,15 +13,23 @@ export function InboxPage() {
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
   const [generation, setGeneration] = useState<number | null>(null);
+  const refreshSeq = useRef(0);
 
   const refresh = useCallback(() => {
+    const seq = ++refreshSeq.current;
     void (async () => {
       try {
         const list = await listAllMessages(filter === "" ? {} : { subjectContains: filter });
+        if (seq !== refreshSeq.current) {
+          return;
+        }
         setItems(list.items);
         setGeneration(list.storeGeneration);
         setError("");
       } catch (err) {
+        if (seq !== refreshSeq.current) {
+          return;
+        }
         setError(err instanceof APIError ? err.message : "Could not load inbox.");
       }
     })();

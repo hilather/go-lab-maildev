@@ -58,6 +58,51 @@ func TestPlanApplyHideExtensions(t *testing.T) {
 	requireCode(t, err, domainerr.CodeIdempotencyConflict)
 }
 
+func TestApplyIdempotencyIncludesExpectedRevision(t *testing.T) {
+	svc, boot := mustBoot(t)
+	ctx := context.Background()
+	first := ChangeIn{
+		ExpectedRevision: boot.Revision,
+		IdempotencyKey:   "rev-1",
+		Reason:           "hide SIZE",
+		Operations:       []model.Operation{hideSIZE()},
+	}
+	res, err := svc.Apply(ctx, actor(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := svc.Apply(ctx, actor(), ChangeIn{
+		ExpectedRevision: res.RuntimeRevision,
+		IdempotencyKey:   "rev-2",
+		Reason:           "hide SMTPUTF8",
+		Operations: []model.Operation{{
+			Op:             model.OpReplaceHideExtensions,
+			HideExtensions: []string{"SMTPUTF8"},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.RuntimeRevision == res.RuntimeRevision {
+		t.Fatal("second apply must change revision")
+	}
+	// Same key + ops + a different expectedRevision is a different request.
+	_, err = svc.Apply(ctx, actor(), ChangeIn{
+		ExpectedRevision: other.RuntimeRevision,
+		IdempotencyKey:   first.IdempotencyKey,
+		Reason:           first.Reason,
+		Operations:       first.Operations,
+	})
+	requireCode(t, err, domainerr.CodeIdempotencyConflict)
+	replay, err := svc.Apply(ctx, actor(), first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.Generation != res.Generation || replay.RuntimeRevision != res.RuntimeRevision {
+		t.Fatal("exact retry must replay the cached apply")
+	}
+}
+
 func TestApplyRequiresExpectedRevision(t *testing.T) {
 	svc, boot := mustBoot(t)
 	_, err := svc.Apply(context.Background(), actor(), ChangeIn{

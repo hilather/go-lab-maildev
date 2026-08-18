@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
@@ -185,6 +186,14 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 	if err != nil {
 		return nil, err
 	}
+	if spec.Listeners.Management.TLS.Enabled {
+		tlsLn, err := wrapManagementTLS(ln, spec.Listeners.Management.TLS)
+		if err != nil {
+			_ = ln.Close()
+			return nil, err
+		}
+		ln = tlsLn
+	}
 	ready := func() bool {
 		return observability.Evaluate(svc.HealthFacts()).Ready
 	}
@@ -253,6 +262,17 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 	hs.Attach(ln)
 	go func() { _ = hs.Serve(ln) }()
 	return hs, nil
+}
+
+func wrapManagementTLS(ln net.Listener, spec model.ListenerTLS) (net.Listener, error) {
+	cert, err := tls.LoadX509KeyPair(spec.CertFile, spec.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("management TLS: %w", err)
+	}
+	return tls.NewListener(ln, &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}), nil
 }
 
 func compatMounts(svc *app.App, spec model.Spec, ready func() bool, verifier *auth.Verifier) (map[string]http.Handler, error) {

@@ -362,14 +362,17 @@ func (m *Memory) Get(id string, markRead bool) (*model.Message, error) {
 		}
 		return nil, fmt.Errorf("%w: %v", ErrSpill, err)
 	}
-	if markRead {
-		m.mu.Lock()
-		if rec, ok := m.byID[id]; ok {
-			rec.msg.Read = true
-			snap.msg.Read = true
-		}
+	m.mu.Lock()
+	rec, ok = m.byID[id]
+	if !ok {
 		m.mu.Unlock()
+		return nil, ErrNotFound
 	}
+	if markRead {
+		rec.msg.Read = true
+		snap.msg.Read = true
+	}
+	m.mu.Unlock()
 	return snap.msg, nil
 }
 
@@ -421,9 +424,6 @@ func (m *Memory) List(q model.ListQuery) (model.ListResult, error) {
 	items := make([]*model.Message, 0, len(snaps))
 	for _, snap := range snaps {
 		if err := loadSpill(snap); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
 			return model.ListResult{}, fmt.Errorf("%w: %v", ErrSpill, err)
 		}
 		items = append(items, snap.msg)
@@ -566,6 +566,11 @@ func (m *Memory) Wait(ctx context.Context, filter model.MessageFilter) (*model.M
 				}
 				return nil, fmt.Errorf("%w: %v", ErrSpill, err)
 			}
+			m.mu.Lock()
+			if _, still := m.byID[snap.msg.ID]; !still {
+				continue
+			}
+			m.mu.Unlock()
 			return snap.msg, nil
 		}
 		if err := ctx.Err(); err != nil {

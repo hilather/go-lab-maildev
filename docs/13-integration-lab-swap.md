@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Integration, Platform
-Last reviewed: 2026-08-18 (SWAP-001 review)
+Last reviewed: 2026-08-18 (SWAP-001 review + management TLS)
 Related ADRs: 0005, 0006, 0007
 
 This document is the bill of materials for replacing `maildev/maildev:2.2.1` in `mcp-integration-lab` with LabMail. SWAP-001 lands the overlay in **this** repo. The compose/image pin change is a follow-up in that repo after `v1.0.0-rc.1`. DEP-001 image files are stacked later and are not required here.
@@ -230,7 +230,7 @@ One-release `internal/maildev` translator. AGENTS.md rule 11 today: after reject
 | `hide-extensions` | Map → `smtp.hideExtensions` |
 | `ip` / `web-ip` | Map → listener `address` (host still compose-mapped) |
 | `verbose` / `silent` | Map → `observability.logLevel` |
-| `https` + cert/key (web) | Map → `listeners.management.tls` |
+| `https` + cert/key (web) | Map → `listeners.management.tls` (LabMail terminates TLS 1.2+ when `enabled`) |
 | `disable-web` | Map → `ui.enabled: false` (**REST/MCP stay up** — not maildev’s “kill the web server”) |
 | `mail-directory` | **Reject** (ephemeral invariant; `internal/maildev_test.go` still renders it today) |
 | `base-pathname` | **Reject** (non-goal) |

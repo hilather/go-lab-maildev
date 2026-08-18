@@ -1,0 +1,28 @@
+# Minimal Compose smoke for the hardened image. Pin by digest in GitOps.
+# Healthcheck is HTTP ready (exec form). Do not probe SMTP TCP.
+# Secret file mounts land with SEC-001 / SWAP-001. Auth is stubbed open until then.
+services:
+  labmail:
+    image: ghcr.io/hilather/labmail:local
+    build:
+      context: ..
+    command: ["serve", "--config=/etc/labmail/config.yaml"]
+    ports:
+      - "1025:1025/tcp"
+      - "1080:1080/tcp"
+    volumes:
+      - ./labmail.yaml:/etc/labmail/config.yaml:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    user: "65532:65532"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/labmail", "healthcheck", "--url=http://127.0.0.1:1080/v1/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

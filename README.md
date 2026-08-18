@@ -8,9 +8,9 @@ Systems under test deliver RFC 5321 SMTP here. LabMail will capture, index, and 
 [![Go](https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
-Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox + native `/v1` REST + maildev `/email` compat + Streamable HTTP MCP + observability + lab static bearer**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1`, `/email` compat, `POST /mcp`, slog JSON, OpenMetrics). There is **no inbox UI or container image** yet.
+Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox + native `/v1` REST + maildev `/email` compat + Streamable HTTP MCP + observability + lab static bearer + hardened image**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1`, `/email` compat, `POST /mcp`, slog JSON, OpenMetrics). There is **no inbox UI** yet.
 
-Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image (later) `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
+Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
 New here? Start with [START-HERE.md](https://github.com/hilather/go-lab-maildev/blob/main/START-HERE.md). Architecture, ADRs, and the program board are indexed in [Documentation](#documentation).
 
@@ -44,7 +44,9 @@ go build -o bin/labmail ./cmd/labmail
 ./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025 --management-listen 127.0.0.1:1080
 ```
 
-`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`) and management HTTP from `spec.listeners.management.address` (override with `--management-listen ADDR|off`). Native `/v1`, maildev `/email` (when `compatEnabled`, default true), and Streamable HTTP `POST /mcp` share that listener; `POST /email/:id/relay` is 403. Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Ready is SMTP bound + store up. Probe readiness with `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready` or `GET /healthz`. Metrics are hand-rolled OpenMetrics on `spec.observability.metrics.listen` (default `127.0.0.1:9090`; empty disables); `publicPath: true` also serves `GET /v1/metrics`. Developer MCP: `labmail mcp-stdio --config testdata/config/valid/defaults.yaml --token-file /path/to/token` (required unless `auth.mode` is `dev-loopback-unauth`).
+`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`) and management HTTP from `spec.listeners.management.address` (override with `--management-listen ADDR|off`). `--shutdown-timeout` (default 5s) and `--pid-file` are optional. Native `/v1`, maildev `/email` (when `compatEnabled`, default true), and Streamable HTTP `POST /mcp` share that listener; `POST /email/:id/relay` is 403. Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Ready is SMTP bound + store up. Probe readiness with `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready` or `GET /healthz`. Metrics are hand-rolled OpenMetrics on `spec.observability.metrics.listen` (default `127.0.0.1:9090`; empty disables); `publicPath: true` also serves `GET /v1/metrics`. Developer MCP: `labmail mcp-stdio --config testdata/config/valid/defaults.yaml --token-file /path/to/token` (required unless `auth.mode` is `dev-loopback-unauth`).
+
+Hardened image: non-root UID `65532`, scratch, read-only root, `cap_drop: ALL`. Healthcheck is HTTP ready (not SMTP/`node`). Compose smoke: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml).
 
 ## Build and test
 
@@ -57,10 +59,11 @@ make test
 make test-parity
 make test-config-compat
 make test-docs
+make test-container
 make build
 ```
 
-Required CI jobs: format, lint, unit, documentation, generated-file, parity. There is no optional or bypassable job.
+Required CI jobs: format, lint, unit, documentation, generated-file, parity, container-test. There is no optional or bypassable job. `make test-container` needs Docker.
 
 ## Documentation
 

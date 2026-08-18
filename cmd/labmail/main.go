@@ -64,7 +64,8 @@ Commands:
   help            print this help
   validate        fail-closed YAML check (--config)
   canonicalize    emit canonical spec (--config, --format yaml|json)
-  serve           load YAML, bind SMTP, /v1, and /mcp (--config, --smtp-listen, --management-listen)
+  serve           load YAML, bind SMTP, /v1, /mcp, and /email (--config, --smtp-listen,
+                  --management-listen, --shutdown-timeout, --pid-file)
   healthcheck     probe GET /v1/health/ready (--url)
   mcp-stdio       Streamable MCP over stdio (--config, --token-file)
 `

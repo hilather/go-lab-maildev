@@ -39,7 +39,7 @@ func parseServeFlags(args []string, stderr io.Writer) (serveFlags, error) {
 	smtpListen := fs.String("smtp-listen", "", "override SMTP listen address (empty uses YAML)")
 	mgmtListen := fs.String("management-listen", "", "override management listen address; off/none/- leaves it unbound")
 	shutdown := fs.Duration("shutdown-timeout", server.DefaultShutdownWait, "graceful shutdown deadline")
-	pidFile := fs.String("pid-file", "", "write process id after the SMTP listener binds")
+	pidFile := fs.String("pid-file", "", "write process id after listeners bind")
 	if err := fs.Parse(args); err != nil {
 		return serveFlags{}, err
 	}

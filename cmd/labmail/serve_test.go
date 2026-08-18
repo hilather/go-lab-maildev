@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"net/http"
 	"net/smtp"
 	"os"
 	"path/filepath"
@@ -87,6 +88,7 @@ func TestServeSendMail(t *testing.T) {
 		done <- serveCmd(ctx, []string{
 			"--config", path,
 			"--smtp-listen", "127.0.0.1:0",
+			"--management-listen", "off",
 			"--pid-file", pid,
 		}, &stdout, &stderr)
 	}()
@@ -119,17 +121,68 @@ func TestServeSendMail(t *testing.T) {
 	}
 }
 
+func TestServeBindsManagement(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	path := testdataConfig(t, "valid", "defaults.yaml")
+	var stdout, stderr safeBuffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serveCmd(ctx, []string{
+			"--config", path,
+			"--smtp-listen", "127.0.0.1:0",
+			"--management-listen", "127.0.0.1:0",
+		}, &stdout, &stderr)
+	}()
+	_ = waitSMTPListen(t, &stdout)
+	mgmt := waitPrefix(t, &stdout, "labmail management listen=")
+	var resp *http.Response
+	var err error
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err = http.Get("http://" + mgmt + "/v1/health/ready")
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("ready: %v stderr=%q", err, stderr.String())
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("ready status=%d", resp.StatusCode)
+	}
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("serve exit %d stderr=%q", code, stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not exit")
+	}
+}
+
 func waitSMTPListen(t *testing.T, stdout *safeBuffer) string {
+	t.Helper()
+	return waitPrefix(t, stdout, "labmail smtp listen=")
+}
+
+func waitPrefix(t *testing.T, stdout *safeBuffer, prefix string) string {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		for _, line := range strings.Split(stdout.String(), "\n") {
-			if strings.HasPrefix(line, "labmail smtp listen=") {
-				return strings.TrimPrefix(line, "labmail smtp listen=")
+			if strings.HasPrefix(line, prefix) {
+				return strings.TrimPrefix(line, prefix)
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("smtp listen not printed: %q", stdout.String())
+	t.Fatalf("%s not printed: %q", prefix, stdout.String())
 	return ""
 }

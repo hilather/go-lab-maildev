@@ -123,3 +123,16 @@ type AuditList struct {
 
 // AuditEvent is one mutation or security record.
 type AuditEvent = audit.Event
+
+// ExtractResult is POST /v1/messages/{id}:extract.
+type ExtractResult struct {
+	URLs   []string         `json:"urls"`
+	Tokens []ExtractedToken `json:"tokens"`
+}
+
+// ExtractedToken is one OTP-like match.
+type ExtractedToken struct {
+	Kind    string `json:"kind"`
+	Value   string `json:"value"`
+	Context string `json:"context"`
+}

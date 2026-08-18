@@ -36,7 +36,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		return serveCmd(ctx, args[2:], stdout, stderr)
-	case "healthcheck", "mcp-stdio":
+	case "healthcheck":
+		return healthcheckCmd(args[2:], stdout, stderr)
+	case "mcp-stdio":
 		_, _ = fmt.Fprintf(stderr, "labmail %s is not implemented yet\n", args[1])
 		return 2
 	default:
@@ -54,16 +56,16 @@ const usageText = `usage: labmail <command>
 
 LabMail is a receive-only SMTP lab appliance. validate and canonicalize
 load a fail-closed labmail.dev/v1alpha1 document. serve binds SMTP and
-stores accepted mail in a bounded memory inbox. Management HTTP is not bound yet.
+native /v1 management HTTP. Session/compat/MCP are later PRs.
 
 Commands:
   version         print build and protocol metadata
   help            print this help
   validate        fail-closed YAML check (--config)
   canonicalize    emit canonical spec (--config, --format yaml|json)
-  serve           load YAML and bind SMTP (--config, --smtp-listen)
+  serve           load YAML, bind SMTP and /v1 (--config, --smtp-listen, --management-listen)
+  healthcheck     probe GET /v1/health/ready (--url)
 
 Planned (not implemented):
-  healthcheck     probe GET /v1/health/ready
   mcp-stdio       Streamable MCP over stdio
 `

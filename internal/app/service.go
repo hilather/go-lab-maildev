@@ -25,6 +25,7 @@ type Service interface {
 	MarkRead(ctx context.Context, actor Actor, id string) error
 	MarkAllRead(ctx context.Context, actor Actor) (int, error)
 	Wait(ctx context.Context, actor Actor, filter model.MessageFilter) (*model.Message, error)
+	Extract(ctx context.Context, actor Actor, id string) (*ExtractResult, error)
 
 	QueryAudit(ctx context.Context, actor Actor, in AuditQuery) (*AuditList, error)
 	GetAudit(ctx context.Context, actor Actor, id string) (*AuditEvent, error)

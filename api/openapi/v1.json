@@ -1,0 +1,1638 @@
+{
+  "components": {
+    "schemas": {
+      "ApplyResult": {
+        "description": "Application type ApplyResult.",
+        "type": "object"
+      },
+      "AuditEvent": {
+        "description": "Application type AuditEvent.",
+        "type": "object"
+      },
+      "AuditList": {
+        "description": "Application type AuditList.",
+        "type": "object"
+      },
+      "AuditQuery": {
+        "description": "Application type AuditQuery.",
+        "type": "object"
+      },
+      "CapabilityView": {
+        "description": "Application type CapabilityView.",
+        "type": "object"
+      },
+      "ChangeIn": {
+        "description": "Application type ChangeIn.",
+        "type": "object"
+      },
+      "Export": {
+        "description": "Application type Export.",
+        "type": "object"
+      },
+      "ExtractResult": {
+        "description": "Application type ExtractResult.",
+        "type": "object"
+      },
+      "FieldViolation": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Message": {
+        "description": "Application type Message.",
+        "type": "object"
+      },
+      "MessageList": {
+        "description": "Application type MessageList.",
+        "type": "object"
+      },
+      "Plan": {
+        "description": "Application type Plan.",
+        "type": "object"
+      },
+      "Problem": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "currentRevision": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "fieldViolations": {
+            "items": {
+              "$ref": "#/components/schemas/FieldViolation"
+            },
+            "type": "array"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "remediation": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
+        "type": "object"
+      },
+      "ResetIn": {
+        "description": "Application type ResetIn.",
+        "type": "object"
+      },
+      "State": {
+        "description": "labmail.dev/v1alpha1 LabMail document.",
+        "properties": {
+          "apiVersion": {
+            "const": "labmail.dev/v1alpha1",
+            "type": "string"
+          },
+          "kind": {
+            "const": "LabMail",
+            "type": "string"
+          },
+          "metadata": {
+            "properties": {
+              "labels": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "spec": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "spec"
+        ],
+        "type": "object"
+      },
+      "StateView": {
+        "description": "Application type StateView.",
+        "type": "object"
+      },
+      "Status": {
+        "description": "Application type Status.",
+        "type": "object"
+      },
+      "ValidateIn": {
+        "description": "Application type ValidateIn.",
+        "type": "object"
+      },
+      "Version": {
+        "description": "Application type Version.",
+        "type": "object"
+      },
+      "WaitIn": {
+        "description": "Application type WaitIn.",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "token",
+        "description": "Lab static bearer. Auth is stubbed open in API-001; SEC-001 adds bearer + basic.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "REST adapter for the shared LabMail capability registry. Generated from internal/capabilities. Do not edit by hand.",
+    "title": "LabMail Management API",
+    "version": "v1",
+    "x-generated-by": "internal/control/rest.RenderOpenAPI; DO NOT EDIT."
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/audit": {
+      "get": {
+        "description": "Query recent in-memory audit events.",
+        "operationId": "get_v1_audit",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditList"
+                }
+              }
+            },
+            "description": "Audit list"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Audit list",
+        "tags": [
+          "audit"
+        ],
+        "x-capability-id": "audit.list",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.audit.read"
+        ]
+      }
+    },
+    "/v1/audit/{eventId}": {
+      "get": {
+        "description": "Get one audit event by ID.",
+        "operationId": "get_v1_audit_eventId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEvent"
+                }
+              }
+            },
+            "description": "Audit get"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Audit get",
+        "tags": [
+          "audit"
+        ],
+        "x-capability-id": "audit.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.audit.read"
+        ]
+      }
+    },
+    "/v1/capabilities": {
+      "get": {
+        "description": "Capability list and protocol metadata.",
+        "operationId": "get_v1_capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilityView"
+                }
+              }
+            },
+            "description": "Capabilities"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Capabilities",
+        "tags": [
+          "capabilities"
+        ],
+        "x-capability-id": "capabilities.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/changes:apply": {
+      "post": {
+        "description": "Apply operations. expectedRevision is required.",
+        "operationId": "post_v1_changes_apply",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyResult"
+                }
+              }
+            },
+            "description": "Apply"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Apply",
+        "tags": [
+          "changes"
+        ],
+        "x-capability-id": "changes.apply",
+        "x-idempotent": true,
+        "x-mutating": true,
+        "x-required-scopes": [
+          "mail.admin"
+        ]
+      }
+    },
+    "/v1/changes:plan": {
+      "post": {
+        "description": "Dry-run operations against the active snapshot.",
+        "operationId": "post_v1_changes_plan",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            },
+            "description": "Plan"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Plan",
+        "tags": [
+          "changes"
+        ],
+        "x-capability-id": "changes.plan",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.admin"
+        ]
+      }
+    },
+    "/v1/events/stream": {
+      "get": {
+        "description": "REST SSE inbox events. MCP uses subscriptions/listen URI-only notify.",
+        "operationId": "get_v1_events_stream",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Events stream"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Events stream",
+        "tags": [
+          "events"
+        ],
+        "x-capability-id": "events.stream",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/health/live": {
+      "get": {
+        "description": "Process liveness. Not an MCP tool.",
+        "operationId": "get_v1_health_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Health live"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "security": [],
+        "summary": "Health live",
+        "tags": [
+          "health"
+        ],
+        "x-capability-id": "health.live",
+        "x-idempotent": true,
+        "x-mutating": false
+      }
+    },
+    "/v1/health/ready": {
+      "get": {
+        "description": "Readiness (valid snapshot, listeners bound). Not an MCP tool.",
+        "operationId": "get_v1_health_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Health ready"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "security": [],
+        "summary": "Health ready",
+        "tags": [
+          "health"
+        ],
+        "x-capability-id": "health.ready",
+        "x-idempotent": true,
+        "x-mutating": false
+      }
+    },
+    "/v1/messages": {
+      "delete": {
+        "description": "Delete every message. Does not bump epoch.",
+        "operationId": "delete_v1_messages",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Clear inbox"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Clear inbox",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.clear",
+        "x-idempotent": true,
+        "x-mutating": true,
+        "x-required-scopes": [
+          "mail.write"
+        ]
+      },
+      "get": {
+        "description": "Cursor-paginated inbox list. HMAC cursors bind storeGeneration.",
+        "operationId": "get_v1_messages",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subjectContains",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unread",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageList"
+                }
+              }
+            },
+            "description": "List messages"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "List messages",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.list",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages/{id}": {
+      "delete": {
+        "description": "Delete one message by id.",
+        "operationId": "delete_v1_messages_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Delete message"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Delete message",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.delete",
+        "x-idempotent": true,
+        "x-mutating": true,
+        "x-required-scopes": [
+          "mail.write"
+        ]
+      },
+      "get": {
+        "description": "Full message. markRead defaults to false on the native path.",
+        "operationId": "get_v1_messages_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Native default is false. Compat GET /email/:id marks read.",
+            "in": "query",
+            "name": "markRead",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "description": "Get message"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Get message",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages/{id}/attachments/{attId}": {
+      "get": {
+        "description": "Download one attachment. Content-Disposition: attachment.",
+        "operationId": "get_v1_messages_id_attachments_attId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Get attachment"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Get attachment",
+        "tags": [
+          "attachments"
+        ],
+        "x-capability-id": "attachments.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages/{id}/html": {
+      "get": {
+        "description": "Raw HTML body with no CSP. Not the sandboxed preview.",
+        "operationId": "get_v1_messages_id_html",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "HTML body"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "HTML body",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.html",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages/{id}/preview": {
+      "get": {
+        "description": "CSP document for the sandboxed iframe. cid: rewritten to data: URLs.",
+        "operationId": "get_v1_messages_id_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "HTML preview"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "HTML preview",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.preview",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages/{id}/raw": {
+      "get": {
+        "description": "RFC 822 source (message/rfc822).",
+        "operationId": "get_v1_messages_id_raw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "message/rfc822": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Raw message"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Raw message",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.raw",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages/{id}:extract": {
+      "post": {
+        "description": "Extract URLs and OTP-like tokens using the frozen RE2 set.",
+        "operationId": "post_v1_messages_id_extract",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractResult"
+                }
+              }
+            },
+            "description": "Extract tokens"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Extract tokens",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.extract",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/messages:read-all": {
+      "post": {
+        "description": "Set every read bit. Does not bump storeGeneration.",
+        "operationId": "post_v1_messages_read_all",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Mark all read"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Mark all read",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.read_all",
+        "x-idempotent": true,
+        "x-mutating": true,
+        "x-required-scopes": [
+          "mail.write"
+        ]
+      }
+    },
+    "/v1/messages:wait": {
+      "post": {
+        "description": "Block until a matching message arrives or the timeout fires.",
+        "operationId": "post_v1_messages_wait",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WaitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "description": "Wait for message"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Wait for message",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.wait",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/metrics": {
+      "get": {
+        "description": "OpenMetrics text. Served only when observability.metrics.publicPath is true.",
+        "operationId": "get_v1_metrics",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Metrics"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Metrics",
+        "tags": [
+          "metrics"
+        ],
+        "x-capability-id": "metrics.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/schema/config": {
+      "get": {
+        "description": "Published v1alpha1 config JSON Schema.",
+        "operationId": "get_v1_schema_config",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Config schema"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Config schema",
+        "tags": [
+          "schema"
+        ],
+        "x-capability-id": "schema.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/session": {
+      "delete": {
+        "description": "Clear the inbox UI session cookie. Implemented in SEC-001.",
+        "operationId": "delete_v1_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Delete session"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Delete session",
+        "tags": [
+          "session"
+        ],
+        "x-capability-id": "session.delete",
+        "x-idempotent": true,
+        "x-mutating": true
+      },
+      "get": {
+        "description": "Current session principal. Implemented in SEC-001.",
+        "operationId": "get_v1_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Get session"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Get session",
+        "tags": [
+          "session"
+        ],
+        "x-capability-id": "session.get",
+        "x-idempotent": true,
+        "x-mutating": false
+      },
+      "post": {
+        "description": "Cookie + CSRF session for the inbox UI. Implemented in SEC-001.",
+        "operationId": "post_v1_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Create session"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Create session",
+        "tags": [
+          "session"
+        ],
+        "x-capability-id": "session.create",
+        "x-idempotent": false,
+        "x-mutating": true
+      }
+    },
+    "/v1/state": {
+      "get": {
+        "description": "Redacted spec plus revision metadata.",
+        "operationId": "get_v1_state",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StateView"
+                }
+              }
+            },
+            "description": "Get state"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Get state",
+        "tags": [
+          "state"
+        ],
+        "x-capability-id": "state.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/state:export": {
+      "get": {
+        "description": "Canonical desired-state export plus drift material.",
+        "operationId": "get_v1_state_export",
+        "parameters": [
+          {
+            "description": "Export encoding. Omitted or yaml returns canonical YAML. json returns a metadata wrapper.",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "yaml",
+              "enum": [
+                "yaml",
+                "json"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Export"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Canonical export."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Export",
+        "tags": [
+          "state"
+        ],
+        "x-capability-id": "state.export",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.admin"
+        ]
+      }
+    },
+    "/v1/state:reset": {
+      "post": {
+        "description": "Reread the bootstrap mount, wipe the inbox, and swap. Never writes the file.",
+        "operationId": "post_v1_state_reset",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetIn"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyResult"
+                }
+              }
+            },
+            "description": "Reset"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Reset",
+        "tags": [
+          "state"
+        ],
+        "x-capability-id": "state.reset",
+        "x-idempotent": false,
+        "x-mutating": true,
+        "x-required-scopes": [
+          "mail.admin"
+        ]
+      }
+    },
+    "/v1/state:validate": {
+      "post": {
+        "description": "Validate a candidate document and/or operations without writing.",
+        "operationId": "post_v1_state_validate",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            },
+            "description": "Validate"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Validate",
+        "tags": [
+          "state"
+        ],
+        "x-capability-id": "state.validate",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.admin"
+        ]
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "description": "Listeners, store stats, and revisions.",
+        "operationId": "get_v1_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            },
+            "description": "Agent status"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Agent status",
+        "tags": [
+          "status"
+        ],
+        "x-capability-id": "status.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    },
+    "/v1/version": {
+      "get": {
+        "description": "Build and protocol versions.",
+        "operationId": "get_v1_version",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            },
+            "description": "Version"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Version",
+        "tags": [
+          "version"
+        ],
+        "x-capability-id": "version.get",
+        "x-idempotent": true,
+        "x-mutating": false,
+        "x-required-scopes": [
+          "mail.read"
+        ]
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "description": "Management listener (default address :1080)",
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Process liveness. Not an MCP tool.",
+      "name": "health"
+    },
+    {
+      "description": "Build and protocol versions.",
+      "name": "version"
+    },
+    {
+      "description": "Capability list and protocol metadata.",
+      "name": "capabilities"
+    },
+    {
+      "description": "Listeners, store stats, and revisions.",
+      "name": "status"
+    },
+    {
+      "description": "Published v1alpha1 config JSON Schema.",
+      "name": "schema"
+    },
+    {
+      "description": "Redacted spec plus revision metadata.",
+      "name": "state"
+    },
+    {
+      "description": "Dry-run operations against the active snapshot.",
+      "name": "changes"
+    },
+    {
+      "description": "Cookie + CSRF session for the inbox UI. Implemented in SEC-001.",
+      "name": "session"
+    },
+    {
+      "description": "REST SSE inbox events. MCP uses subscriptions/listen URI-only notify.",
+      "name": "events"
+    },
+    {
+      "description": "Cursor-paginated inbox list. HMAC cursors bind storeGeneration.",
+      "name": "messages"
+    },
+    {
+      "description": "Download one attachment. Content-Disposition: attachment.",
+      "name": "attachments"
+    },
+    {
+      "description": "Query recent in-memory audit events.",
+      "name": "audit"
+    },
+    {
+      "description": "OpenMetrics text. Served only when observability.metrics.publicPath is true.",
+      "name": "metrics"
+    }
+  ]
+}

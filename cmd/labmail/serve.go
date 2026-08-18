@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/control/rest"
+	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtp/server"
 )
 
@@ -58,10 +61,10 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 		return 1
 	}
 	_, _ = fmt.Fprintf(stdout, "labmail smtp listen=%s\n", rt.smtp.Addr().String())
-	if managementUnbound(flags.ManagementListen) {
+	if rt.http == nil {
 		_, _ = fmt.Fprintln(stdout, "labmail management: not bound")
 	} else {
-		_, _ = fmt.Fprintln(stdout, "labmail management: not implemented")
+		_, _ = fmt.Fprintf(stdout, "labmail management listen=%s\n", rt.http.Addr())
 	}
 	<-ctx.Done()
 	deadline := flags.ShutdownTimeout
@@ -77,6 +80,7 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 
 type serveRuntime struct {
 	smtp    *server.Server
+	http    *rest.Server
 	svc     *app.App
 	pidPath string
 }
@@ -110,12 +114,65 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 		return nil, err
 	}
 	rt := &serveRuntime{smtp: srv, svc: svc, pidPath: flags.PIDFile}
+	mgmt, unbound := managementListen(flags.ManagementListen, snap.Canonical.Spec.Listeners.Management.Address)
+	if !unbound {
+		hs, err := startManagement(svc, srv, mgmt, snap.Canonical.Spec)
+		if err != nil {
+			_ = srv.Shutdown(context.Background())
+			svc.Close()
+			return nil, err
+		}
+		rt.http = hs
+	}
 	if err := writePIDFile(flags.PIDFile); err != nil {
-		_ = srv.Shutdown(context.Background())
-		svc.Close()
+		_ = rt.shutdown(context.Background())
 		return nil, fmt.Errorf("pid-file: %w", err)
 	}
 	return rt, nil
+}
+
+func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.Spec) (*rest.Server, error) {
+	if addr == "" {
+		addr = rest.DefaultAddr
+	}
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	hs, err := rest.New(rest.Config{
+		Addr:           addr,
+		Service:        svc,
+		AllowedOrigins: spec.Management.OriginAllowlist,
+		MaxBodyBytes:   spec.Management.BodyLimit,
+		MaxConcurrent:  spec.Management.MaxConcurrent,
+		RatePerSec:     float64(spec.Management.RequestsPerSecond),
+		RateBurst:      float64(spec.Management.Burst),
+		PublicMetrics:  spec.Observability.Metrics.PublicPath,
+		Ready: func() bool {
+			return smtp.Addr() != nil
+		},
+	})
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
+	}
+	hs.Attach(ln)
+	go func() { _ = hs.Serve(ln) }()
+	return hs, nil
+}
+
+func managementListen(flagAddr, yamlAddr string) (addr string, unbound bool) {
+	switch strings.ToLower(strings.TrimSpace(flagAddr)) {
+	case "off", "none", "-":
+		return "", true
+	case "":
+		if yamlAddr == "" {
+			yamlAddr = rest.DefaultAddr
+		}
+		return yamlAddr, false
+	default:
+		return strings.TrimSpace(flagAddr), false
+	}
 }
 
 func (r *serveRuntime) shutdown(ctx context.Context) error {
@@ -128,6 +185,11 @@ func (r *serveRuntime) shutdown(ctx context.Context) error {
 			first = err
 		}
 	}
+	if r.http != nil {
+		if err := r.http.Shutdown(ctx); err != nil && first == nil {
+			first = err
+		}
+	}
 	if r.svc != nil {
 		r.svc.Close()
 	}
@@ -135,15 +197,6 @@ func (r *serveRuntime) shutdown(ctx context.Context) error {
 		_ = os.Remove(r.pidPath)
 	}
 	return first
-}
-
-func managementUnbound(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "", "off", "none", "-":
-		return true
-	default:
-		return false
-	}
 }
 
 func writePIDFile(path string) error {

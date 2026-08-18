@@ -2,10 +2,12 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (API-001)
 Related ADRs: 0004, 0005, 0007
 
-Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md).
+Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
+
+API-001 implements every native `/v1` route except UI session (`POST/GET/DELETE /v1/session` land in SEC-001). Auth is stubbed open; bearer+basic land in SEC-001. Compat `/email` is COMPAT-001. MCP is MCP-001.
 
 ## Problem details
 

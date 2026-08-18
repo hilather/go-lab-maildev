@@ -44,6 +44,10 @@ export function useInboxLive(onChange: () => void, enabled: boolean): LiveMode {
       es.addEventListener("mail.deleted", refresh);
       es.addEventListener("store.wiped", refresh);
       es.onopen = () => {
+        // close() can still deliver a queued open after fallbackToPoll.
+        if (poll !== undefined || es === null) {
+          return;
+        }
         opened = true;
         setMode("sse");
       };

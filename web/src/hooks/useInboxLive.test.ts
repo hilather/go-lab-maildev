@@ -112,4 +112,23 @@ describe("useInboxLive", () => {
     });
     expect(onChange).toHaveBeenCalledTimes(1);
   });
+
+  it("ignores onopen after the watchdog has fallen back to poll", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { result } = renderHook(() => useInboxLive(onChange, true));
+    const inst = FakeEventSource.instances[0];
+    if (!inst) {
+      throw new Error("expected EventSource");
+    }
+    act(() => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+    expect(result.current).toBe("poll");
+    act(() => {
+      inst.onopen?.(new Event("open"));
+    });
+    expect(result.current).toBe("poll");
+  });
 });

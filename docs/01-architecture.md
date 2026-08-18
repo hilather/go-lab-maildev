@@ -325,7 +325,7 @@ Operator-facing copy of this list: [docs/known-limitations.md](https://github.co
 - Compat `/email` ids are ULIDs; list omits `text`/`html`; checksum is sha256 not md5; `GET /config` is a redacted LabMail shape.
 - Compat does not implement maildev WebSocket.
 - `POST /email/:id/relay` never works (intentional).
-- SMTP AUTH is PLAIN/LOGIN only. Implicit SMTPS is 1.1.
+- SMTP AUTH is PLAIN/LOGIN only **when SMTP-001b lands**. This tree fail-closes `smtp.auth.mode != none` and `smtp.tls.mode != off`. Implicit SMTPS is 1.1.
 - Healthcheck plane in compose changes from SMTP TCP (`node`) to HTTP `/v1/health/ready` (ready still requires SMTP bound).
 - Worst-case RSS ≈ stored `maxBytes` (256 MiB) + `maxInFlightDataBytes` (64 MiB) + ~64 MiB slack ≈ **384 MiB**. Caps are stacked: in-flight does not reduce inbox capacity. Spill on tmpfs does not add a second disk budget — it is still RAM.
 - SMTP AUTH and STARTTLS are not implemented until SMTP-001b; `serve`, live apply, and reset fail-close those YAML modes.

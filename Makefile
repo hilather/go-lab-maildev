@@ -63,6 +63,7 @@ test-race:
 	$(GO) test -race ./...
 
 test-fuzz-smoke:
+	$(GO) test ./scripts/checkdocs -run TestFuzzCorporaPresent -count=1
 	$(GO) test ./internal/buildinfo -fuzz=FuzzInfoString -fuzztime=5s -count=1
 	$(GO) test ./internal/config -fuzz=FuzzDecode -fuzztime=5s -count=1
 	$(GO) test ./internal/smtp/codec -fuzz=FuzzReadLine -fuzztime=5s -count=1

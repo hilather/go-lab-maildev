@@ -302,7 +302,9 @@ func matchingRuns(runs []checkRun, name, wantSHA string) (hits []checkRun, wrong
 		if !checkNameMatches(r.Name, name) {
 			continue
 		}
-		if wantSHA != "" && r.HeadSHA != "" && r.HeadSHA != wantSHA {
+		// Empty head_sha is not the tag commit. A blank fixture must not
+		// satisfy -require-ci.
+		if wantSHA != "" && r.HeadSHA != wantSHA {
 			wrongSHA++
 			continue
 		}

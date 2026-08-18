@@ -25,7 +25,7 @@ labmail version
 
 `labmail send` is **not** shipped.
 
-CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. SMTP-001a implements `serve` for the SMTP listener. API-001 binds management HTTP. OBS-001 implements `labmail healthcheck --url=…` against `GET /v1/health/ready` (ready = SMTP bound + store initialized + management bound or explicitly off), slog JSON events, and hand-rolled OpenMetrics (`spec.observability.metrics.listen` / `publicPath`). DEP-001 wires `--smtp-listen`, `--management-listen ADDR|off`, `--shutdown-timeout` (default 5s), and `--pid-file` (written after both requested listeners bind).
+This tree: `serve` binds SMTP (Memory inbox, not Null) and management HTTP (`/v1`, `/mcp`, `/email` when enabled, inbox SPA). CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. OBS-001 implements `labmail healthcheck --url=…` against `GET /v1/health/ready` (ready = SMTP bound + store initialized + management bound or explicitly off), slog JSON events, and hand-rolled OpenMetrics (`spec.observability.metrics.listen` / `publicPath`). DEP-001 wires `--smtp-listen`, `--management-listen ADDR|off`, `--shutdown-timeout` (default 5s), and `--pid-file`, plus the hardened image, compose smoke, and `scripts/test-container.sh`.
 
 ## Hardened container
 

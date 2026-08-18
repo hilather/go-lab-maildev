@@ -126,7 +126,55 @@ func Check(root string) error {
 	if err := checkMetadata(root); err != nil {
 		return err
 	}
+	// Fixture trees used by checkdocs tests have no fuzz packages.
+	if _, err := os.Stat(filepath.Join(root, "internal", "config", "fuzz_test.go")); err == nil {
+		if err := checkFuzzCorpora(root); err != nil {
+			return err
+		}
+	}
 	return checkExampleYAML(root)
+}
+
+// RequiredFuzzCorpora are the GA-001 seed directories. Deleting them must
+// fail closed; in-function f.Add seeds are not a substitute.
+var RequiredFuzzCorpora = []string{
+	"internal/buildinfo/testdata/fuzz/FuzzInfoString",
+	"internal/config/testdata/fuzz/FuzzDecode",
+	"internal/smtp/codec/testdata/fuzz/FuzzReadLine",
+	"internal/mimeparse/testdata/fuzz/FuzzParse",
+}
+
+func checkFuzzCorpora(root string) error {
+	var missing []string
+	for _, rel := range RequiredFuzzCorpora {
+		dir := filepath.Join(root, filepath.FromSlash(rel))
+		ents, err := os.ReadDir(dir)
+		if err != nil {
+			missing = append(missing, rel+": "+err.Error())
+			continue
+		}
+		ok := false
+		for _, e := range ents {
+			if e.IsDir() {
+				continue
+			}
+			body, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				continue
+			}
+			if bytes.HasPrefix(body, []byte("go test fuzz v1")) {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			missing = append(missing, rel+": no seed starting with go test fuzz v1")
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("fuzz corpora missing:\n  %s", strings.Join(missing, "\n  "))
+	}
+	return nil
 }
 
 var numberedDoc = regexp.MustCompile(`^docs/[0-9]{2}-.+\.md$`)

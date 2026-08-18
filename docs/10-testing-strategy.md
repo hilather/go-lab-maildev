@@ -46,8 +46,12 @@ FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-
 
 Jobs: format, lint, unit, race, fuzz-smoke, generated-file, documentation, security-scan, changelog, parity, config-compat, container-test, web. There is no optional or bypassable job. Tag creation is gated by `.github/workflows/release.yml` (`tag-gate`): notes file present, required headings, generated files clean, every required CI job success on the exact tag commit.
 
+## Frozen fixtures present on this tree
+
+- Extract regex coverage for the four RE2 patterns in [docs/03-message-store.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/03-message-store.md) (`TestExtractFrozenRegexes`).
+- `TestMaildevScenarioCompat`: unauthenticated `GET /email` → 401, Basic → array containing `subject`, SMTP `SendMail`.
+- Compat goldens from `maildev/maildev:2.2.1` for `subject`/`from`/`to`/`id`/`time`/`read` plus one attachment fixture with `fileName` and **no** `stream` (`testdata/compat/`).
+
 ## Frozen fixtures to add later
 
-- Extract regex goldens for the four RE2 patterns in [docs/03-message-store.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/03-message-store.md).
-- `TestMaildevScenarioCompat`: unauthenticated `GET /email` → 401, Basic → array containing `subject`, SMTP `SendMail`.
-- Compat goldens from `maildev/maildev:2.2.1` for `subject`/`from`/`to`/`id`/`time`/`read` plus one attachment fixture with `fileName` and **no** `stream`.
+- Implicit SMTPS (`smtp.tls.mode: implicit`) remains 1.1; no 1.0 transcript.

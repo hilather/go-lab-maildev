@@ -62,6 +62,13 @@ func TestEvaluateChecks(t *testing.T) {
 	if err := evaluateChecks(jobs, bad, "abc"); err == nil {
 		t.Fatal("expected failed job")
 	}
+	blank := append([]checkRun(nil), runs...)
+	for i := range blank {
+		blank[i].HeadSHA = ""
+	}
+	if err := evaluateChecks(jobs, blank, "abc"); err == nil {
+		t.Fatal("expected empty HeadSHA to fail")
+	}
 }
 
 func TestRequiredCIJobsHaveNoDuplicates(t *testing.T) {

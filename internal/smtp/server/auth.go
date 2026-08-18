@@ -24,6 +24,10 @@ func (s *session) cmdAuth(arg string) bool {
 		_ = s.reply(502, "5.5.1 AUTH not implemented")
 		return true
 	}
+	if s.tlsRequiredCleartext() {
+		_ = s.reply(530, "5.7.0 Must issue a STARTTLS command first")
+		return true
+	}
 	if s.state == stateGreeting {
 		_ = s.reply(503, "5.5.1 HELO/EHLO first")
 		return true

@@ -62,6 +62,44 @@ func TestSTARTTLSHandshake(t *testing.T) {
 	}
 }
 
+func TestAuthWithheldUntilRequiredSTARTTLS(t *testing.T) {
+	spec := authSpec(t, "lab", "secret")
+	tlsSpec := starttlsSpec(t, true)
+	spec.TLS = tlsSpec.TLS
+	c := dial(t, startServer(t, spec, nil))
+	_, lines, err := c.Cmd("EHLO x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := smtptest.ReplyText(lines)
+	if !strings.Contains(text, "STARTTLS") {
+		t.Fatalf("STARTTLS missing: %v", lines)
+	}
+	if strings.Contains(text, "AUTH") {
+		t.Fatalf("AUTH advertised on cleartext required-TLS: %v", lines)
+	}
+	// One-step PLAIN must 530 without accepting the lab password in the clear.
+	mustCmd(t, c, 530, "AUTH PLAIN AGxhYgBzZWNyZXQ=")
+	mustCmd(t, c, 530, "AUTH LOGIN")
+	mustCmd(t, c, 220, "STARTTLS")
+	if err := c.StartTLS(&tls.Config{InsecureSkipVerify: true}); err != nil {
+		t.Fatal(err)
+	}
+	_, lines, err = c.Cmd("EHLO x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text = smtptest.ReplyText(lines)
+	if strings.Contains(text, "STARTTLS") {
+		t.Fatalf("STARTTLS still advertised after handshake: %v", lines)
+	}
+	if !strings.Contains(text, "AUTH PLAIN LOGIN") {
+		t.Fatalf("AUTH missing after STARTTLS: %v", lines)
+	}
+	mustCmd(t, c, 235, "AUTH PLAIN AGxhYgBzZWNyZXQ=")
+	mustCmd(t, c, 250, "MAIL FROM:<a@b>")
+}
+
 func TestSTARTTLSRequiredBlocksCleartext(t *testing.T) {
 	c := dial(t, startServer(t, starttlsSpec(t, true), nil))
 	mustCmd(t, c, 250, "EHLO x")

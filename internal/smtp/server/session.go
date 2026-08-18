@@ -137,7 +137,7 @@ func (s *session) ehloLines() []string {
 	if spec.TLS.Mode == model.TLSModeStartTLS && !s.tls && !hidden["STARTTLS"] {
 		lines = append(lines, "STARTTLS")
 	}
-	if spec.Auth.Mode == model.SMTPAuthPlainLogin && !s.authed && !hidden["AUTH"] {
+	if spec.Auth.Mode == model.SMTPAuthPlainLogin && !s.authed && !hidden["AUTH"] && !s.tlsRequiredCleartext() {
 		lines = append(lines, "AUTH PLAIN LOGIN")
 	}
 	return lines
@@ -355,7 +355,7 @@ func (s *session) resetAfterTLS() {
 
 func (s *session) policyOK() bool {
 	spec := s.spec()
-	if spec.TLS.Mode == model.TLSModeStartTLS && spec.TLS.Required && !s.tls {
+	if s.tlsRequiredCleartext() {
 		_ = s.reply(530, "5.7.0 Must issue a STARTTLS command first")
 		return false
 	}
@@ -364,6 +364,13 @@ func (s *session) policyOK() bool {
 		return false
 	}
 	return true
+}
+
+// tlsRequiredCleartext is true when STARTTLS is mandatory and this session
+// has not completed the handshake. AUTH must not be advertised or accepted.
+func (s *session) tlsRequiredCleartext() bool {
+	spec := s.spec()
+	return spec.TLS.Mode == model.TLSModeStartTLS && spec.TLS.Required && !s.tls
 }
 
 func (s *session) spec() model.SMTPSpec {

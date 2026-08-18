@@ -58,6 +58,7 @@ func newTestServer(t *testing.T) (*Server, *app.App) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(s.Close)
 	return s, svc
 }
 

@@ -90,6 +90,8 @@ type Server struct {
 
 	cursorMu  sync.Mutex
 	cursorKey []byte
+
+	inboxCancel func()
 }
 
 type ctxKey int
@@ -128,6 +130,15 @@ func New(cfg Config) (*Server, error) {
 		Version: info.Version,
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	s := &Server{
+		cfg:       cfg,
+		svc:       cfg.Service,
+		maxBody:   maxBody,
+		timeout:   timeout,
+		inflight:  make(chan struct{}, n),
+		rate:      newLimiter(cfg.RatePerSec, cfg.RateBurst),
+		cursorKey: key,
+	}
 	sdkOpts := &sdk.ServerOptions{
 		Instructions: "LabMail control plane. Use typed mail_* tools; do not assume connection state. Protocol " + ProtocolVersion + ".",
 		Logger:       logger,
@@ -136,26 +147,18 @@ func New(cfg Config) (*Server, error) {
 			Tools:     &sdk.ToolCapabilities{ListChanged: false},
 			Resources: &sdk.ResourceCapabilities{ListChanged: false, Subscribe: true},
 		},
-		SchemaCache: sdk.NewSchemaCache(),
+		SchemaCache:        sdk.NewSchemaCache(),
+		SubscribeHandler:   s.onSubscribe,
+		UnsubscribeHandler: s.onUnsubscribe,
 	}
-	sdkSrv := sdk.NewServer(impl, sdkOpts)
+	s.sdk = sdk.NewServer(impl, sdkOpts)
 	if !cfg.AllowLegacyClients {
-		sdkSrv.AddReceivingMiddleware(pinProtocolMiddleware)
-	}
-
-	s := &Server{
-		cfg:       cfg,
-		svc:       cfg.Service,
-		sdk:       sdkSrv,
-		maxBody:   maxBody,
-		timeout:   timeout,
-		inflight:  make(chan struct{}, n),
-		rate:      newLimiter(cfg.RatePerSec, cfg.RateBurst),
-		cursorKey: key,
+		s.sdk.AddReceivingMiddleware(pinProtocolMiddleware)
 	}
 	s.svc.OnReset(s.RotateCursors)
 	s.registerTools()
 	s.registerResources()
+	s.startInboxFanout()
 
 	s.http = sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server {
 		return s.sdk
@@ -175,9 +178,36 @@ func (s *Server) Handler() http.Handler {
 	return http.HandlerFunc(s.serveHTTP)
 }
 
-// Close marks the adapter stopped. In-flight requests still run to completion.
+// Close marks the adapter stopped and ends inbox notify fan-out.
 func (s *Server) Close() {
 	s.closed.Store(true)
+	if s.inboxCancel != nil {
+		s.inboxCancel()
+		s.inboxCancel = nil
+	}
+}
+
+func (s *Server) startInboxFanout() {
+	// One Subscribe for HTTP and stdio: ResourceUpdated is URI-only.
+	ch, cancel := s.svc.Subscribe(context.Background(), app.Actor{ID: "mcp", Class: "system", Transport: "mcp"}, 16)
+	s.inboxCancel = cancel
+	go func() {
+		for range ch {
+			_ = s.sdk.ResourceUpdated(context.Background(), &sdk.ResourceUpdatedNotificationParams{URI: resourceMessages})
+		}
+	}()
+}
+
+func (s *Server) onSubscribe(ctx context.Context, req *sdk.SubscribeRequest) error {
+	uri := ""
+	if req != nil && req.Params != nil {
+		uri = req.Params.URI
+	}
+	return s.authorizeResource(actorFrom(ctx), uri)
+}
+
+func (s *Server) onUnsubscribe(context.Context, *sdk.UnsubscribeRequest) error {
+	return nil
 }
 
 // RotateCursors issues a new HMAC key. Reset/restart invalidate list cursors.
@@ -256,8 +286,11 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(withActor(r.Context(), actor))
 
 	if strings.TrimSpace(r.Header.Get(headerMethod)) == methodListen {
-		s.handleListen(w, r)
-		return
+		var ok bool
+		r, ok = s.enforceListenPin(w, r)
+		if !ok {
+			return
+		}
 	}
 
 	s.http.ServeHTTP(w, r)

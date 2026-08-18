@@ -111,6 +111,7 @@ func TestAllowLegacyClientsNegotiatesViaSDK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(s.Close)
 	body := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"legacy-gateway","version":"0.0.1"}}}`
 	rec := doRaw(t, s.Handler(), body, map[string]string{
 		"Content-Type": "application/json",
@@ -118,6 +119,11 @@ func TestAllowLegacyClientsNegotiatesViaSDK(t *testing.T) {
 	}, "127.0.0.1:1")
 	if rec.Code != http.StatusOK && rec.Code != http.StatusAccepted {
 		t.Fatalf("legacy initialize status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	got := decodeRPC(t, rec)
+	result, _ := got["result"].(map[string]any)
+	if result == nil || result["protocolVersion"] == "" {
+		t.Fatalf("legacy initialize missing result.protocolVersion: %s", rec.Body.String())
 	}
 	rec2 := doRaw(t, s.Handler(), body, map[string]string{
 		"Content-Type":        "application/json",

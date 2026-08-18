@@ -24,6 +24,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
+- MCP inbox `resources/updated` is fan-out via the official SDK on both Streamable HTTP and `mcp-stdio` (URI-only `labmail://messages`). `subscriptions/listen` stays pinned to `2026-07-28` even when `allowLegacyClients` is true.
 - Reset preflights store options (including a creatable spill directory) and installs new caps under one lock, so a failed reset cannot empty the inbox under the old snapshot.
 
 ### Removed or deprecated

@@ -42,7 +42,7 @@ FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-
 
 ## Required CI (FND-001)
 
-Jobs: format, lint, unit, documentation, generated-file. There is no optional or bypassable job. Later PRs add race, fuzz-smoke, security-scan, container-test, changelog, parity, and config-compat when those targets first exist.
+Jobs: format, lint, unit, documentation, generated-file, parity. There is no optional or bypassable job. Later PRs add race, fuzz-smoke, security-scan, container-test, changelog, and config-compat when those targets first exist.
 
 ## Frozen fixtures to add later
 

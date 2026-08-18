@@ -49,6 +49,7 @@ func TestOriginAllowlist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(s.Close)
 	ok := doRaw(t, s.Handler(), rpcCall(1, "ping", nil), map[string]string{
 		"Content-Type":        "application/json",
 		"Accept":              "application/json, text/event-stream",

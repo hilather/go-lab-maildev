@@ -65,7 +65,7 @@ Health live/ready, OpenAPI, UI assets, session/CSRF, `/v1/metrics`, `/email` com
 | `labmail://messages/{id}` | `messages.get` |
 | `labmail://audit/recent` | `audit.list` |
 
-`subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`.
+`subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Inbox `notifications/resources/updated` is emitted through the official SDK `ResourceUpdated` path so Streamable HTTP and `labmail mcp-stdio` share one notify implementation. The HTTP adapter intercepts `subscriptions/listen` only to enforce the D17 protocol pin (`2026-07-28` on the header or `_meta`).
 
 ## Auth
 

@@ -17,7 +17,7 @@ services:
     note: "SMTP ingest (no auth, no TLS required): ${LAB_PUBLIC_HOST}:${MAILDEV_SMTP_PORT}. Point systems under test at it as their outbound SMTP server."
     credential:
       file: /run/lab-secrets/maildev-web-password
-      usage: "HTTP basic auth for the web UI and /email compat, user '${MAILDEV_WEB_USER}'"
+      usage: "HTTP basic auth for the web UI and /email compat, user 'admin' (frozen; LabMail YAML does not interpolate MAILDEV_WEB_USER)"
     connection:
       endpoints:
         - name: SMTP ingest

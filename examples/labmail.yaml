@@ -1,8 +1,11 @@
 # mcp-integration-lab overlay: copy to profiles/default/labmail/bootstrap.yaml
-# and mount at /etc/labmail/config.yaml. allowLegacyClients is on so
+# and mount at /etc/labmail/config.yaml. Not the DEP-001 compose-smoke
+# bootstrap (that file must not gain these /run/secrets refs unless the
+# smoke compose mints and mounts them). allowLegacyClients is on so
 # MCPJungle (mark3labs/mcp-go v0.48) can register without a LabMail patch
 # (D17). SMTP AUTH stays off so smoke SendMail(..., nil, ...) still works.
-# Also used by examples/compose.smoke.yaml.
+# Basic username is frozen admin (YAML does not interpolate MAILDEV_WEB_USER).
+# Bind-mounted secret files must be 0o644 (UID 65532).
 apiVersion: labmail.dev/v1alpha1
 kind: LabMail
 metadata:

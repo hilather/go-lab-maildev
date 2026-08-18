@@ -19,8 +19,8 @@ import (
 
 // TestMaildevScenarioCompat is the mcp-integration-lab smoke twin
 // (maildevScenario): SendMail, unauthenticated GET /email → 401, Basic →
-// array containing subject. Goldens live in testdata/compat/. The lab swap
-// PR copies this name and these three assertions.
+// array containing subject. The lab swap PR copies this name and these
+// three assertions (not testdata/compat goldens; those are handler_test).
 func TestMaildevScenarioCompat(t *testing.T) {
 	dir := t.TempDir()
 	tokenPath := filepath.Join(dir, "token")

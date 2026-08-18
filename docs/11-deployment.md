@@ -53,7 +53,7 @@ Posture:
 
 ## Reference compose
 
-Copyable smoke file: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml) with [examples/labmail.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.yaml) (SWAP-001 overlay; `allowLegacyClients: true`, Basic `tokenRef`). Healthcheck is HTTP ready (exec form). Scratch has no `node`; do not probe SMTP TCP.
+Copyable smoke file: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml). The lab overlay YAML is [examples/labmail.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.yaml) (SWAP-001; `allowLegacyClients: true`). That path is also reserved by DEP-001 for compose-smoke; do not mount this overlay as the smoke config without 0o644 secret files. Preferred stack split: `examples/labmail/bootstrap.yaml` vs smoke `examples/labmail.yaml`. Bind-mounted secrets are **0o644** (UID 65532). Healthcheck is HTTP ready (exec form). Scratch has no `node`; do not probe SMTP TCP.
 
 ```yaml
 services:
@@ -104,6 +104,7 @@ Service name stays `maildev` (D15). Healthcheck plane change: today’s maildev 
     # Do not leave MAILDEV_ARGS / MAILDEV_WEB_USER / MAILDEV_WEB_PASS
     # here. `environment: {}` does not clear operator env — delete the
     # keys from the service definition entirely.
+    # Bind-mounted secrets must be 0o644 (UID 65532).
     read_only: true
     tmpfs: ["/tmp"]
     cap_drop: [ALL]

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -99,15 +100,9 @@ func TestLabMCPJungleExamples(t *testing.T) {
 	if group.Name != "integration" {
 		t.Fatalf("group name=%q", group.Name)
 	}
-	found := false
-	for _, s := range group.IncludedServers {
-		if s == "labmail" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("integration.json must append labmail, got %v", group.IncludedServers)
+	want := []string{"labdns", "labldap", "labtacacs", "labinfo", "labmail"}
+	if !slices.Equal(group.IncludedServers, want) {
+		t.Fatalf("included_servers=%v want %v (append labmail; do not replace)", group.IncludedServers, want)
 	}
 }
 
@@ -132,5 +127,8 @@ func TestLabinfoMaildevSnippetKeepsCatalogID(t *testing.T) {
 	}
 	if !strings.Contains(text, "labmail-token") {
 		t.Fatal("snippet must add bearer credential file")
+	}
+	if !strings.Contains(text, "user 'admin'") {
+		t.Fatal("Basic user is frozen at admin; do not interpolate MAILDEV_WEB_USER as the live username")
 	}
 }

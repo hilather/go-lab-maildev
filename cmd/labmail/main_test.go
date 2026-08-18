@@ -6,9 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/hilather/go-lab-maildev/internal/config"
+	"github.com/hilather/go-lab-maildev/internal/smtp/server"
 )
 
-func testdataConfig(t *testing.T, elem ...string) string {
+func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
 	if err != nil {
@@ -16,8 +20,7 @@ func testdataConfig(t *testing.T, elem ...string) string {
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			parts := append([]string{dir, "testdata", "config"}, elem...)
-			return filepath.Join(parts...)
+			return dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -25,6 +28,12 @@ func testdataConfig(t *testing.T, elem ...string) string {
 		}
 		dir = parent
 	}
+}
+
+func testdataConfig(t *testing.T, elem ...string) string {
+	t.Helper()
+	parts := append([]string{repoRoot(t), "testdata", "config"}, elem...)
+	return filepath.Join(parts...)
 }
 
 func TestVersion(t *testing.T) {
@@ -152,5 +161,120 @@ func TestValidateAndCanonicalize(t *testing.T) {
 	code = run([]string{"labmail", "canonicalize", "--config", path, "--format", "xml"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("bad format exit %d want 2", code)
+	}
+}
+
+func TestParseServeFlags(t *testing.T) {
+	var stderr bytes.Buffer
+	got, err := parseServeFlags([]string{
+		"--config", "labmail.yaml",
+		"--smtp-listen", "127.0.0.1:1025",
+		"--management-listen", "off",
+		"--shutdown-timeout", "8s",
+		"--pid-file", "/tmp/labmail.pid",
+	}, &stderr)
+	if err != nil {
+		t.Fatalf("parse: %v stderr=%q", err, stderr.String())
+	}
+	if got.Config != "labmail.yaml" || got.SMTPListen != "127.0.0.1:1025" {
+		t.Fatalf("listen flags: %+v", got)
+	}
+	if got.ManagementListen != "off" {
+		t.Fatalf("management-listen=%q", got.ManagementListen)
+	}
+	if got.ShutdownTimeout != 8*time.Second {
+		t.Fatalf("shutdown-timeout=%s want 8s", got.ShutdownTimeout)
+	}
+	if got.PIDFile != "/tmp/labmail.pid" {
+		t.Fatalf("pid-file=%q", got.PIDFile)
+	}
+
+	stderr.Reset()
+	def, err := parseServeFlags([]string{"--config", "labmail.yaml"}, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if def.ShutdownTimeout != server.DefaultShutdownWait {
+		t.Fatalf("default shutdown=%s", def.ShutdownTimeout)
+	}
+}
+
+func TestDebugStatus(t *testing.T) {
+	if _, err := os.Stat("/proc/self/status"); err != nil {
+		t.Skip("/proc/self/status not available")
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"labmail", "debug-status"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Uid:") {
+		t.Fatalf("stdout=%q missing Uid", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "CapEff:") {
+		t.Fatalf("stdout=%q missing CapEff", stdout.String())
+	}
+}
+
+func TestDockerfileHardening(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	for _, want := range []string{
+		"FROM scratch",
+		"USER 65532:65532",
+		"Apache-2.0",
+		"ghcr.io/hilather/labmail",
+		`ENTRYPOINT ["/labmail"]`,
+		`CMD ["serve", "--config=/etc/labmail/config.yaml"]`,
+		`CMD ["/labmail", "healthcheck", "--url=http://127.0.0.1:1080/v1/health/ready"]`,
+		"EXPOSE 1025/tcp 1080/tcp",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("Dockerfile missing %q", want)
+		}
+	}
+	if strings.Contains(text, "node -e") || strings.Contains(text, `CMD ["node"`) {
+		t.Error("Dockerfile healthcheck must not exec node")
+	}
+}
+
+func TestComposeSmokeContract(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "examples", "compose.smoke.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body)
+	for _, want := range []string{
+		`test: ["CMD", "/labmail", "healthcheck", "--url=http://127.0.0.1:1080/v1/health/ready"]`,
+		`user: "65532:65532"`,
+		"read_only: true",
+		"cap_drop:",
+		"- ALL",
+		"tmpfs:",
+		"- /tmp",
+		"no-new-privileges:true",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("compose.smoke.yaml missing %q", want)
+		}
+	}
+	if strings.Contains(text, "node -e") || strings.Contains(text, `"node"`) {
+		t.Error("compose smoke healthcheck must not exec node")
+	}
+}
+
+func TestExampleAndContainerYAML(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"examples/labmail.yaml",
+		"testdata/container/config.yaml",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if _, err := config.LoadFile(path); err != nil {
+			t.Fatalf("load %s: %v", rel, err)
+		}
 	}
 }

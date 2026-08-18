@@ -2,10 +2,10 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-17 (OBS-001)
+Last reviewed: 2026-08-17 (DEP-001)
 Related ADRs: 0001, 0003
 
-Dockerfile, compose, and `scripts/test-container.sh` land in DEP-001 (PR 11). This document freezes the contract so later PRs do not invent ports or image posture.
+DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here.
 
 ## CLI
 
@@ -25,7 +25,7 @@ labmail version
 
 `labmail send` is **not** shipped.
 
-CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. SMTP-001a implements `serve` for the SMTP listener. API-001 binds management HTTP. OBS-001 implements `labmail healthcheck --url=…` against `GET /v1/health/ready` (ready = SMTP bound + store initialized + management bound or explicitly off), slog JSON events, and hand-rolled OpenMetrics (`spec.observability.metrics.listen` / `publicPath`).
+CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. SMTP-001a implements `serve` for the SMTP listener. API-001 binds management HTTP. OBS-001 implements `labmail healthcheck --url=…` against `GET /v1/health/ready` (ready = SMTP bound + store initialized + management bound or explicitly off), slog JSON events, and hand-rolled OpenMetrics (`spec.observability.metrics.listen` / `publicPath`). DEP-001 wires `--smtp-listen`, `--management-listen ADDR|off`, `--shutdown-timeout` (default 5s), and `--pid-file` (written after both requested listeners bind).
 
 ## Hardened container
 
@@ -53,28 +53,37 @@ Posture:
 
 ## Reference compose
 
-Also `examples/compose.smoke.yaml` (DEP-001):
+Copyable smoke file: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml) with [examples/labmail.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.yaml). Healthcheck is HTTP ready (exec form). Scratch has no `node`; do not probe SMTP TCP. Secret file mounts land with SEC-001 / SWAP-001 (auth is stubbed open until then).
 
 ```yaml
 services:
   labmail:
     image: ghcr.io/hilather/labmail:local
+    build:
+      context: ..
     command: ["serve", "--config=/etc/labmail/config.yaml"]
     ports:
       - "1025:1025/tcp"
       - "1080:1080/tcp"
     volumes:
       - ./labmail.yaml:/etc/labmail/config.yaml:ro
-      - ./secrets/labmail-token:/run/secrets/labmail-token:ro
-      - ./secrets/maildev-web-password:/run/secrets/maildev-web-password:ro
     read_only: true
-    tmpfs: ["/tmp"]
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     user: "65532:65532"
     restart: unless-stopped
-    networks: [default]
+    healthcheck:
+      test: ["CMD", "/labmail", "healthcheck", "--url=http://127.0.0.1:1080/v1/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 ```
+
+`make test-container` (`scripts/test-container.sh`) builds the image, asserts UID `65532`, `CapEff=0`, Apache-2.0 label, exec-form HTTP ready healthcheck, no `/bin/sh` or busybox, read-only root, then delivers SMTP and lists `/v1/messages`. It parses `examples/compose.smoke.yaml` with `docker compose config` when the plugin is present.
 
 ## Integration-lab compose fragment
 

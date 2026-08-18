@@ -38,6 +38,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return serveCmd(ctx, args[2:], stdout, stderr)
 	case "healthcheck":
 		return healthcheckCmd(args[2:], stdout, stderr)
+	case "debug-status":
+		return debugStatusCmd(args[2:], stdout, stderr)
 	case "mcp-stdio":
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
@@ -64,7 +66,8 @@ Commands:
   help            print this help
   validate        fail-closed YAML check (--config)
   canonicalize    emit canonical spec (--config, --format yaml|json)
-  serve           load YAML, bind SMTP, /v1, and /mcp (--config, --smtp-listen, --management-listen)
+  serve           load YAML, bind SMTP, /v1, /mcp, and /email (--config, --smtp-listen,
+                  --management-listen, --shutdown-timeout, --pid-file)
   healthcheck     probe GET /v1/health/ready (--url)
   mcp-stdio       Streamable MCP over stdio (--config, --token-file)
 `

@@ -29,7 +29,7 @@ help:
 		'  security-scan       govulncheck' \
 		'  test-parity         REST/MCP capability parity and MCP goldens' \
 		'  test-config-compat  positive+negative v1alpha1 config fixtures' \
-		'  test-container      unimplemented until DEP-001 (PR 11); fail-closed' \
+		'  test-container      build ghcr.io/hilather/labmail and check non-root/read-only/no-caps' \
 		'  test-changelog      unimplemented until REL/GA; fail-closed'
 
 fmt: format
@@ -77,7 +77,7 @@ test-config-compat:
 	$(GO) test ./internal/config -run TestConfigCompat -count=1
 
 test-container:
-	@echo 'test-container: unimplemented until DEP-001 (PR 11)' >&2; exit 1
+	bash scripts/test-container.sh
 
 test-changelog:
 	@echo 'test-changelog: unimplemented until a checkchangelog script lands' >&2; exit 1

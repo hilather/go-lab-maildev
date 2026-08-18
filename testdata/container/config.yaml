@@ -1,0 +1,31 @@
+# Minimal local-only bootstrap for container contract tests.
+# Auth is stubbed open until SEC-001; do not require secret files here.
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: container-smoke
+spec:
+  listeners:
+    smtp:
+      address: ":1025"
+    management:
+      address: ":1080"
+      restPath: /v1
+      mcpPath: /mcp
+      compatEnabled: true
+  smtp:
+    hostname: labmail.lab
+  store:
+    maxMessages: 100
+    maxBytes: 8MiB
+    fullPolicy: reject
+  ui:
+    enabled: false
+  management:
+    auth:
+      mode: bearer_and_basic
+  observability:
+    logLevel: info
+    metrics:
+      listen: ""
+      publicPath: false

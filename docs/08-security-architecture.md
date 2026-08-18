@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Security, SMTP, Control Plane
-Last reviewed: 2026-08-17 (SEC-001)
+Last reviewed: 2026-08-17 (SEC-001 + DEP-001)
 Related ADRs: 0002, 0003, 0005, 0007
 
 LabMail is a lab sink, not a public MX. The critical invariant is receive-only: outbound SMTP must be unrepresentable.
@@ -12,7 +12,7 @@ LabMail is a lab sink, not a public MX. The critical invariant is receive-only: 
 | Threat | Severity | Mitigation |
 |---|---|---|
 | Open relay / LabMail used to spam | **Critical** | No SMTP client; reserved YAML keys; 403 relay; import boundary; tests |
-| Unauthenticated inbox read on a published `:1080` | High | Default `bearer_and_basic`; smoke asserts 401; no `dev-loopback-unauth` in the image default YAML |
+| Unauthenticated inbox read on a published `:1080` | High | Default YAML is `bearer_and_basic`; SEC-001 smoke asserts 401; no `dev-loopback-unauth` in the image default |
 | HTML mail XSS in the operator browser | High | Preview CSP `img-src data:` only; `cid:` inlined as `data:` (not HTTP); iframe `sandbox` without scripts/same-origin; no parent `innerHTML`; download route `Content-Disposition: attachment` |
 | Path traversal via attachment filename | High | Ignore client path; server-side `attId`; sanitize download name |
 | SMTP AUTH / management secret leakage | High | File refs only; redaction in logs/export/audit/MCP; never log DATA by default (`logMailContents` is not offered — maildev’s `--log-mail-contents` is a footgun) |

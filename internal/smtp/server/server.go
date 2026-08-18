@@ -96,6 +96,9 @@ func New(opts Options) (*Server, error) {
 // SwapSpec replaces the fallback spec used when no snapshot store is attached.
 // Live apply prefers Snapshots.Load on the next MAIL, RCPT, and DATA.
 func (s *Server) SwapSpec(spec model.SMTPSpec) error {
+	if err := rejectUnimplemented(spec); err != nil {
+		return err
+	}
 	spec = withSpecDefaults(spec)
 	s.spec.Store(&spec)
 	return nil

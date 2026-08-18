@@ -58,7 +58,7 @@ func TestServeAcceptsAuthMode(t *testing.T) {
 	var stdout, stderr safeBuffer
 	done := make(chan int, 1)
 	go func() {
-		done <- serveCmd(ctx, []string{"--config", cfg, "--smtp-listen", "127.0.0.1:0"}, &stdout, &stderr)
+		done <- serveCmd(ctx, []string{"--config", cfg, "--smtp-listen", "127.0.0.1:0", "--management-listen", "off"}, &stdout, &stderr)
 	}()
 	addr := waitSMTPListen(t, &stdout)
 	auth := smtp.PlainAuth("", "lab", "secret", "127.0.0.1")

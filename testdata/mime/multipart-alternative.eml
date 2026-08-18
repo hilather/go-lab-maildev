@@ -1,0 +1,16 @@
+From: alice@lab.test
+To: bob@lab.test
+Subject: alt body
+Message-ID: <alt@labmail.lab>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="bound-alt"
+
+--bound-alt
+Content-Type: text/plain; charset=utf-8
+
+plain alternative
+--bound-alt
+Content-Type: text/html; charset=utf-8
+
+<p>html alternative</p>
+--bound-alt--

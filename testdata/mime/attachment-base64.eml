@@ -1,0 +1,18 @@
+From: alice@lab.test
+To: bob@lab.test
+Subject: with attachment
+Message-ID: <att@labmail.lab>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="bound-mix"
+
+--bound-mix
+Content-Type: text/plain; charset=utf-8
+
+see attached
+--bound-mix
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: attachment; filename="notes.txt"
+Content-Transfer-Encoding: base64
+
+aGVsbG8gYXR0Cg==
+--bound-mix--

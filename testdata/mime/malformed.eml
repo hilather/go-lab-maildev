@@ -1,0 +1,6 @@
+From: <not-an-address
+Subject: broken
+Content-Type: multipart/mixed; boundary="abc"
+
+--not-the-boundary
+this is not valid MIME

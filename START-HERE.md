@@ -1,6 +1,6 @@
 # Start here
 
-LabMail is a receive-only SMTP lab appliance in the LabDNS / LabLDAP / TacLab family. Systems under test deliver RFC 5321 SMTP to it. LabMail captures, indexes, and (once implemented) exposes every accepted message over REST, MCP, and an embedded inbox UI. It never opens an outbound SMTP session and never relays.
+LabMail is a receive-only SMTP lab appliance in the LabDNS / LabLDAP / TacLab family. Systems under test deliver RFC 5321 SMTP to it. LabMail captures, indexes, and exposes every accepted message over REST, MCP, and an embedded inbox UI. It never opens an outbound SMTP session and never relays.
 
 If you want to run what exists today, stay on this page, then follow the [README](README.md). If you want to change it, read [AGENTS.md](AGENTS.md) before touching code.
 
@@ -12,7 +12,7 @@ If you want to run what exists today, stay on this page, then follow the [README
 4. `./bin/labmail help`
 5. `./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025 --management-listen 127.0.0.1:1080`
 
-`validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` binds SMTP, native `/v1` REST, `POST /mcp`, and maildev `/email` compat (when `compatEnabled`). Default auth is `bearer_and_basic`. `healthcheck` probes `GET /v1/health/ready`. `mcp-stdio` is the developer stdio adapter (`--token-file` is verified). Session cookie `labmail_session` + `X-LabMail-CSRF` is REST-only. The hardened image and compose smoke are in [docs/11-deployment.md](docs/11-deployment.md); `make test-container` needs Docker.
+`validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` binds SMTP, native `/v1` REST, the inbox SPA at `/`, `POST /mcp`, and maildev `/email` compat (when `compatEnabled`). Default auth is `bearer_and_basic`. `healthcheck` probes `GET /v1/health/ready`. `mcp-stdio` is the developer stdio adapter (`--token-file` is verified). Session cookie `labmail_session` + `X-LabMail-CSRF` is REST-only. `make web-build` (Node **22.14.0**) embeds the production SPA. The hardened image and compose smoke are in [docs/11-deployment.md](docs/11-deployment.md); `make test-container` needs Docker.
 
 YAML field rules, revisions, and reset live in [docs/04-state-and-configuration.md](docs/04-state-and-configuration.md). SMTP accept/reject tables live in [docs/02-smtp-semantics.md](docs/02-smtp-semantics.md). REST and MCP twins are in [docs/06-rest-api.md](docs/06-rest-api.md) and [docs/07-mcp-api.md](docs/07-mcp-api.md).
 

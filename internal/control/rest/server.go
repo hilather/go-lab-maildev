@@ -96,6 +96,11 @@ type Config struct {
 	Sessions *auth.Store
 	// CookieSecure forces the Secure flag (management TLS).
 	CookieSecure bool
+	// UI serves the embedded inbox SPA when a request is not a native /v1,
+	// MCP, or compat path. rest must not import internal/web; cmd wires this.
+	UI http.Handler
+	// UIEnabled reports spec.ui.enabled. Nil means enabled whenever UI != nil.
+	UIEnabled func() bool
 }
 
 // Server is the stdlib net/http management listener.
@@ -347,6 +352,9 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		capID = string(rt.cap.ID)
 	}
 	if !pathOK {
+		if s.tryUI(w, r, instance) {
+			return
+		}
 		s.writeProblem(w, r, instance, domainerr.NotFound("not found"))
 		return
 	}

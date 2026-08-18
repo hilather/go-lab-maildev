@@ -11,6 +11,11 @@ coverage.html
 .gocache/
 .gomodcache/
 
+# Frontend (embedded copy lives in internal/web/dist)
+web/node_modules/
+web/dist/
+web/coverage/
+
 # Editor and OS noise
 .idea/
 .vscode/

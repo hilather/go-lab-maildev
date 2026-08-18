@@ -16,6 +16,8 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, v any) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	// Session JSON can include csrf; never let a shared cache keep it.
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
 }

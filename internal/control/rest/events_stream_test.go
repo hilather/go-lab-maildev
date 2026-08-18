@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/model"
 )
 
 type sseTestFrame struct {
@@ -98,6 +100,48 @@ func TestEventsStream(t *testing.T) {
 	case <-heartbeats:
 	case <-time.After(time.Second):
 		t.Fatal("missing : heartbeat comment")
+	}
+}
+
+func TestEventsStreamClosesOnAuthIdentityChange(t *testing.T) {
+	s, svc, _ := newAuthServer(t)
+	ts := httptest.NewServer(s.Handler())
+	t.Cleanup(ts.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/v1/events/stream", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+testBearerToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(io.Discard, resp.Body)
+		done <- err
+	}()
+
+	snap := svc.Active()
+	if len(snap.Canonical.Spec.Management.Auth.Tokens) != 1 {
+		t.Fatal("expected one token")
+	}
+	snap.Canonical.Spec.Management.Auth.Tokens[0].Role = model.RoleViewer
+	snap.Canonical.Spec.Management.Auth.Tokens[0].Scopes = nil
+	s.reloadAuth()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SSE stream stayed open after auth identity change")
 	}
 }
 

@@ -87,10 +87,20 @@ func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*Apply
 		s.forgetIdempOnConflict(in.IdempotencyKey, err)
 		return nil, nil, err
 	}
-	if err := s.checkStoreCaps(cand, in.Force, true); err != nil {
+	if err := s.checkStoreCaps(cand, in.Force, false); err != nil {
 		return nil, nil, err
 	}
+	// Snapshot first so SMTP re-reads the new caps; rollback if store apply fails.
 	prev := s.snaps.Swap(cand.next)
+	if afterSnapshotSwap != nil {
+		afterSnapshotSwap()
+	}
+	if err := s.applyStoreCaps(cand, in.Force); err != nil {
+		if prev != nil {
+			s.snaps.Swap(prev)
+		}
+		return nil, nil, err
+	}
 	res := &ApplyResult{
 		Plan:            *s.planFrom(cand),
 		Applied:         true,
@@ -232,9 +242,7 @@ func (s *App) checkStoreCaps(cand *candidate, force, apply bool) error {
 	over := stats.MessageCount > spec.MaxMessages || stats.Bytes > spec.MaxBytes
 	if !over {
 		if apply {
-			if err := s.inbox.ReplaceCaps(store.OptionsFromSpec(spec), force); err != nil {
-				return mapStoreCapErr(err)
-			}
+			return s.applyStoreCaps(cand, force)
 		}
 		return nil
 	}
@@ -250,12 +258,23 @@ func (s *App) checkStoreCaps(cand *candidate, force, apply bool) error {
 		Message: fmt.Sprintf("apply evicts oldest messages to fit new caps (at least %d)", n),
 	})
 	if apply {
-		if err := s.inbox.ReplaceCaps(store.OptionsFromSpec(spec), force); err != nil {
-			return mapStoreCapErr(err)
-		}
+		return s.applyStoreCaps(cand, force)
 	}
 	return nil
 }
+
+func (s *App) applyStoreCaps(cand *candidate, force bool) error {
+	if s.inbox == nil || cand == nil || cand.next == nil || cand.next.Canonical == nil {
+		return nil
+	}
+	if !anyReplaceStoreCaps(cand.ops) {
+		return nil
+	}
+	return mapStoreCapErr(s.inbox.ReplaceCaps(store.OptionsFromSpec(cand.next.Canonical.Spec.Store), force))
+}
+
+// afterSnapshotSwap is invoked after Swap and before applyStoreCaps (tests).
+var afterSnapshotSwap func()
 
 func mapStoreCapErr(err error) error {
 	if err == nil {

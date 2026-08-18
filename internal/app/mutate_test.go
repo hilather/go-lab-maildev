@@ -137,6 +137,30 @@ func TestReplaceStoreCapsRejectWithoutForce(t *testing.T) {
 	}
 }
 
+func TestReplaceStoreCapsRollbackIfApplyFails(t *testing.T) {
+	svc, boot := mustBoot(t)
+	ctx := context.Background()
+	insertRaw(t, svc, "one")
+	t.Cleanup(func() { afterSnapshotSwap = nil })
+	afterSnapshotSwap = func() {
+		insertRaw(t, svc, "two")
+	}
+	_, err := svc.Apply(ctx, actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Operations:       []model.Operation{shrinkStore(1, model.FullPolicyReject)},
+	})
+	requireCode(t, err, domainerr.CodeStoreOverNewCap)
+	if svc.Active().Revision != boot.Revision {
+		t.Fatal("failed store-cap apply must roll back the snapshot")
+	}
+	if svc.Active().Canonical.Spec.Store.MaxMessages == 1 {
+		t.Fatal("rolled-back snapshot still has the candidate caps")
+	}
+	if svc.Inbox().Stats().MessageCount != 2 {
+		t.Fatalf("count=%d", svc.Inbox().Stats().MessageCount)
+	}
+}
+
 func TestReplaceStoreCapsForceEvicts(t *testing.T) {
 	svc, boot := mustBoot(t)
 	ctx := context.Background()

@@ -149,7 +149,7 @@ func (s *App) Close() {
 }
 
 // SetHealth installs live listener facts for Status.Ready / Evaluate.
-// A nil fn restores the store-only default (listeners assumed up).
+// A nil fn restores the unknown-listener default (not ready).
 func (s *App) SetHealth(fn func() observability.Facts) {
 	if s == nil {
 		return
@@ -160,7 +160,7 @@ func (s *App) SetHealth(fn func() observability.Facts) {
 }
 
 // HealthFacts is the input to observability.Evaluate. Without SetHealth,
-// Ready means the inbox exists (HTTP-less / httptest default).
+// listeners are unknown so Ready is false (fail closed).
 func (s *App) HealthFacts() observability.Facts {
 	if s == nil {
 		return observability.Facts{}
@@ -174,7 +174,7 @@ func (s *App) HealthFacts() observability.Facts {
 		f.StoreUp = storeUp
 		return f
 	}
-	return observability.Facts{StoreUp: storeUp, SMTPBound: storeUp, MgmtBound: storeUp}
+	return observability.Facts{StoreUp: storeUp}
 }
 
 func (s *App) requireCtx(ctx context.Context) error {

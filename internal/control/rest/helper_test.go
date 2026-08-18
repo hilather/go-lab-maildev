@@ -59,7 +59,7 @@ func bootTestApp(t *testing.T) *app.App {
 func newTestServer(t *testing.T) (*Server, *app.App) {
 	t.Helper()
 	svc := bootTestApp(t)
-	s, err := New(Config{Service: svc, RatePerSec: -1})
+	s, err := New(Config{Service: svc, RatePerSec: -1, Ready: func() bool { return true }})
 	if err != nil {
 		t.Fatal(err)
 	}

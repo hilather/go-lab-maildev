@@ -180,7 +180,9 @@ func consumeInline(msg *model.Message, h *mail.InlineHeader, body []byte) error 
 		return nil
 	}
 	if strings.HasPrefix(media, "text/html") {
-		msg.HTML = string(body)
+		if disp != "attachment" {
+			msg.HTML = string(body)
+		}
 		if !asAttach {
 			return nil
 		}

@@ -128,6 +128,26 @@ func TestParseHTMLInlineCID(t *testing.T) {
 	}
 }
 
+func TestParseHTMLAttachmentNotPreviewBody(t *testing.T) {
+	raw := []byte("From: a@lab.test\r\nTo: b@lab.test\r\nSubject: att-html\r\nMIME-Version: 1.0\r\n" +
+		"Content-Type: text/html; charset=utf-8\r\n" +
+		"Content-Disposition: attachment; filename=\"note.html\"\r\n\r\n" +
+		"<html><body>secret attachment</body></html>\r\n")
+	msg := Parse(raw)
+	if msg.HTML != "" {
+		t.Fatalf("attachment HTML leaked into preview body: %q", msg.HTML)
+	}
+	if len(msg.Attachments) != 1 {
+		t.Fatalf("atts=%d", len(msg.Attachments))
+	}
+	if msg.Attachments[0].Disposition != "attachment" {
+		t.Fatalf("disp=%q", msg.Attachments[0].Disposition)
+	}
+	if !strings.Contains(string(msg.Attachments[0].Data), "secret attachment") {
+		t.Fatalf("att data=%q", msg.Attachments[0].Data)
+	}
+}
+
 func TestParseMalformedStillStored(t *testing.T) {
 	raw := testdataMIME(t, "malformed.eml")
 	msg := Parse(raw)

@@ -16,6 +16,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 		s.writeProblem(w, r, instance, asDomain(errStreaming))
 		return
 	}
+	ctx, stop := s.trackStream(r.Context())
+	defer stop()
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -24,7 +27,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 
 	idle := make(chan app.InboxEvent)
 	events := (<-chan app.InboxEvent)(idle)
-	ch, cancel := s.svc.Subscribe(r.Context(), actor, 32)
+	ch, cancel := s.svc.Subscribe(ctx, actor, 32)
 	defer cancel()
 	if ch != nil {
 		events = ch
@@ -38,7 +41,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 	defer tick.Stop()
 	for {
 		select {
-		case <-r.Context().Done():
+		case <-ctx.Done():
 			return
 		case <-tick.C:
 			_, _ = w.Write([]byte(": heartbeat\n\n"))

@@ -121,6 +121,10 @@ type Server struct {
 	cursorMu  sync.Mutex
 	cursorKey []byte
 
+	streamMu   sync.Mutex
+	streams    map[uint64]context.CancelFunc
+	nextStream uint64
+
 	mu     sync.Mutex
 	http   *http.Server
 	ln     net.Listener
@@ -169,6 +173,7 @@ func New(cfg Config) (*Server, error) {
 		logger:       cfg.Logger,
 		sseHeartbeat: hb,
 		cursorKey:    key,
+		streams:      map[uint64]context.CancelFunc{},
 	}
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
@@ -402,8 +407,41 @@ func (s *Server) reloadAuth() {
 	}
 	changed := !s.cfg.Auth.Equivalent(next)
 	s.cfg.Auth.Replace(next)
-	if changed && s.cfg.Sessions != nil {
-		s.cfg.Sessions.Clear()
+	if changed {
+		if s.cfg.Sessions != nil {
+			s.cfg.Sessions.Clear()
+		}
+		s.closeStreams()
+	}
+}
+
+func (s *Server) trackStream(parent context.Context) (context.Context, func()) {
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	s.streamMu.Lock()
+	s.nextStream++
+	id := s.nextStream
+	if s.streams == nil {
+		s.streams = map[uint64]context.CancelFunc{}
+	}
+	s.streams[id] = cancel
+	s.streamMu.Unlock()
+	return ctx, func() {
+		cancel()
+		s.streamMu.Lock()
+		delete(s.streams, id)
+		s.streamMu.Unlock()
+	}
+}
+
+func (s *Server) closeStreams() {
+	s.streamMu.Lock()
+	defer s.streamMu.Unlock()
+	for id, cancel := range s.streams {
+		cancel()
+		delete(s.streams, id)
 	}
 }
 

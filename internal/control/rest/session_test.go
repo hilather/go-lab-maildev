@@ -40,7 +40,7 @@ func newAuthServer(t *testing.T) (*Server, *app.App, *auth.Verifier) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1, Ready: func() bool { return true }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestStaleCookieFallsThroughLoopbackUnauth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1, Ready: func() bool { return true }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestReloadAuthKeepsSessionsWhenSecretsUnreadable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1, Ready: func() bool { return true }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +268,7 @@ func TestApplyRoleDemotionClearsSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1, Ready: func() bool { return true }})
 	if err != nil {
 		t.Fatal(err)
 	}

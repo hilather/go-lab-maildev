@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Security, SMTP, Control Plane
-Last reviewed: 2026-08-18 (SEC-001 + DEP-001 + UI-001 + relay segment + management TLS)
+Last reviewed: 2026-08-18 (SEC-001 + DEP-001 + UI-001 + relay segment + management TLS + stream revoke)
 Related ADRs: 0002, 0003, 0005, 0007
 
 LabMail is a lab sink, not a public MX. The critical invariant is receive-only: outbound SMTP must be unrepresentable.
@@ -44,7 +44,7 @@ auto-relay-rules, relay, smarthost, smartHost, forwardTo, mx, deliver
 
 ## Authn/z details
 
-- Tokens: **≥256 bits** entropy (TacLab ADR 0010), compared as SHA-256 digests in the in-memory index. Bootstrap file is the only durable secret.
+- Tokens: **≥256 bits** entropy (TacLab ADR 0010), compared as SHA-256 digests in the in-memory index. Bootstrap file is the only durable secret. When apply/reset changes the compiled auth identity, REST SSE streams and MCP long requests are cancelled and UI sessions are cleared.
 - Basic: `username` exact match + constant-time password compare; then the principal is `tokens[basic.tokenRef]`. Failed Basic and failed Bearer both return `401` `unauthenticated` with `WWW-Authenticate: Bearer realm="labmail"` **and** (if basic enabled) `WWW-Authenticate: Basic realm="labmail"`.
 - UI session cookie name **`labmail_session`**: `HttpOnly`, `SameSite=Lax`, `Secure` iff management TLS; CSRF header `X-LabMail-CSRF` required on cookie-authenticated mutations even over HTTP (`POST /v1/session`, `DELETE /v1/session`). `GET /v1/session` returns the CSRF secret for a valid cookie (reload recovery). Session JSON (and other REST JSON) is `Cache-Control: no-store`. Native `GET /v1/messages/{id}` defaults `markRead=false`; the SPA does not pass `markRead=true` (compat `GET /email/:id` still marks read). Token files are reread on reset and apply; the session table is cleared only when the compiled auth identity changes. A failed secret reread keeps the previous verifier and live sessions.
 - No `.well-known/oauth-protected-resource` (ADR 0005: lab static bearer).

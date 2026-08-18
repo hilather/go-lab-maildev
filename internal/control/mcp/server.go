@@ -96,7 +96,12 @@ type Server struct {
 	cursorMu  sync.Mutex
 	cursorKey []byte
 
+	inboxMu     sync.Mutex
 	inboxCancel func()
+
+	longMu   sync.Mutex
+	longs    map[uint64]context.CancelFunc
+	nextLong uint64
 }
 
 type ctxKey int
@@ -143,6 +148,7 @@ func New(cfg Config) (*Server, error) {
 		inflight:  make(chan struct{}, n),
 		rate:      newLimiter(cfg.RatePerSec, cfg.RateBurst),
 		cursorKey: key,
+		longs:     map[uint64]context.CancelFunc{},
 	}
 	sdkOpts := &sdk.ServerOptions{
 		Instructions: "LabMail control plane. Use typed mail_* tools; do not assume connection state. Protocol " + ProtocolVersion + ".",
@@ -188,16 +194,29 @@ func (s *Server) Handler() http.Handler {
 // Close marks the adapter stopped and ends inbox notify fan-out.
 func (s *Server) Close() {
 	s.closed.Store(true)
+	s.closeLongRequests()
+	s.inboxMu.Lock()
 	if s.inboxCancel != nil {
 		s.inboxCancel()
 		s.inboxCancel = nil
 	}
+	s.inboxMu.Unlock()
 }
 
 func (s *Server) startInboxFanout() {
+	s.restartInboxFanout()
+}
+
+func (s *Server) restartInboxFanout() {
+	s.inboxMu.Lock()
+	if s.inboxCancel != nil {
+		s.inboxCancel()
+		s.inboxCancel = nil
+	}
 	// One Subscribe for HTTP and stdio: ResourceUpdated is URI-only.
 	ch, cancel := s.svc.Subscribe(context.Background(), app.Actor{ID: "mcp", Class: "system", Transport: "mcp"}, 16)
 	s.inboxCancel = cancel
+	s.inboxMu.Unlock()
 	go func() {
 		for range ch {
 			_ = s.sdk.ResourceUpdated(context.Background(), &sdk.ResourceUpdatedNotificationParams{URI: resourceMessages})
@@ -261,7 +280,10 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	var cancel context.CancelFunc
-	if s.timeout > 0 && !isLongRequest(r) {
+	if isLongRequest(r) {
+		ctx, cancel = s.trackLongRequest(ctx)
+		defer cancel()
+	} else if s.timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, s.timeout)
 		defer cancel()
 	}
@@ -366,5 +388,40 @@ func (s *Server) reloadAuth() {
 	if err != nil {
 		return
 	}
+	changed := !s.cfg.Auth.Equivalent(next)
 	s.cfg.Auth.Replace(next)
+	if changed {
+		s.closeLongRequests()
+		s.restartInboxFanout()
+	}
+}
+
+func (s *Server) trackLongRequest(parent context.Context) (context.Context, func()) {
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	s.longMu.Lock()
+	s.nextLong++
+	id := s.nextLong
+	if s.longs == nil {
+		s.longs = map[uint64]context.CancelFunc{}
+	}
+	s.longs[id] = cancel
+	s.longMu.Unlock()
+	return ctx, func() {
+		cancel()
+		s.longMu.Lock()
+		delete(s.longs, id)
+		s.longMu.Unlock()
+	}
+}
+
+func (s *Server) closeLongRequests() {
+	s.longMu.Lock()
+	defer s.longMu.Unlock()
+	for id, cancel := range s.longs {
+		cancel()
+		delete(s.longs, id)
+	}
 }

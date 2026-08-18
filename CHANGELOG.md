@@ -21,6 +21,10 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 - Plan/apply idempotency fingerprints include `expectedRevision` and `force`, so a reused key with a different concurrency token is `idempotency_conflict`.
 - `spec.listeners.management.tls.enabled` terminates TLS on the management listener (TLS 1.2+). Enabling it no longer set `Secure` cookies on a cleartext bind.
 - Inbox UI ignores stale overlapping list responses and keeps a 15s list watchdog while SSE is open so dropped fan-out events cannot leave the page silent.
+- `replaceStoreCaps` swaps the config snapshot before applying store caps, and rolls the snapshot back if `ReplaceCaps` fails, so a failed apply cannot leave new YAML live under the old inbox limits.
+- REST SSE streams and MCP long requests (`subscriptions/listen`, `mail_messages_wait`) are cancelled when apply/reset changes the compiled auth identity. MCP inbox fan-out is restarted on the same change.
+- `HealthFacts` without `SetHealth` no longer assumes SMTP and management are bound; Ready stays false until `serve` installs listener facts.
+- HTML parts with `Content-Disposition: attachment` stay in `Attachments` and no longer populate `msg.HTML` / the sandboxed preview.
 
 ### Removed or deprecated
 

@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Observability, SMTP, Control Plane
-Last reviewed: 2026-08-17 (OBS-001)
+Last reviewed: 2026-08-18 (OBS-001 + HealthFacts fail-closed)
 Related ADRs: 0001
 
 ## Logs (`log/slog` JSON)
@@ -50,7 +50,7 @@ Bounded labels only. Do not put subjects or addresses in metric labels.
 | `GET /v1/health/ready` | SMTP bound **and** (management bound or explicitly off) **and** store initialized |
 | `GET /healthz` | Compat alias of ready |
 
-Ready does **not** require MCP clients or a non-empty inbox.
+Ready does **not** require MCP clients or a non-empty inbox. Without `SetHealth` (listener facts unknown), Ready is false; `labmail serve` installs the live SMTP/management probe.
 
 Healthcheck CLI: `labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready`.
 

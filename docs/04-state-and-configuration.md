@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-18 (STA-001 + smtp.behavior + operator quick start + apply idempotency)
+Last reviewed: 2026-08-18 (STA-001 + smtp.behavior + operator quick start + apply idempotency + store-cap swap)
 Related ADRs: 0003
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -221,7 +221,7 @@ Envelope (LabDNS-shaped):
 | `replaceAdmission` | `admission`: admission object | |
 | `replaceSMTPBehavior` | `behavior`: `{greetingDelay, commandDelay, dropOnConnect, closeAfterVerb, replies}` | `behavior` is required. `{}` clears scripting back to stock SMTP. Omitted/empty fields inside a present object are the runtime no-op. Delays max 30s. Not a random chaos engine (D16). Live on the next command. |
 
-`:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
+`:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). `replaceStoreCaps` swaps the snapshot first, then applies inbox caps; a failed cap apply rolls the snapshot back so SMTP never observes new YAML under the old store limits. Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
 
 Fine-grained record CRUD is unnecessary. Agents that need a different sink posture should change YAML and reset, or apply one of the above.
 

@@ -13,8 +13,18 @@ func TestStatusReadyUsesHealthFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if st.Ready {
+		t.Fatal("unknown listeners must not report ready")
+	}
+	svc.SetHealth(func() observability.Facts {
+		return observability.Facts{SMTPBound: true, StoreUp: true, MgmtBound: true}
+	})
+	st, err = svc.Status(context.Background(), actor())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !st.Ready {
-		t.Fatal("store-up app is ready without a listener probe")
+		t.Fatal("SetHealth ready facts must make Status.Ready true")
 	}
 	svc.SetHealth(func() observability.Facts {
 		return observability.Facts{SMTPBound: false, StoreUp: true, MgmtBound: true}

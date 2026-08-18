@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/audit"
+	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/store"
@@ -137,7 +140,8 @@ func (s *App) MarkAllRead(ctx context.Context, actor Actor) (int, error) {
 }
 
 // Wait returns the newest matching message or a timeout domain error.
-func (s *App) Wait(ctx context.Context, actor Actor, filter model.MessageFilter) (*model.Message, error) {
+// Timeout 0 uses DefaultWaitTimeout (10s). The wait is capped by store.maxWait.
+func (s *App) Wait(ctx context.Context, actor Actor, in WaitIn) (*model.Message, error) {
 	if err := s.requireCtx(ctx); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return nil, domainerr.Timeout("wait timed out")
@@ -148,7 +152,29 @@ func (s *App) Wait(ctx context.Context, actor Actor, filter model.MessageFilter)
 	if err := s.requireInbox(); err != nil {
 		return nil, err
 	}
-	msg, err := s.inbox.Wait(ctx, filter)
+	timeout := in.Timeout
+	if timeout <= 0 {
+		timeout = DefaultWaitTimeout
+	}
+	maxWait := config.DefaultStoreMaxWait
+	if snap := s.Active(); snap != nil && snap.Canonical != nil && snap.Canonical.Spec.Store.MaxWait > 0 {
+		maxWait = snap.Canonical.Spec.Store.MaxWait
+	}
+	if timeout > maxWait {
+		timeout = maxWait
+	}
+	if dl, ok := ctx.Deadline(); ok {
+		remain := time.Until(dl)
+		if remain <= 0 {
+			return nil, domainerr.Timeout("wait timed out")
+		}
+		if remain < timeout {
+			timeout = remain
+		}
+	}
+	wctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	msg, err := s.inbox.Wait(wctx, in.Filter)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			return nil, domainerr.Timeout("wait timed out")
@@ -156,6 +182,59 @@ func (s *App) Wait(ctx context.Context, actor Actor, filter model.MessageFilter)
 		return nil, mapStoreErr(err)
 	}
 	return msg, nil
+}
+
+// Subscribe fans out inbox membership events. cancel must be called.
+func (s *App) Subscribe(ctx context.Context, actor Actor, buffer int) (<-chan InboxEvent, func()) {
+	_ = ctx
+	_ = actor
+	if s == nil || s.inbox == nil {
+		ch := make(chan InboxEvent)
+		close(ch)
+		return ch, func() {}
+	}
+	src, cancelSrc := s.inbox.Subscribe(buffer)
+	if buffer <= 0 {
+		buffer = 16
+	}
+	out := make(chan InboxEvent, buffer)
+	done := make(chan struct{})
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-done:
+				return
+			case ev, ok := <-src:
+				if !ok {
+					return
+				}
+				next := InboxEvent{Type: ev.Type, ID: ev.ID, Subject: ev.Subject, Generation: ev.Generation}
+				select {
+				case out <- next:
+				case <-done:
+					return
+				}
+			}
+		}
+	}()
+	var once sync.Once
+	return out, func() {
+		once.Do(func() {
+			close(done)
+			cancelSrc()
+		})
+	}
+}
+
+// OnReset registers a hook invoked after a successful Reset (cursor rotation).
+func (s *App) OnReset(fn func()) {
+	if s == nil || fn == nil {
+		return
+	}
+	s.mu.Lock()
+	s.resetHooks = append(s.resetHooks, fn)
+	s.mu.Unlock()
 }
 
 func mapStoreErr(err error) error {

@@ -53,12 +53,18 @@ func rewriteCID(html string, atts []model.Attachment) string {
 		if att == nil || len(att.Data) == 0 || len(att.Data) > previewMax {
 			return m
 		}
-		ct := att.ContentType
-		if ct == "" {
-			ct = "application/octet-stream"
-		}
-		return "data:" + ct + ";base64," + base64.StdEncoding.EncodeToString(att.Data)
+		return "data:" + previewDataType(att.ContentType) + ";base64," + base64.StdEncoding.EncodeToString(att.Data)
 	})
+}
+
+var mediaTypeToken = regexp.MustCompile(`(?i)^[a-z0-9][a-z0-9!#$&\-^_.+]{0,126}/[a-z0-9][a-z0-9!#$&\-^_.+]{0,126}$`)
+
+func previewDataType(ct string) string {
+	ct = strings.TrimSpace(strings.Split(ct, ";")[0])
+	if !mediaTypeToken.MatchString(ct) {
+		return "application/octet-stream"
+	}
+	return strings.ToLower(ct)
 }
 
 func cidKeys(cid string) []string {

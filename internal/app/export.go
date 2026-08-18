@@ -109,6 +109,8 @@ func (s *App) Status(ctx context.Context, actor Actor) (*Status, error) {
 		st.Revisions.StoreGeneration = stats.Generation
 		st.Revisions.MessageCount = stats.MessageCount
 		st.Revisions.StoreBytes = stats.Bytes
+		st.UnreadCount = stats.UnreadCount
+		st.Epoch = stats.Epoch
 	}
 	return &st, nil
 }

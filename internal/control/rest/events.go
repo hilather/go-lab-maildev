@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hilather/go-lab-maildev/internal/store"
+	"github.com/hilather/go-lab-maildev/internal/app"
 )
 
 const sseHeartbeat = 15 * time.Second
 
-func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance string) {
+func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance string, actor app.Actor) {
 	flusher, ok := flusherOf(w)
 	if !ok {
 		s.writeProblem(w, r, instance, asDomain(errStreaming))
@@ -22,15 +22,19 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	idle := make(chan store.Event)
-	events := (<-chan store.Event)(idle)
-	if inbox := s.inbox(); inbox != nil {
-		ch, cancel := inbox.Subscribe(32)
-		defer cancel()
+	idle := make(chan app.InboxEvent)
+	events := (<-chan app.InboxEvent)(idle)
+	ch, cancel := s.svc.Subscribe(r.Context(), actor, 32)
+	defer cancel()
+	if ch != nil {
 		events = ch
 	}
 
-	tick := time.NewTicker(sseHeartbeat)
+	hb := s.sseHeartbeat
+	if hb <= 0 {
+		hb = sseHeartbeat
+	}
+	tick := time.NewTicker(hb)
 	defer tick.Stop()
 	for {
 		select {

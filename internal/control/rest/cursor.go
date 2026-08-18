@@ -32,13 +32,13 @@ func (s *Server) encodeCursor(id string, generation uint64) string {
 	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
-func (s *Server) decodeCursor(cur string, currentGen uint64) (string, error) {
+func (s *Server) decodeCursor(cur string) (string, uint64, error) {
 	if cur == "" {
-		return "", nil
+		return "", 0, nil
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(cur)
 	if err != nil || len(raw) != cursorRawLen {
-		return "", domainerr.ValidationFailed("invalid cursor",
+		return "", 0, domainerr.ValidationFailed("invalid cursor",
 			domainerr.FieldViolation{Path: "cursor", Code: "invalid_value", Message: "cursor is not a valid LabMail list cursor"})
 	}
 	s.cursorMu.Lock()
@@ -47,12 +47,9 @@ func (s *Server) decodeCursor(cur string, currentGen uint64) (string, error) {
 	mac := hmac.New(sha256.New, key)
 	_, _ = mac.Write(raw[:cursorIDLen+cursorGenLen])
 	if !hmac.Equal(mac.Sum(nil), raw[cursorIDLen+cursorGenLen:]) {
-		return "", domainerr.CursorStale("list cursor is not valid for this process")
+		return "", 0, domainerr.CursorStale("list cursor is not valid for this process")
 	}
 	gen := binary.BigEndian.Uint64(raw[cursorIDLen : cursorIDLen+cursorGenLen])
-	if gen != currentGen {
-		return "", domainerr.CursorStale("list cursor is stale; restart the list")
-	}
 	id := string(raw[:cursorIDLen])
-	return id, nil
+	return id, gen, nil
 }

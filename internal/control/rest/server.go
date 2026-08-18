@@ -16,7 +16,6 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
-	"github.com/hilather/go-lab-maildev/internal/store"
 )
 
 const (
@@ -80,20 +79,23 @@ type Config struct {
 	RateBurst float64
 	// PublicMetrics serves GET /v1/metrics. False returns not_found.
 	PublicMetrics bool
+	// SSEHeartbeat is the events stream comment interval. Non-positive uses 15s.
+	SSEHeartbeat time.Duration
 	// Mounts are additional handlers served ahead of REST routing.
 	Mounts map[string]http.Handler
 }
 
 // Server is the stdlib net/http management listener.
 type Server struct {
-	cfg      Config
-	svc      app.Service
-	routes   []compiledRoute
-	handler  http.Handler
-	maxBody  int64
-	timeout  time.Duration
-	inflight chan struct{}
-	rate     *limiter
+	cfg          Config
+	svc          app.Service
+	routes       []compiledRoute
+	handler      http.Handler
+	maxBody      int64
+	timeout      time.Duration
+	inflight     chan struct{}
+	rate         *limiter
+	sseHeartbeat time.Duration
 
 	cursorMu  sync.Mutex
 	cursorKey []byte
@@ -125,16 +127,22 @@ func New(cfg Config) (*Server, error) {
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
 	}
-	s := &Server{
-		cfg:       cfg,
-		svc:       cfg.Service,
-		routes:    compileRoutes(capabilities.All()),
-		maxBody:   maxBody,
-		timeout:   timeout,
-		inflight:  make(chan struct{}, n),
-		rate:      newLimiter(cfg.RatePerSec, cfg.RateBurst),
-		cursorKey: key,
+	hb := cfg.SSEHeartbeat
+	if hb <= 0 {
+		hb = sseHeartbeat
 	}
+	s := &Server{
+		cfg:          cfg,
+		svc:          cfg.Service,
+		routes:       compileRoutes(capabilities.All()),
+		maxBody:      maxBody,
+		timeout:      timeout,
+		inflight:     make(chan struct{}, n),
+		rate:         newLimiter(cfg.RatePerSec, cfg.RateBurst),
+		sseHeartbeat: hb,
+		cursorKey:    key,
+	}
+	s.svc.OnReset(s.RotateCursors)
 	s.handler = http.HandlerFunc(s.serveHTTP)
 	if len(cfg.Mounts) > 0 {
 		mux := http.NewServeMux()
@@ -354,16 +362,6 @@ func (s *Server) isReady(ctx context.Context) bool {
 	}
 	st, err := s.svc.Status(ctx, app.Actor{ID: "ready", Class: "startup", Transport: "rest"})
 	return err == nil && st != nil && st.Ready
-}
-
-func (s *Server) inbox() *store.Memory {
-	type hasInbox interface {
-		Inbox() *store.Memory
-	}
-	if h, ok := s.svc.(hasInbox); ok {
-		return h.Inbox()
-	}
-	return nil
 }
 
 type statusWriter struct {

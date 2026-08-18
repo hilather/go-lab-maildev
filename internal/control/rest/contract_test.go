@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -228,6 +229,22 @@ func TestMarkReadDefaultFalse(t *testing.T) {
 	if err != nil || again.Read {
 		t.Fatalf("store read=%v err=%v", again, err)
 	}
+}
+
+func TestDeleteIfMatchStoreGeneration(t *testing.T) {
+	s, svc := newTestServer(t)
+	id := insertMail(t, svc, "if-match", "b")
+	gen := svc.Inbox().Generation()
+	req := httptestReq(http.MethodDelete, "/v1/messages/"+id, "")
+	req.Header.Set("If-Match", strconv.FormatUint(gen, 10))
+	rec := doRaw(s.Handler(), req)
+	requireStatus(t, rec, http.StatusNoContent)
+
+	id = insertMail(t, svc, "if-match-bad", "b")
+	req = httptestReq(http.MethodDelete, "/v1/messages/"+id, "")
+	req.Header.Set("If-Match", "1")
+	rec = doRaw(s.Handler(), req)
+	requireProblem(t, rec, http.StatusConflict, "revision_conflict")
 }
 
 func TestWaitAndExtract(t *testing.T) {

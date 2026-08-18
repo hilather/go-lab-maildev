@@ -24,8 +24,10 @@ type Service interface {
 	ClearMessages(ctx context.Context, actor Actor, in DeleteIn) (int, error)
 	MarkRead(ctx context.Context, actor Actor, id string) error
 	MarkAllRead(ctx context.Context, actor Actor) (int, error)
-	Wait(ctx context.Context, actor Actor, filter model.MessageFilter) (*model.Message, error)
+	Wait(ctx context.Context, actor Actor, in WaitIn) (*model.Message, error)
 	Extract(ctx context.Context, actor Actor, id string) (*ExtractResult, error)
+	Subscribe(ctx context.Context, actor Actor, buffer int) (<-chan InboxEvent, func())
+	OnReset(fn func())
 
 	QueryAudit(ctx context.Context, actor Actor, in AuditQuery) (*AuditList, error)
 	GetAudit(ctx context.Context, actor Actor, id string) (*AuditEvent, error)

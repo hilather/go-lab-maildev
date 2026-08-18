@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
@@ -82,8 +83,39 @@ func TestWaitTimeout(t *testing.T) {
 	svc, _ := mustBoot(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 0)
 	defer cancel()
-	_, err := svc.Wait(ctx, actor(), model.MessageFilter{Subject: "never"})
+	_, err := svc.Wait(ctx, actor(), WaitIn{Filter: model.MessageFilter{Subject: "never"}})
 	requireCode(t, err, domainerr.CodeTimeout)
+}
+
+func TestSubscribeInboxEvents(t *testing.T) {
+	svc, _ := mustBoot(t)
+	ch, cancel := svc.Subscribe(context.Background(), actor(), 8)
+	defer cancel()
+	id := insertRaw(t, svc, "sub")
+	ev := <-ch
+	if ev.Type != InboxMailReceived || ev.ID != id {
+		t.Fatalf("insert event %+v", ev)
+	}
+	if err := svc.DeleteMessage(context.Background(), actor(), id, DeleteIn{}); err != nil {
+		t.Fatal(err)
+	}
+	ev = <-ch
+	if ev.Type != InboxMailDeleted || ev.ID != id {
+		t.Fatalf("delete event %+v", ev)
+	}
+}
+
+func TestWaitAppliesDefaultAndCap(t *testing.T) {
+	svc, _ := mustBoot(t)
+	start := time.Now()
+	_, err := svc.Wait(context.Background(), actor(), WaitIn{
+		Filter:  model.MessageFilter{Subject: "never"},
+		Timeout: time.Millisecond,
+	})
+	requireCode(t, err, domainerr.CodeTimeout)
+	if time.Since(start) > 2*time.Second {
+		t.Fatal("explicit wait timeout was not honored")
+	}
 }
 
 func TestGetAudit(t *testing.T) {

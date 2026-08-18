@@ -46,7 +46,7 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request, instance strin
 	case capabilities.StateReset:
 		s.handleReset(w, r, instance, ctx, actor)
 	case capabilities.EventsStream:
-		s.handleEvents(w, r, instance)
+		s.handleEvents(w, r, instance, actor)
 	case capabilities.MessagesList:
 		s.handleListMessages(w, r, instance, ctx, actor)
 	case capabilities.MessagesGet:
@@ -118,18 +118,19 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request, instance s
 		Ready:     st.Ready,
 		Revisions: rev,
 		Listeners: []listenerJSON{},
-		Store:     storeStatsJSON{MessageCount: st.Revisions.MessageCount, Bytes: st.Revisions.StoreBytes, Generation: st.Revisions.StoreGeneration},
+		Store: storeStatsJSON{
+			MessageCount: st.Revisions.MessageCount,
+			Bytes:        st.Revisions.StoreBytes,
+			Generation:   st.Revisions.StoreGeneration,
+			UnreadCount:  st.UnreadCount,
+			Epoch:        st.Epoch,
+		},
 	}
 	if view != nil && view.Canonical != nil {
 		out.Listeners = []listenerJSON{
 			{Name: "smtp", Address: view.Canonical.Spec.Listeners.SMTP.Address},
 			{Name: "management", Address: view.Canonical.Spec.Listeners.Management.Address},
 		}
-	}
-	if inbox := s.inbox(); inbox != nil {
-		stats := inbox.Stats()
-		out.Store.UnreadCount = stats.UnreadCount
-		out.Store.Epoch = stats.Epoch
 	}
 	s.writeJSON(w, http.StatusOK, out)
 	_ = r
@@ -263,7 +264,6 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request, instance st
 		s.writeProblem(w, r, instance, asDomain(err))
 		return
 	}
-	s.RotateCursors()
 	s.writeJSON(w, http.StatusOK, fromApply(res))
 }
 

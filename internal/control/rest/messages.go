@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
-	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
 )
@@ -20,19 +19,24 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request, inst
 		s.writeProblem(w, r, instance, err)
 		return
 	}
-	gen := uint64(0)
-	if inbox := s.inbox(); inbox != nil {
-		gen = inbox.Generation()
+	rawCursor := q.Cursor
+	var cursorGen uint64
+	if rawCursor != "" {
+		id, gen, err := s.decodeCursor(rawCursor)
+		if err != nil {
+			s.writeProblem(w, r, instance, err)
+			return
+		}
+		q.Cursor = id
+		cursorGen = gen
 	}
-	id, err := s.decodeCursor(q.Cursor, gen)
-	if err != nil {
-		s.writeProblem(w, r, instance, err)
-		return
-	}
-	q.Cursor = id
 	res, err := s.svc.ListMessages(ctx, actor, q)
 	if err != nil {
 		s.writeProblem(w, r, instance, asDomain(err))
+		return
+	}
+	if rawCursor != "" && cursorGen != res.Generation {
+		s.writeProblem(w, r, instance, domainerr.CursorStale("list cursor is stale; restart the list"))
 		return
 	}
 	items := make([]messageJSON, 0, len(res.Items))
@@ -191,16 +195,36 @@ func (s *Server) deleteIn(w http.ResponseWriter, r *http.Request, instance strin
 			return app.DeleteIn{}, domainerr.ValidationFailed("invalid body")
 		}
 	}
-	if raw := r.URL.Query().Get("expectedStoreGeneration"); raw != "" {
-		n, err := strconv.ParseUint(raw, 10, 64)
-		if err != nil {
-			s.writeProblem(w, r, instance, domainerr.ValidationFailed("invalid expectedStoreGeneration",
-				domainerr.FieldViolation{Path: "expectedStoreGeneration", Code: "invalid_value", Message: "expectedStoreGeneration must be an integer"}))
-			return app.DeleteIn{}, err
+	if body.ExpectedStoreGeneration == nil {
+		if raw := r.URL.Query().Get("expectedStoreGeneration"); raw != "" {
+			n, err := parseStoreGeneration(raw)
+			if err != nil {
+				s.writeProblem(w, r, instance, err)
+				return app.DeleteIn{}, err
+			}
+			body.ExpectedStoreGeneration = &n
 		}
-		body.ExpectedStoreGeneration = &n
+	}
+	if body.ExpectedStoreGeneration == nil {
+		if raw := strings.Trim(r.Header.Get(headerIfMatch), `"`); raw != "" && !strings.EqualFold(raw, "*") {
+			n, err := parseStoreGeneration(raw)
+			if err != nil {
+				s.writeProblem(w, r, instance, err)
+				return app.DeleteIn{}, err
+			}
+			body.ExpectedStoreGeneration = &n
+		}
 	}
 	return app.DeleteIn{ExpectedStoreGeneration: body.ExpectedStoreGeneration}, nil
+}
+
+func parseStoreGeneration(raw string) (uint64, error) {
+	n, err := strconv.ParseUint(strings.TrimSpace(raw), 10, 64)
+	if err != nil {
+		return 0, domainerr.ValidationFailed("invalid expectedStoreGeneration",
+			domainerr.FieldViolation{Path: "expectedStoreGeneration", Code: "invalid_value", Message: "expectedStoreGeneration must be an integer"})
+	}
+	return n, nil
 }
 
 func (s *Server) handleReadAll(w http.ResponseWriter, r *http.Request, instance string, ctx context.Context, actor app.Actor) {
@@ -235,7 +259,7 @@ func (s *Server) handleWait(w http.ResponseWriter, r *http.Request, instance str
 	}
 	filter.Before = before
 
-	timeout := 10 * time.Second
+	var timeout time.Duration
 	if in.Timeout != "" {
 		d, err := time.ParseDuration(in.Timeout)
 		if err != nil || d < 0 {
@@ -245,16 +269,7 @@ func (s *Server) handleWait(w http.ResponseWriter, r *http.Request, instance str
 		}
 		timeout = d
 	}
-	maxWait := config.DefaultStoreMaxWait
-	if st, err := s.svc.GetState(ctx, actor); err == nil && st != nil && st.Canonical != nil && st.Canonical.Spec.Store.MaxWait > 0 {
-		maxWait = st.Canonical.Spec.Store.MaxWait
-	}
-	if timeout > maxWait {
-		timeout = maxWait
-	}
-	wctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	msg, err := s.svc.Wait(wctx, actor, filter)
+	msg, err := s.svc.Wait(ctx, actor, app.WaitIn{Filter: filter, Timeout: timeout})
 	if err != nil {
 		s.writeProblem(w, r, instance, asDomain(err))
 		return

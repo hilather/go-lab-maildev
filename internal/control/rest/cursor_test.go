@@ -1,8 +1,12 @@
 package rest
 
 import (
+	"bytes"
+	"context"
 	"net/http"
 	"testing"
+
+	"github.com/hilather/go-lab-maildev/internal/app"
 )
 
 func TestCursorHMACAndStale(t *testing.T) {
@@ -33,6 +37,18 @@ func TestCursorHMACAndStale(t *testing.T) {
 
 func TestCursorRotatesOnReset(t *testing.T) {
 	s, svc := newTestServer(t)
+	s.cursorMu.Lock()
+	key1 := append([]byte(nil), s.cursorKey...)
+	s.cursorMu.Unlock()
+	if _, err := svc.Reset(context.Background(), app.Actor{ID: "t", Transport: "direct"}, app.ResetIn{Reason: "hook"}); err != nil {
+		t.Fatal(err)
+	}
+	s.cursorMu.Lock()
+	key2 := append([]byte(nil), s.cursorKey...)
+	s.cursorMu.Unlock()
+	if bytes.Equal(key1, key2) {
+		t.Fatal("Service.Reset must rotate the REST cursor HMAC key")
+	}
 	h := s.Handler()
 	insertMail(t, svc, "a", "1")
 	insertMail(t, svc, "b", "2")

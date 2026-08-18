@@ -19,13 +19,13 @@ func TestRESTImportDAG(t *testing.T) {
 		"github.com/hilather/go-lab-maildev/internal/config":       true,
 		"github.com/hilather/go-lab-maildev/internal/domainerr":    true,
 		"github.com/hilather/go-lab-maildev/internal/model":        true,
-		"github.com/hilather/go-lab-maildev/internal/store":        true,
 	}
 	forbiddenPref := []string{
 		"github.com/emersion",
 		"github.com/modelcontextprotocol",
 		"github.com/hilather/go-lab-maildev/internal/compiler",
 		"github.com/hilather/go-lab-maildev/internal/smtp",
+		"github.com/hilather/go-lab-maildev/internal/store",
 		"github.com/hilather/go-lab-maildev/internal/control/mcp",
 		"github.com/hilather/go-lab-maildev/internal/control/compat",
 		"github.com/hilather/go-lab-maildev/internal/web",

@@ -67,6 +67,7 @@ func (l *limiter) allow(remote string) error {
 	now := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	l.evictIdleLocked(now)
 	b := l.buckets[key]
 	if b == nil {
 		b = &bucket{tokens: l.burst, last: now}
@@ -83,4 +84,22 @@ func (l *limiter) allow(remote string) error {
 	}
 	b.tokens--
 	return nil
+}
+
+func (l *limiter) evictIdleLocked(now time.Time) {
+	if l == nil || len(l.buckets) == 0 {
+		return
+	}
+	idleFor := 30 * time.Second
+	if l.rate > 0 {
+		refill := time.Duration(float64(time.Second) * (l.burst / l.rate) * 4)
+		if refill > idleFor {
+			idleFor = refill
+		}
+	}
+	for k, b := range l.buckets {
+		if now.Sub(b.last) > idleFor {
+			delete(l.buckets, k)
+		}
+	}
 }

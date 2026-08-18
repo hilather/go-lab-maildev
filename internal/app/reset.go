@@ -58,6 +58,7 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 	displaced := s.snaps.Swap(next)
 	s.snaps.SetBootstrap(next)
 	s.idemp.clear()
+	hooks := append([]func(){}, s.resetHooks...)
 
 	res := &ApplyResult{
 		Plan:            *s.planFrom(&candidate{prev: displaced, next: next, diff: diff}),
@@ -78,6 +79,9 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 		Result:          audit.ResultOK,
 		Diff:            toAuditDiff(diff),
 	})
+	for _, fn := range hooks {
+		fn()
+	}
 	return cloneApply(res), nil
 }
 

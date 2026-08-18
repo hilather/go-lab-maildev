@@ -18,6 +18,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 	}
 	ctx, stop := s.trackStream(r.Context())
 	defer stop()
+	ch, cancel := s.svc.Subscribe(ctx, actor, 32)
+	defer cancel()
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -27,8 +29,6 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 
 	idle := make(chan app.InboxEvent)
 	events := (<-chan app.InboxEvent)(idle)
-	ch, cancel := s.svc.Subscribe(ctx, actor, 32)
-	defer cancel()
 	if ch != nil {
 		events = ch
 	}

@@ -67,6 +67,11 @@ func ReadLine(r *bufio.Reader, maxInclCRLF int) (string, error) {
 			return "", err
 		}
 		if len(buf)+1 > maxInclCRLF {
+			// Drain to LF so a later command is not poisoned by the tail
+			// of this overlong line (DATA abort must keep the session).
+			if b != '\n' {
+				_, _ = r.ReadBytes('\n')
+			}
 			return "", ErrLineTooLong
 		}
 		if b == '\n' {

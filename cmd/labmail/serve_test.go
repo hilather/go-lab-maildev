@@ -354,8 +354,12 @@ func TestServeManagementTLS(t *testing.T) {
 		t.Fatalf("https live status=%d", resp.StatusCode)
 	}
 	plain, plainErr := http.Get("http://" + mgmt + "/v1/health/live")
-	if plainErr == nil {
+	if plain != nil {
 		_ = plain.Body.Close()
+	}
+	// Go's HTTPS listener may write HTTP 400 for a cleartext probe; it must
+	// not serve the live probe as 200.
+	if plainErr == nil && plain != nil && plain.StatusCode == http.StatusOK {
 		t.Fatal("plain HTTP must not succeed when management TLS is enabled")
 	}
 	cancel()

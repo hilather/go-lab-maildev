@@ -30,11 +30,15 @@ func TestReadLineBareLF(t *testing.T) {
 }
 
 func TestReadLineTooLong(t *testing.T) {
-	payload := strings.Repeat("A", MaxCommandLine) + "\r\n"
+	payload := strings.Repeat("A", MaxCommandLine) + "\r\nNOOP\r\n"
 	r := bufio.NewReader(strings.NewReader(payload))
 	_, err := ReadLine(r, MaxCommandLine)
 	if !errors.Is(err, ErrLineTooLong) {
 		t.Fatalf("err=%v", err)
+	}
+	got, err := ReadLine(r, MaxCommandLine)
+	if err != nil || got != "NOOP" {
+		t.Fatalf("after too-long: got %q err=%v", got, err)
 	}
 }
 

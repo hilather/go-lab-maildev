@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 export const POLL_INTERVAL_MS = 3000;
+export const SSE_WATCHDOG_MS = 15000;
 
 export type LiveMode = "idle" | "sse" | "poll";
 
@@ -15,27 +16,29 @@ export function useInboxLive(onChange: () => void, enabled: boolean): LiveMode {
     let es: EventSource | null = null;
     let poll: number | undefined;
     let opened = false;
+    let exclusivePoll = false;
 
     const refresh = () => {
       onChange();
     };
 
-    const startPoll = () => {
+    const startPoll = (interval: number) => {
       if (poll !== undefined) {
-        return;
+        window.clearInterval(poll);
       }
-      setMode("poll");
-      poll = window.setInterval(refresh, POLL_INTERVAL_MS);
+      poll = window.setInterval(refresh, interval);
     };
 
     // Exclusive fallback: close EventSource so the browser cannot keep
     // reconnecting while poll is the live path.
     const fallbackToPoll = () => {
+      exclusivePoll = true;
       if (es !== null) {
         es.close();
         es = null;
       }
-      startPoll();
+      setMode("poll");
+      startPoll(POLL_INTERVAL_MS);
     };
 
     try {
@@ -45,17 +48,19 @@ export function useInboxLive(onChange: () => void, enabled: boolean): LiveMode {
       es.addEventListener("store.wiped", refresh);
       es.onopen = () => {
         // close() can still deliver a queued open after fallbackToPoll.
-        if (poll !== undefined || es === null) {
+        if (exclusivePoll || es === null) {
           return;
         }
         opened = true;
         setMode("sse");
+        // Recover silently dropped SSE events (store fan-out is drop-oldest).
+        startPoll(SSE_WATCHDOG_MS);
       };
       es.onerror = () => {
         fallbackToPoll();
       };
     } catch {
-      startPoll();
+      fallbackToPoll();
     }
 
     const watchdog = window.setTimeout(() => {

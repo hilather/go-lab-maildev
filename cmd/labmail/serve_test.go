@@ -3,7 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"io"
+	"math/big"
+	"net"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -98,6 +107,57 @@ func writeServeConfig(t *testing.T, metricsListen string, publicPath bool) strin
 
 func strconvQuote(s string) string {
 	return `"` + s + `"`
+}
+
+func writeServeConfigTLS(t *testing.T, certFile, keyFile string) string {
+	t.Helper()
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte(serveTestToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  listeners:\n    management:\n      tls:\n        enabled: true\n        certFile: " + certFile + "\n        keyFile: " + keyFile + "\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func writeServeTLSCert(t *testing.T) (certFile, keyFile string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "labmail.lab"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"localhost", "labmail.lab"},
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1)},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	certFile = filepath.Join(dir, "mgmt.crt")
+	keyFile = filepath.Join(dir, "mgmt.key")
+	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return certFile, keyFile
 }
 
 func TestServeSendMail(t *testing.T) {
@@ -239,6 +299,68 @@ func TestServeBindsManagement(t *testing.T) {
 	}
 	if ui.StatusCode != 200 || !strings.Contains(string(raw), "LabMail") {
 		t.Fatalf("GET / status=%d body=%s", ui.StatusCode, raw)
+	}
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("serve exit %d stderr=%q", code, stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not exit")
+	}
+}
+
+func TestServeManagementTLS(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cert, key := writeServeTLSCert(t)
+	path := writeServeConfigTLS(t, cert, key)
+	var stdout, stderr safeBuffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serveCmd(ctx, []string{
+			"--config", path,
+			"--smtp-listen", "127.0.0.1:0",
+			"--management-listen", "127.0.0.1:0",
+		}, &stdout, &stderr)
+	}()
+	_ = waitSMTPListen(t, &stdout)
+	mgmt := waitPrefix(t, &stdout, "labmail management listen=")
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		},
+	}
+	var resp *http.Response
+	var err error
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err = client.Get("https://" + mgmt + "/v1/health/live")
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("https live: %v stderr=%q stdout=%q", err, stderr.String(), stdout.String())
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != 200 {
+		t.Fatalf("https live status=%d", resp.StatusCode)
+	}
+	plain, plainErr := http.Get("http://" + mgmt + "/v1/health/live")
+	if plain != nil {
+		_ = plain.Body.Close()
+	}
+	// Go's HTTPS listener may write HTTP 400 for a cleartext probe; it must
+	// not serve the live probe as 200.
+	if plainErr == nil && plain != nil && plain.StatusCode == http.StatusOK {
+		t.Fatal("plain HTTP must not succeed when management TLS is enabled")
 	}
 	cancel()
 	select {

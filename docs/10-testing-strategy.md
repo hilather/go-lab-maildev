@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001 + UI-001 + SWAP-001 + GA-001)
+Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001 + UI-001 + SWAP-001 + GA-001 + bugfix regressions)
 Related ADRs: 0002, 0004
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).

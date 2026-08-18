@@ -14,7 +14,13 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
-- None.
+- Native `/v1/**/relay` is a path-segment guard. Message and attachment ids that only contain the substring `relay` are no longer `403 receive_only`.
+- Inbox `List` returns `store.ErrSpill` when a recorded spill file cannot be read, matching `Get`/`Wait` and `docs/03-message-store.md`. Missing spill files are no longer dropped from the page while `Stats` still counts them.
+- `Get`/`Wait` re-check membership after spill I/O so a concurrent delete/wipe cannot return a message that is no longer in the store.
+- A DATA line over 8192 octets replies `500` and aborts the transaction without closing the SMTP session.
+- Plan/apply idempotency fingerprints include `expectedRevision` and `force`, so a reused key with a different concurrency token is `idempotency_conflict`.
+- `spec.listeners.management.tls.enabled` terminates TLS on the management listener (TLS 1.2+). Enabling it no longer set `Secure` cookies on a cleartext bind.
+- Inbox UI ignores stale overlapping list responses and keeps a 15s list watchdog while SSE is open so dropped fan-out events cannot leave the page silent.
 
 ### Removed or deprecated
 

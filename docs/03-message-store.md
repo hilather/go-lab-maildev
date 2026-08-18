@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Store, SMTP, Application
-Last reviewed: 2026-08-17 (STA-001)
+Last reviewed: 2026-08-18 (List/Get/Wait spill consistency)
 Related ADRs: 0003
 
 Package `internal/store`. Captured mail is runtime evidence, not desired state. Restart or reset wipes the inbox.

@@ -336,13 +336,13 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// Compat mounts run after the shared gates so GET /email cannot bypass
-	// inflight/timeout/rate. Dispatch before the /v1 /relay substring check so
+	// inflight/timeout/rate. Dispatch before the native /relay segment check so
 	// attachment names like relay.pdf are not false receive_only hits.
 	if s.dispatchMount(w, r, instance) {
 		return
 	}
 
-	if strings.Contains(strings.ToLower(r.URL.Path), "/relay") {
+	if isNativeRelayPath(r.URL.Path) {
 		s.writeProblem(w, r, instance, domainerr.ReceiveOnly("LabMail is receive-only; relay is not implemented"))
 		return
 	}
@@ -427,6 +427,17 @@ func (s *Server) dispatchMount(w http.ResponseWriter, r *http.Request, instance 
 
 func isMountHealthPath(path string) bool {
 	return strings.TrimSuffix(path, "/") == "/healthz"
+}
+
+// isNativeRelayPath matches a path-segment "relay" (docs/08: any /v1/**/relay).
+// A substring check would 403 GET /v1/messages/relay-test and similar ids.
+func isNativeRelayPath(path string) bool {
+	for _, p := range strings.Split(strings.Trim(path, "/"), "/") {
+		if strings.EqualFold(p, "relay") {
+			return true
+		}
+	}
+	return false
 }
 
 func isHealthCap(cap capabilities.Capability) bool {

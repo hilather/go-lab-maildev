@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Compat, REST, Application
-Last reviewed: 2026-08-18 (SWAP-001)
+Last reviewed: 2026-08-18 (SWAP-001 + management TLS)
 Related ADRs: 0005, 0007
 
 Native management API is `/v1` + `POST /mcp`. Maildev `/email` is a **compat adapter** (`REST_ONLY_PROTOCOL` plus parity-required native twins) in `internal/control/compat`. See [docs/adr/0007-compat-email-surface.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0007-compat-email-surface.md).
@@ -102,7 +102,7 @@ YAML replaces them. Semantic coverage:
 | `--ip` / `--web-ip` | listener `address` |
 | `--mail-directory` | **Rejected.** Store is memory; optional tmpfs spill is not durable. |
 | `--outgoing-*`, `--auto-relay*` | **Schema-impossible.** Unknown-field / reserved-name reject |
-| `--https` (web) | `spec.listeners.management.tls` (optional; lab stays HTTP) |
+| `--https` (web) | `spec.listeners.management.tls` (optional; when `enabled`, management is HTTPS / TLS 1.2+) |
 | `--disable-web` | `spec.ui.enabled: false` |
 | `--base-pathname` | Non-goal |
 | `--mcp` (upstream v3) | Always-on Streamable HTTP at `/mcp` when management is bound |

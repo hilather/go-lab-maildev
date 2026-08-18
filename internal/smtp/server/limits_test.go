@@ -264,4 +264,7 @@ func TestDATALineTooLong500(t *testing.T) {
 	if err != nil || code != 500 {
 		t.Fatalf("code=%d %v err=%v", code, lines, err)
 	}
+	// Abort DATA, keep the session (docs/02: 500 aborts DATA, does not close).
+	mustCmd(t, c, 250, "NOOP")
+	mustCmd(t, c, 250, "MAIL FROM:<a@b>")
 }

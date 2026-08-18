@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-18 (COMPAT-001 + OBS-001 + SEC-001 + UI-001)
+Last reviewed: 2026-08-18 (COMPAT-001 + OBS-001 + SEC-001 + UI-001 + apply idempotency)
 Related ADRs: 0004, 0005, 0007
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
@@ -62,7 +62,7 @@ Ready becomes unready as soon as SMTP `Shutdown` begins (`Accepting()` is false)
 
 **Origin (LabDNS wording, copied):** a **present** non-loopback `Origin` is rejected unless it is on `originAllowlist` (DNS-rebinding default-deny). **Missing Origin is allowed** for official SDK, curl, and MCPJungle (the gateway typically sends no Origin). Loopback Origins are those whose host is `localhost`, `127.0.0.1`, `::1`, or any RFC 6890 loopback; `http://localhost:1080` and `http://127.0.0.1:1080` are both loopback. Published LAN UI (`http://192.168.x.x:1080`) **must** list that origin in `originAllowlist` or the browser will 403.
 
-Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Idempotency LRU default 256; reset clears it.
+Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Plan/apply identity is `expectedRevision` + `force` + `reason` + operations. Idempotency LRU default 256; reset clears it.
 
 ## Message list (native)
 

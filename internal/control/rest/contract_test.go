@@ -203,6 +203,18 @@ func TestRelayForbidden(t *testing.T) {
 	requireProblem(t, got, http.StatusForbidden, "receive_only")
 }
 
+func TestRelaySegmentDoesNotBlockMessageIDs(t *testing.T) {
+	s, svc := newTestServer(t)
+	id := insertMail(t, svc, "relay-subject", "body")
+	got := doReq(t, s.Handler(), http.MethodGet, "/v1/messages/"+id, "")
+	requireStatus(t, got, http.StatusOK)
+	// "relay" as a substring of the last segment is not a relay route.
+	missing := doReq(t, s.Handler(), http.MethodGet, "/v1/messages/relay-test", "")
+	requireProblem(t, missing, http.StatusNotFound, "not_found")
+	att := doReq(t, s.Handler(), http.MethodGet, "/v1/messages/"+id+"/attachments/relay.pdf", "")
+	requireProblem(t, att, http.StatusNotFound, "not_found")
+}
+
 func TestSessionRegistered(t *testing.T) {
 	s, _ := newTestServer(t)
 	got := doReq(t, s.Handler(), http.MethodGet, "/v1/session", "")

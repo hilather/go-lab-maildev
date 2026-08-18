@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-18 (UI-001 + SWAP-001 + GA-001)
+Last reviewed: 2026-08-18 (UI-001 + SWAP-001 + GA-001 + management TLS)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -149,7 +149,7 @@ Required for GA / 1.0 (D12, PR 12). The UI talks REST only. XSS/CSP/`cid:` rewri
 | Embed | `internal/web` `go:embed` of `web/dist` (copy step; `web/` has its own `go.mod` if needed like TacLab) |
 | Auth | Login page: paste bearer **or** basic username/password. `POST /v1/session`. Cookie `labmail_session` + `X-LabMail-CSRF`. Cookie is REST-only. |
 | Pages | Inbox list, message view (text / HTML preview / headers / raw / attachments), status (revisions, store stats), audit (if scoped), gated reset |
-| Live update | `EventSource` `GET /v1/events/stream` (SSE). Fallback: 3s poll of `GET /v1/messages`. **No** maildev WebSocket. |
+| Live update | `EventSource` `GET /v1/events/stream` (SSE) plus a 15s list watchdog while the stream is open. Exclusive fallback: 3s poll of `GET /v1/messages`. **No** maildev WebSocket. |
 | HTML preview | `<iframe src="/v1/messages/{id}/preview" sandbox>` — **no** `allow-scripts`, **no** `allow-same-origin`, **no** `allow-popups-to-escape-sandbox`. Not `srcdoc`. Never parent `innerHTML`. |
 | Missing on purpose | Relay button, “send”, outgoing settings, compose-new-mail |
 
@@ -295,7 +295,7 @@ labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready
 labmail version
 ```
 
-`serve` loads → compile → bind SMTP → bind management → write pid file. `SIGTERM`/`SIGINT`: stop SMTP accept, drain sessions (deadline), then HTTP, then `store.Wipe` spill files. `SIGUSR1` unused (no chaos).
+`serve` loads → compile → bind SMTP → bind management → write pid file. `spec.listeners.management.tls.enabled` wraps the management listener with TLS 1.2+ (`certFile`/`keyFile`). `SIGTERM`/`SIGINT`: stop SMTP accept, drain sessions (deadline), then HTTP, then `store.Wipe` spill files. `SIGUSR1` unused (no chaos).
 
 Optional later: `labmail send` is **not** shipped in the production binary (it would look like a sender). Tests use `internal/smtptest`.
 

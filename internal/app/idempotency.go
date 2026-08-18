@@ -164,14 +164,18 @@ func (c *idempCache) unlinkLocked(e *idempEntry) {
 }
 
 type changeFingerprint struct {
-	Reason     string            `json:"reason"`
-	Operations []model.Operation `json:"operations"`
+	ExpectedRevision model.Revision    `json:"expectedRevision"`
+	Force            bool              `json:"force"`
+	Reason           string            `json:"reason"`
+	Operations       []model.Operation `json:"operations"`
 }
 
 func fingerprintChange(in ChangeIn) (string, error) {
 	b, err := json.Marshal(changeFingerprint{
-		Reason:     in.Reason,
-		Operations: in.Operations,
+		ExpectedRevision: in.ExpectedRevision,
+		Force:            in.Force,
+		Reason:           in.Reason,
+		Operations:       in.Operations,
 	})
 	if err != nil {
 		return "", domainerr.Internal("idempotency fingerprint: " + err.Error())

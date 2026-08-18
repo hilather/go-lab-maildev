@@ -162,9 +162,9 @@ func TestSwapSpecAppliesToNextMAIL(t *testing.T) {
 	}
 	mustCmd(t, c, 552, "MAIL FROM:<a@b> SIZE=100")
 	blocked := spec
-	blocked.Auth.Mode = model.SMTPAuthPlainLogin
+	blocked.TLS.Mode = model.TLSModeImplicit
 	if err := srv.SwapSpec(blocked); err == nil {
-		t.Fatal("SwapSpec must reject AUTH")
+		t.Fatal("SwapSpec must reject implicit TLS")
 	}
 	mustCmd(t, c, 552, "MAIL FROM:<a@b> SIZE=100")
 }

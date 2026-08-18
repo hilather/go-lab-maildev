@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-17 (SMTP-001a)
+Last reviewed: 2026-08-17 (SMTP-001b)
 Related ADRs: 0002, 0004
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -12,7 +12,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Layer | What | Where |
 |---|---|---|
 | Unit | config decode/unknown fields/reserved names/byte sizes; store caps/wipe/wait/race; auth scopes; domainerr mapping; extract regex | `internal/*` |
-| SMTP protocol | 3a: greeting–DATA, SIZE, limits, 452/451 epoch; 3b: AUTH LOGIN transcript, STARTTLS required | `internal/smtp/server` with `internal/smtptest`; transcripts in `testdata/smtp` |
+| SMTP protocol | 3a: greeting–DATA, SIZE, limits, 452/451 epoch; 3b: AUTH LOGIN/PLAIN transcripts, STARTTLS optional/required + handshake | `internal/smtp/server` with `internal/smtptest`; transcripts in `testdata/smtp` |
 | MIME | multipart/alternative, attachments, base64, quoted-printable, broken MIME still stored | `internal/mimeparse` + `testdata/mime` |
 | REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json | `internal/control/rest` |
 | Compat | PR 7: array + relay 403 + `/healthz` (fake principal). PR 9: `TestMaildevScenarioCompat` (401 + Basic + subject) | `internal/control/compat` |
@@ -37,7 +37,7 @@ make test-parity test-config-compat test-docs
 make test-container security-scan test-changelog
 ```
 
-FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. SMTP-001a adds `testdata/smtp` transcripts, `net/smtp.SendMail` interop, the receive-only import-boundary test, and `FuzzReadLine` on `internal/smtp/codec`. `generate`, `verify-generated`, `test-parity`, `test-container`, and `test-changelog` fail closed until their owning PR.
+FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. SMTP-001a adds `testdata/smtp` transcripts, `net/smtp.SendMail` interop, the receive-only import-boundary test, and `FuzzReadLine` on `internal/smtp/codec`. SMTP-001b adds AUTH LOGIN/PLAIN transcripts (`testdata/smtp/auth-login.txt`, `auth-plain.txt`), STARTTLS optional/required fixtures, and `net/smtp` STARTTLS interop. `generate`, `verify-generated`, `test-parity`, `test-container`, and `test-changelog` fail closed until their owning PR.
 
 ## Required CI (FND-001)
 
@@ -45,7 +45,6 @@ Jobs: format, lint, unit, documentation. There is no optional or bypassable job.
 
 ## Frozen fixtures to add later
 
-- AUTH LOGIN transcript in `testdata/smtp/auth-login.txt` (334/334/235 from [docs/02-smtp-semantics.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/02-smtp-semantics.md)).
 - Extract regex goldens for the four RE2 patterns in [docs/03-message-store.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/03-message-store.md).
 - `TestMaildevScenarioCompat`: unauthenticated `GET /email` → 401, Basic → array containing `subject`, SMTP `SendMail`.
 - Compat goldens from `maildev/maildev:2.2.1` for `subject`/`from`/`to`/`id`/`time`/`read` plus one attachment fixture with `fileName` and **no** `stream`.

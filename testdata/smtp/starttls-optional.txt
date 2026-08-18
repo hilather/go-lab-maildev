@@ -1,0 +1,15 @@
+# STARTTLS advertised; cleartext MAIL allowed when required=false.
+S: 220 labmail.lab LabMail ready
+C: EHLO client.example
+S: 250-labmail.lab
+S: 250-SIZE 10485760
+S: 250-8BITMIME
+S: 250-SMTPUTF8
+S: 250-ENHANCEDSTATUSCODES
+S: 250 STARTTLS
+C: MAIL FROM:<alice@lab.test>
+S: 250 2.1.0 OK
+C: RSET
+S: 250 2.0.0 OK
+C: QUIT
+S: 221 2.0.0 Bye

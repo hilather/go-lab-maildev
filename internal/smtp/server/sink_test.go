@@ -84,18 +84,13 @@ func TestNewRequiresAddress(t *testing.T) {
 
 func TestNewRejectsAuthAndTLS(t *testing.T) {
 	spec := defaultSMTPSpec(t)
-	spec.Auth.Mode = model.SMTPAuthPlainLogin
+	spec.TLS.Mode = model.TLSModeImplicit
 	if _, err := New(Options{Address: "127.0.0.1:0", Spec: spec}); err == nil {
-		t.Fatal("plain_login should fail closed")
-	}
-	spec = defaultSMTPSpec(t)
-	spec.TLS.Mode = model.TLSModeStartTLS
-	if _, err := New(Options{Address: "127.0.0.1:0", Spec: spec}); err == nil {
-		t.Fatal("starttls should fail closed")
+		t.Fatal("implicit should fail closed")
 	}
 	spec = defaultSMTPSpec(t)
 	spec.TLS.Required = true
 	if _, err := New(Options{Address: "127.0.0.1:0", Spec: spec}); err == nil {
-		t.Fatal("tls.required should fail closed")
+		t.Fatal("tls.required without starttls should fail closed")
 	}
 }

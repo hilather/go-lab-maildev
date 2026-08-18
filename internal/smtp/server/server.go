@@ -292,17 +292,25 @@ func withSpecDefaults(s model.SMTPSpec) model.SMTPSpec {
 
 func rejectUnimplemented(spec model.SMTPSpec) error {
 	switch spec.Auth.Mode {
-	case "", model.SMTPAuthNone:
+	case "", model.SMTPAuthNone, model.SMTPAuthPlainLogin:
 	default:
-		return fmt.Errorf("smtp/server: smtp.auth.mode %q is not implemented until SMTP-001b", spec.Auth.Mode)
+		return fmt.Errorf("smtp/server: smtp.auth.mode %q is not supported", spec.Auth.Mode)
 	}
 	switch spec.TLS.Mode {
-	case "", model.TLSModeOff:
+	case "", model.TLSModeOff, model.TLSModeStartTLS:
+	case model.TLSModeImplicit:
+		return fmt.Errorf("smtp/server: smtp.tls.mode implicit is not supported until 1.1; use starttls or a future listeners.smtpImplicit bind")
 	default:
-		return fmt.Errorf("smtp/server: smtp.tls.mode %q is not implemented until SMTP-001b", spec.TLS.Mode)
+		return fmt.Errorf("smtp/server: smtp.tls.mode %q is not supported", spec.TLS.Mode)
 	}
 	if spec.TLS.Required {
-		return fmt.Errorf("smtp/server: smtp.tls.required is not implemented until SMTP-001b")
+		mode := spec.TLS.Mode
+		if mode == "" {
+			mode = model.TLSModeOff
+		}
+		if mode != model.TLSModeStartTLS {
+			return fmt.Errorf("smtp/server: smtp.tls.required is legal only when mode is starttls")
+		}
 	}
 	return nil
 }

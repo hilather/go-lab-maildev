@@ -41,7 +41,7 @@ func TestServeInvalidDoesNotBind(t *testing.T) {
 	}
 }
 
-func TestServeRejectsAuthMode(t *testing.T) {
+func TestServeAcceptsAuthMode(t *testing.T) {
 	dir := t.TempDir()
 	pw := filepath.Join(dir, "smtp.pass")
 	if err := os.WriteFile(pw, []byte("secret\n"), 0o600); err != nil {
@@ -52,16 +52,27 @@ func TestServeRejectsAuthMode(t *testing.T) {
 	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var stdout, stderr bytes.Buffer
-	code := serveCmd(context.Background(), []string{"--config", cfg, "--smtp-listen", "127.0.0.1:0"}, &stdout, &stderr)
-	if code != 1 {
-		t.Fatalf("exit %d want 1 stderr=%q", code, stderr.String())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var stdout, stderr safeBuffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serveCmd(ctx, []string{"--config", cfg, "--smtp-listen", "127.0.0.1:0"}, &stdout, &stderr)
+	}()
+	addr := waitSMTPListen(t, &stdout)
+	auth := smtp.PlainAuth("", "lab", "secret", "127.0.0.1")
+	msg := []byte("Subject: serve-auth\r\n\r\nvia labmail serve AUTH\r\n")
+	if err := smtp.SendMail(addr, auth, "alice@lab.test", []string{"bob@lab.test"}, msg); err != nil {
+		t.Fatalf("SendMail: %v stderr=%q", err, stderr.String())
 	}
-	if strings.Contains(stdout.String(), "smtp listen=") {
-		t.Fatalf("AUTH YAML bound SMTP: %q", stdout.String())
-	}
-	if !strings.Contains(stderr.String(), "smtp.auth.mode") {
-		t.Fatalf("stderr=%q", stderr.String())
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("serve exit %d stderr=%q", code, stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not exit")
 	}
 }
 

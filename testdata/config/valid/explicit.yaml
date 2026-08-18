@@ -39,6 +39,25 @@ spec:
       sessionTimeout: 10m
       commandIdle: 120s
       dataIdle: 180s
+    behavior:
+      greetingDelay: 0s
+      commandDelay: 0s
+      dropOnConnect: false
+      closeAfterVerb: ""
+      replies:
+        greeting: ""
+        helo: ""
+        ehlo: ""
+        mail: ""
+        rcpt: ""
+        data: ""
+        dataEnd: ""
+        rset: ""
+        noop: ""
+        vrfy: ""
+        auth: ""
+        starttls: ""
+        unknown: ""
   store:
     maxMessages: 1000
     maxBytes: 256MiB

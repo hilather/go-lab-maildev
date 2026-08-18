@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: SMTP, Architecture
-Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001)
+Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + smtp.behavior)
 Related ADRs: 0002
 
 Implementation lives in `internal/smtp/codec` (line IO, reply formatting) and `internal/smtp/server` (session, limits, TLS). No third-party SMTP server library. See [docs/adr/0002-in-tree-smtp-receive-only.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0002-in-tree-smtp-receive-only.md).
@@ -17,6 +17,8 @@ This document is the accept/reject table. Do not invent additional commands, rep
 
 `hostname` comes from `spec.smtp.hostname` (default `labmail.lab`). The banner **must not** contain “maildev”.
 
+Empty `spec.smtp.behavior` leaves this greeting unchanged. See [QA handshake scripting](#qa-handshake-scripting-optional).
+
 ## Commands (1.0)
 
 | Command | Supported | Behavior |
@@ -29,7 +31,7 @@ This document is the accept/reject table. Do not invent additional commands, rep
 | `NOOP` | Yes | `250 2.0.0 OK` |
 | `QUIT` | Yes | `221 2.0.0 Bye`, close. |
 | `HELP` | Yes | `214` with command list. No secrets. |
-| `VRFY` | Reply only | Always `252 2.5.2 Cannot VRFY user` (do not imply existence). |
+| `VRFY` | Reply only | Default `252 2.5.2 Cannot VRFY user` (do not imply existence). `spec.smtp.behavior.replies.vrfy` may replace that first line for QA. |
 | `EXPN` | No | `502 5.5.1 EXPN not implemented` |
 | `AUTH` | Optional | `PLAIN` and `LOGIN` when `spec.smtp.auth.mode != none`. |
 | `STARTTLS` | Optional | When `spec.smtp.tls.mode` is `starttls`. |
@@ -169,7 +171,7 @@ TLS 1.2+ (prefer 1.3). No client-cert SMTP AUTH in 1.0.
 - Open a TCP connection to deliver.
 - Rewrite recipients.
 - Generate a DSN or bounce to MAIL FROM.
-- Treat `VRFY` as a mailbox probe.
+- Treat `VRFY` as a mailbox probe (default 252). A QA `replies.vrfy` override is an operator-opt-in exception, not directory semantics.
 
 Successful queue reply:
 
@@ -179,9 +181,37 @@ Successful queue reply:
 
 `<id>` is the public message id (see [docs/03-message-store.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/03-message-store.md)).
 
+## QA handshake scripting (optional)
+
+`spec.smtp.behavior` is **default-off** and **deterministic**. Empty values are a no-op. This is not a LabDNS-style random chaos engine (D16): there is no probability, jitter, or SIGUSR1 fault injection. Use it to replay a specific odd MTA for QA.
+
+| Field | Effect |
+|---|---|
+| `greetingDelay` | Sleep before the 220 (or override) greeting. `0`–`30s`. |
+| `commandDelay` | Sleep after each command line is read, before dispatch. `0`–`30s`. |
+| `dropOnConnect` | Close the TCP connection before any greeting bytes. |
+| `closeAfterVerb` | After the named verb’s reply, close the session. Tokens: `GREETING`, `HELO`, `EHLO`, `MAIL`, `RCPT`, `DATA`, `DATA-END`, `RSET`, `NOOP`, `VRFY`, `AUTH`, `STARTTLS`, `UNKNOWN`. |
+| `replies.<verb>` | Replace the **first** reply line as `CODE text` (SMTP codes 200–599). Empty keeps the default. |
+
+`DATA` is the 354 (or override) before the body. `DATA-END` is the reply after the terminating dot.
+
+**4xx/5xx overrides skip the success path.** `MAIL`/`RCPT` do not change transaction state. `DATA` does not enter the body. `DATA-END` does not `Insert`. `AUTH` does not accept credentials. `STARTTLS` does not start the TLS handshake. Sequence errors (`503` HELO-first, nested MAIL, …) still fire before the override.
+
+A 2xx override replaces only the first reply line (EHLO extension lines stay). Live apply via `replaceSMTPBehavior` (or YAML + reset) is re-read on the **next command** (and on the greeting of a new session).
+
+Example — greet normally, then refuse MAIL with 421 and leave the session helloed:
+
+```yaml
+spec:
+  smtp:
+    behavior:
+      replies:
+        mail: "421 4.3.2 try later"
+```
+
 ## Live sessions vs config apply
 
-- Every `MAIL`, `RCPT`, and `DATA` re-loads the current config snapshot (atomic pointer). AUTH/TLS/SIZE/hide-extensions/admission follow the new snapshot. A session that is `helloed` when `smtp.auth.mode` flips to `plain_login` gets `530` on the next `MAIL` unless it AUTH’d.
+- Every command (and the greeting) re-loads the current config snapshot via `specNow`. AUTH/TLS/SIZE/hide-extensions/admission/`smtp.behavior` follow the new snapshot. A session that is `helloed` when `smtp.auth.mode` flips to `plain_login` gets `530` on the next `MAIL` unless it AUTH’d.
 - If `smtp.tls.required` becomes true under a cleartext session, next `MAIL` is `530`.
 - STARTTLS-completed sessions keep their TLS state; they do not re-handshake.
 

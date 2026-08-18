@@ -168,14 +168,14 @@ func TestServeBindsManagement(t *testing.T) {
 			break
 		}
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	if err != nil {
 		t.Fatalf("ready: %v stderr=%q", err, stderr.String())
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		t.Fatalf("ready status=%d", resp.StatusCode)
 	}
@@ -211,12 +211,12 @@ func TestServeBindsManagement(t *testing.T) {
 		t.Fatalf("mcp GET status=%d want 405", mcpResp.StatusCode)
 	}
 	unauth := doHTTP(t, "http://"+mgmt+"/v1/metrics")
-	defer unauth.Body.Close()
+	defer func() { _ = unauth.Body.Close() }()
 	if unauth.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated metrics status=%d want 401", unauth.StatusCode)
 	}
 	hidden := doHTTPAuth(t, "http://"+mgmt+"/v1/metrics", serveTestToken)
-	defer hidden.Body.Close()
+	defer func() { _ = hidden.Body.Close() }()
 	if hidden.StatusCode != http.StatusNotFound {
 		t.Fatalf("publicPath false: metrics status=%d", hidden.StatusCode)
 	}
@@ -275,7 +275,7 @@ func TestServeCompatDisabled(t *testing.T) {
 			break
 		}
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -341,7 +341,7 @@ func TestServeMetricsListenAndPublicPath(t *testing.T) {
 	metricsAddr := waitPrefix(t, &stdout, "labmail metrics listen=")
 
 	pub := waitHTTPAuth(t, "http://"+mgmt+"/v1/metrics", serveTestToken)
-	defer pub.Body.Close()
+	defer func() { _ = pub.Body.Close() }()
 	if pub.StatusCode != 200 {
 		t.Fatalf("publicPath true: status=%d", pub.StatusCode)
 	}
@@ -350,7 +350,7 @@ func TestServeMetricsListenAndPublicPath(t *testing.T) {
 	}
 
 	scrape := waitHTTP(t, "http://"+metricsAddr+"/metrics")
-	defer scrape.Body.Close()
+	defer func() { _ = scrape.Body.Close() }()
 	if scrape.StatusCode != 200 {
 		t.Fatalf("scrape status=%d", scrape.StatusCode)
 	}
@@ -388,7 +388,7 @@ func waitHTTPAuth(t *testing.T, url, token string) *http.Response {
 			return resp
 		}
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
@@ -426,11 +426,10 @@ func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
 	statusURL := "http://" + rt.http.Addr() + "/v1/status"
 	got := waitHTTP(t, readyURL)
 	if got.StatusCode != http.StatusOK {
-		got.Body.Close()
+		_ = got.Body.Close()
 		t.Fatalf("ready before smtp stop: %d", got.StatusCode)
 	}
-	got.Body.Close()
-
+	_ = got.Body.Close()
 	shctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	if err := rt.smtp.Shutdown(shctx); err != nil {
 		cancel()
@@ -449,19 +448,19 @@ func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
 			break
 		}
 		if ready != nil {
-			ready.Body.Close()
+			_ = ready.Body.Close()
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ready.Body.Close()
+	defer func() { _ = ready.Body.Close() }()
 	if ready.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("ready after smtp stop: %d", ready.StatusCode)
 	}
 	st := waitHTTPAuth(t, statusURL, serveTestToken)
-	defer st.Body.Close()
+	defer func() { _ = st.Body.Close() }()
 	if st.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d", st.StatusCode)
 	}

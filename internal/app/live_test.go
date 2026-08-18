@@ -129,6 +129,50 @@ func TestApplyMaxRecipientsLiveOnRCPT(t *testing.T) {
 	}
 }
 
+func TestApplyReplaceSMTPBehaviorLiveOnMAIL(t *testing.T) {
+	svc, boot := mustBoot(t)
+	srv, err := server.New(server.Options{
+		Address:   "127.0.0.1:0",
+		Spec:      boot.Canonical.Spec.SMTP,
+		Store:     svc.Inbox(),
+		Snapshots: svc.Snapshots(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	})
+	c, err := smtptest.Dial(srv.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	if code, _, err := c.Cmd("EHLO x"); err != nil || code != 250 {
+		t.Fatalf("ehlo %d %v", code, err)
+	}
+	if _, err := svc.Apply(context.Background(), actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Reason:           "qa 421 MAIL",
+		Operations: []model.Operation{{
+			Op: model.OpReplaceSMTPBehavior,
+			Behavior: &model.SMTPBehaviorSpec{
+				Replies: model.SMTPReplyOverrides{Mail: "421 4.3.2 try later"},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, err := c.Cmd("MAIL FROM:<a@b>"); err != nil || code != 421 {
+		t.Fatalf("mail after apply %d %v", code, err)
+	}
+}
+
 func TestResetDuringDATAMaps451(t *testing.T) {
 	svc, boot := mustBoot(t)
 	srv, err := server.New(server.Options{

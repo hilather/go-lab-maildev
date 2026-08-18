@@ -54,7 +54,7 @@ Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 - Full RFC 5321/5322/6409/7504/8461/8617 conformance as a public MTA. This is a **lab sink**. Interop target is “common language clients (`net/smtp`, nodemailer, Django, Spring, swaks, curl `--ssl-reqd` off) can deliver.”
 - CHUNKING (`BDAT`), PIPELINING advertised, DSN (`ORCPT`/`NOTIFY`), `VRFY`/`EXPN` that imply a mailbox, `ETRN`/`ATRN`/`TURN`.
 - Open relay semantics presented as a feature (the sink accepts any RCPT, but that is *capture*, not *relay*).
-- SMTP fault-injection / chaos engine (LabDNS-style). Deferred.
+- SMTP random/probabilistic chaos engine (LabDNS-style). Deferred. Deterministic, default-off `spec.smtp.behavior` (explicit reply/delay/close scripting) is the 1.0 QA knob.
 - Durable mail-directory persistence, object stores, or databases.
 - Multi-replica shared inbox or consensus.
 - maildev WebSocket protocol, Angular UI clone, or `/api` v3 paths.
@@ -85,7 +85,7 @@ These are closed. Implementers do not re-litigate them without an ADR.
 | **D13** | **Container ports stay 1025 / 1080.** Management default bind is `:1080`, not LabDNS’s `:8080`. | Compose map `${MAILDEV_WEB_PORT:-1080}:1080` does not change. |
 | **D14** | **Go 1.26, official MCP SDK `v1.7.0`, protocol `2026-07-28`, Apache-2.0.** `gopkg.in/yaml.v3` with `KnownFields(true)`. | Family pins (LabDNS/LabLDAP go 1.26). |
 | **D15** | **Compat catalog id stays `maildev` during the swap release.** Product name in docs/UI is LabMail. labinfo `name` becomes `Mail sink (LabMail, receive-only)`. | Avoids breaking agent prompts and `services.yaml` id references. A later lab release may rename the id. |
-| **D16** | **No chaos engine in 1.0.** | A mail sink’s job is reliable capture. |
+| **D16** | **No chaos engine in 1.0.** | A mail sink’s job is reliable capture. Deterministic, default-off `spec.smtp.behavior` (explicit reply/delay/close scripting) is not a LabDNS-style random chaos engine. |
 | **D17** | **MCP `spec.management.mcp.allowLegacyClients` default false; integration-lab overlay sets true.** `subscriptions/listen` stays pinned to 2026-07-28. | TacLab knob so MCPJungle (`mark3labs/mcp-go v0.48`) can register without a LabMail patch. |
 
 ## Process architecture
@@ -314,7 +314,7 @@ STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` a
 
 ## Residual limitations (1.0)
 
-Operator-facing copy of this list: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). rc.1 notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md). LabMail is a lab sink, not a public MTA.
+Operator-facing copy of this list: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Current notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md). LabMail is a lab sink, not a public MTA.
 
 - Not a complete MTA. No DSN, CHUNKING, PIPELINING, Sieve, quotas per recipient, or greylisting.
 - MIME parse of pathological messages may yield empty text/html with `parseWarning`; raw is still stored.
@@ -332,7 +332,7 @@ Operator-facing copy of this list: [docs/known-limitations.md](https://github.co
 - Single replica; no shared inbox.
 - MCP clients requiring OAuth PRM cannot authorize. MCPJungle needs `allowLegacyClients: true` (D17).
 - HTML preview blocks remote `https:` images (no tracking pixels).
-- No SMTP chaos / fault injection.
+- No LabDNS-style random SMTP chaos engine (D16). Optional `spec.smtp.behavior` is deterministic and default-off.
 - Catalog service id remains `maildev` during the swap release.
 
 ## Related documents

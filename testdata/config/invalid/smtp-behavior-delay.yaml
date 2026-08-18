@@ -1,0 +1,8 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: t
+spec:
+  smtp:
+    behavior:
+      greetingDelay: 31s

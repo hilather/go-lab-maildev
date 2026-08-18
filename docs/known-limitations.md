@@ -1,40 +1,39 @@
-# Known limitations (1.0 / v1.0.0-rc.1)
+# Known limitations (1.0 / v1.0.0-rc.2)
 
-Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.1** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that lives on sibling branches and is **not** claimed here.
+Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.2** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that is **not** claimed here.
 
-Last reviewed: 2026-08-18 (GA-001)
+Last reviewed: 2026-08-18 (smtp.behavior + rc.2)
 
-This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md).
+This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
 
 LabMail is a **lab sink**. It is **not** a public MTA and does **not** claim RFC 5321/5322 completeness.
 
-## This tree versus stacked siblings
+## This tree versus what is not tagged
 
-This branch stacks through UI-001 (inbox SPA), SEC-001, API/MCP/compat, STORE, SMTP-001a, and CFG. The following land on sibling branches and are **not** in this tree. Do not treat them as GA here:
+Design PRs 1–14, the side-by-side probe, and `spec.smtp.behavior` are in this tree. What is **not** this candidate:
 
-| Sibling | ID | What is missing here |
-|---|---|---|
-| SMTP AUTH / STARTTLS | SMTP-001b | `serve`, live apply, and reset **fail-close** `smtp.auth.mode != none` and `smtp.tls.mode != off`. No PLAIN/LOGIN, no STARTTLS. |
-| Observability | OBS-001 | Frozen slog event names and the hand-rolled OpenMetrics listener are not implemented. Ready is HTTP `/v1/health/ready`; there is no `:9090` catalog yet. |
-| Hardened image | DEP-001 | No `Dockerfile`, no `ghcr.io/hilather/labmail`, no `scripts/test-container.sh`. `make test-container` stays fail-closed. |
-| Swap overlay examples | SWAP-001 | `docs/13` is the design BOM from FND-001. Example `labmail.yaml` / MCPJungle server JSON for mcp-integration-lab are not in this tree. |
+| In this tree | Not this tag |
+|---|---|
+| SMTP AUTH/STARTTLS, OBS, DEP files, SWAP examples, inbox SPA, GA notes, QA handshake scripting | Published `ghcr.io/hilather/labmail` digest |
+| First-party inbox SPA | MailDev Angular / WebSocket UI |
+| Overlay examples in this repo | mcp-integration-lab compose/image pin |
 
-Q2 is closed: **GA / 1.0 is not done without the inbox UI**. The SPA **is** on this branch, so this rc.1 candidate includes it. That does not make this SHA a 1.0 GA tag.
+**GA / 1.0 is not this rc.** The inbox UI is present (Q2). That does not make this SHA a 1.0 GA tag.
 
 ## Not a public MTA
 
 - No DSN, CHUNKING, advertised PIPELINING, Sieve, per-recipient quotas, or greylisting.
 - Interop target is common lab clients (`net/smtp`, nodemailer, Django, Spring, swaks with STARTTLS off). Not Internet MX hosting.
-- `VRFY` is always `252`. `EXPN` / `BDAT` / `ETRN` / `ATRN` / `TURN` are `502`.
+- `VRFY` defaults to `252`. `EXPN` / `BDAT` / `ETRN` / `ATRN` / `TURN` are `502`. A QA `replies.vrfy` override is operator-opt-in.
 - Open-RCPT capture is **not** relay. There is no SMTP client in production packages.
 
 ## SMTP (this tree)
 
 - Default lab posture: no AUTH, no TLS required, any MAIL FROM / RCPT TO accepted, SIZE advertised.
-- AUTH PLAIN/LOGIN and STARTTLS are YAML-optional in the **schema** but **not implemented** until SMTP-001b. Asking for them fail-closes.
+- AUTH PLAIN/LOGIN and STARTTLS are YAML-optional and implemented. Implicit SMTPS stays a validate reject.
 - Implicit SMTPS (`smtp.tls.mode: implicit`, maildev `--incoming-secure`) is **1.1**. 1.0 validate rejects it and does not silently map to STARTTLS.
 - Default `maxMessageBytes` is **10 MiB** (maildev implicit ~50 MiB; 2.2.1 has no `--max-message-size` flag).
-- No SMTP chaos / fault injection (D16).
+- Optional `spec.smtp.behavior` can script greeting/command delays (≤30s), reply overrides (`CODE text`), drop-on-connect, and close-after-verb. It is default-off and deterministic — not a random chaos engine (D16). Live apply is `replaceSMTPBehavior` (next command).
 
 ## Store and MIME
 
@@ -61,13 +60,13 @@ Q2 is closed: **GA / 1.0 is not done without the inbox UI**. The SPA **is** on t
 - HTML preview blocks remote `https:` images (no tracking pixels). `cid:` is inlined as `data:` only; parts larger than 2 MiB decoded are omitted.
 - Catalog service id remains **`maildev`** during the swap release (D15 / Q1). Rename only in a later mcp-integration-lab release.
 
-## Deployment (not in this tree)
+## Deployment
 
-- Healthcheck plane in compose **will** change from SMTP TCP (`node`) to HTTP `/v1/health/ready` when DEP-001 lands (ready still requires SMTP bound).
-- No tag, image digest, SBOM, or provenance in this candidate. `v1.0.0-rc.1` notes ship before that tag exists.
-- Application binaries built without ldflags report version `dev`. The notes version `1.0.0-rc.1` is the candidate identity for the tag, not the default `dev` string.
-- Required GitHub Actions green-on-tag is enforced by Release `tag-gate`, not by this branch commit alone.
+- Healthcheck plane is HTTP `/v1/health/ready` (not SMTP/`node`). Ready still requires SMTP bound.
+- Dockerfile and `make test-container` are in-tree. This candidate does not publish a `ghcr.io/hilather/labmail` digest, SBOM, or provenance.
+- Application binaries built without ldflags report version `dev`. The notes version `1.0.0-rc.2` is the candidate identity for the tag, not the default `dev` string.
+- Required GitHub Actions green-on-tag is enforced by Release `tag-gate`.
 
 ## Explicit non-goals (unchanged)
 
-Outbound SMTP, relay, smarthost, DSN generation, MX lookup, being an MDA / IMAP / POP3 server, full public-MTA conformance, CHUNKING, advertised PIPELINING, implicit SMTPS in 1.0, durable mail-directory, multi-replica inbox, maildev WebSocket / Angular UI / v3 `/api`, OAuth PRM, DKIM/SPF/DMARC, virus scanning, wrapping the Node maildev image, and a LabDNS-style chaos engine.
+Outbound SMTP, relay, smarthost, DSN generation, MX lookup, being an MDA / IMAP / POP3 server, full public-MTA conformance, CHUNKING, advertised PIPELINING, implicit SMTPS in 1.0, durable mail-directory, multi-replica inbox, maildev WebSocket / Angular UI / v3 `/api`, OAuth PRM, DKIM/SPF/DMARC, virus scanning, wrapping the Node maildev image, and a LabDNS-style random chaos engine (deterministic `spec.smtp.behavior` is the 1.0 QA knob).

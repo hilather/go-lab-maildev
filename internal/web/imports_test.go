@@ -3,17 +3,18 @@ package web
 import (
 	"go/parser"
 	"go/token"
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestNoForbiddenImports(t *testing.T) {
 	t.Parallel()
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", nil, parser.ImportsOnly)
+	ents, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
+	fset := token.NewFileSet()
 	forbidden := []string{
 		"github.com/hilather/go-lab-maildev/internal/app",
 		"github.com/hilather/go-lab-maildev/internal/control",
@@ -22,17 +23,20 @@ func TestNoForbiddenImports(t *testing.T) {
 		"github.com/hilather/go-lab-maildev/web",
 		"net/smtp",
 	}
-	for _, pkg := range pkgs {
-		for name, f := range pkg.Files {
-			if strings.HasSuffix(name, "_test.go") {
-				continue
-			}
-			for _, imp := range f.Imports {
-				path := strings.Trim(imp.Path.Value, `"`)
-				for _, bad := range forbidden {
-					if path == bad || strings.HasPrefix(path, bad+"/") {
-						t.Errorf("%s imports forbidden package %s", name, path)
-					}
+	for _, e := range ents {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imp := range f.Imports {
+			path := strings.Trim(imp.Path.Value, `"`)
+			for _, bad := range forbidden {
+				if path == bad || strings.HasPrefix(path, bad+"/") {
+					t.Errorf("%s imports forbidden package %s", name, path)
 				}
 			}
 		}

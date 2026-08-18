@@ -27,12 +27,19 @@ func (s *session) cmdStartTLS() bool {
 		_ = s.reply(503, "5.5.1 Bad sequence")
 		return true
 	}
+	if handled, keep := s.applyErrorOverride("STARTTLS"); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
+	}
 	cfg, err := loadTLSConfig(spec)
 	if err != nil {
 		_ = s.reply(454, "4.7.0 TLS not available")
 		return true
 	}
-	if err := s.reply(220, "2.0.0 Ready to start TLS"); err != nil {
+	if !s.replyKeyed("STARTTLS", 220, "2.0.0 Ready to start TLS") {
+		s.endResult = "behavior"
 		return false
 	}
 	if err := s.setIdle(spec.Admission.CommandIdle); err != nil {

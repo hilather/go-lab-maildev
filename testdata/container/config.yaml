@@ -1,5 +1,5 @@
 # Minimal local-only bootstrap for container contract tests.
-# Auth is stubbed open until SEC-001; do not require secret files here.
+# Health live/ready stay unauthenticated. Inbox reads use the smoke token.
 apiVersion: labmail.dev/v1alpha1
 kind: LabMail
 metadata:
@@ -24,6 +24,11 @@ spec:
   management:
     auth:
       mode: bearer_and_basic
+      tokens:
+        - id: smoke
+          secretFile: /etc/labmail/token
+          role: administrator
+          scopes: [mail.read, mail.write, mail.admin, mail.audit.read]
   observability:
     logLevel: info
     metrics:

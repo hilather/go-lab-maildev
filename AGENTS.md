@@ -31,7 +31,7 @@ The numbered pack is the source of truth after FND-001. Do not invent paths, typ
 - Do not add a database, mail-directory, hidden volume, or other persistence mechanism without an approved ADR.
 - Do not import `emersion/go-smtp` in the server (ADR 0002). MIME parsing is isolated in `internal/mimeparse`.
 - Do not add implicit SMTPS (`smtp.tls.mode: implicit`) in 1.0.
-- Do not add a chaos / fault-injection engine in 1.0.
+- Do not add a random/probabilistic chaos / fault-injection engine in 1.0 (D16). Deterministic, default-off `spec.smtp.behavior` is the allowed QA handshake knob.
 - The embedded inbox UI is required for GA / 1.0 (PR 12). Do not ship 1.0 without it.
 - During the mcp-integration-lab swap release, labinfo catalog id stays `maildev` (D15). Rename only in a later lab release.
 - Hide third-party SMTP, MIME, MCP, and YAML library types behind internal adapters.

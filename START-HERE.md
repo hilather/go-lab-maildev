@@ -59,4 +59,4 @@ A task is not done until:
 - No CI check is ignored, bypassed, or marked optional to get a merge.
 - User-visible and operator-visible changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
-GA / 1.0 is not done without the embedded inbox UI (PR 12; present on this branch). The swap-release labinfo id stays `maildev`. LabMail is a lab sink, not a public MTA. Residuals: [docs/known-limitations.md](docs/known-limitations.md). rc.1 notes: [docs/releases/v1.0.0-rc.1.md](docs/releases/v1.0.0-rc.1.md). AUTH/STARTTLS, the hardened image, and swap overlay examples are sibling-stacked and are not claimed here.
+GA / 1.0 is not done without the embedded inbox UI (PR 12; present on this branch). The swap-release labinfo id stays `maildev`. LabMail is a lab sink, not a public MTA. Residuals: [docs/known-limitations.md](docs/known-limitations.md). Current notes: [docs/releases/v1.0.0-rc.2.md](docs/releases/v1.0.0-rc.2.md).

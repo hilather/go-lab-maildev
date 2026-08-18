@@ -35,6 +35,7 @@ var RequiredRootDocs = []string{
 	"docs/13-integration-lab-swap.md",
 	"docs/known-limitations.md",
 	"docs/releases/v1.0.0-rc.1.md",
+	"docs/releases/v1.0.0-rc.2.md",
 	"docs/adr/0001-use-go.md",
 	"docs/adr/0002-in-tree-smtp-receive-only.md",
 	"docs/adr/0003-ephemeral-inbox-and-gitops.md",

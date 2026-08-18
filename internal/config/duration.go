@@ -13,6 +13,8 @@ var durationFields = map[string]bool{
 	"commandIdle":    true,
 	"dataIdle":       true,
 	"maxWait":        true,
+	"greetingDelay":  true,
+	"commandDelay":   true,
 }
 
 // convertDurations rewrites ParseDuration strings to nanoseconds for

@@ -31,7 +31,7 @@ func TestSchemaPublished(t *testing.T) {
 	defs, _ := root["$defs"].(map[string]any)
 	required := []string{
 		"spec", "listeners", "smtp", "store", "ui", "management", "observability",
-		"smtpAuth", "smtpTLS", "admission", "mgmtAuth", "token",
+		"smtpAuth", "smtpTLS", "admission", "smtpBehavior", "smtpReplies", "mgmtAuth", "token",
 	}
 	for _, name := range required {
 		def, ok := defs[name].(map[string]any)
@@ -58,7 +58,8 @@ func TestSchemaListsModelJSONFields(t *testing.T) {
 	for _, sample := range []any{
 		model.State{}, model.Spec{}, model.ListenersSpec{}, model.SMTPListenerSpec{},
 		model.MgmtListenerSpec{}, model.SMTPSpec{}, model.SMTPAuthSpec{}, model.SMTPTLSSpec{},
-		model.AdmissionSpec{}, model.StoreSpec{}, model.UISpec{}, model.ManagementSpec{},
+		model.AdmissionSpec{}, model.SMTPBehaviorSpec{}, model.SMTPReplyOverrides{},
+		model.StoreSpec{}, model.UISpec{}, model.ManagementSpec{},
 		model.MgmtAuthSpec{}, model.TokenSpec{}, model.BasicSpec{}, model.MCPSpec{},
 		model.ObservabilitySpec{}, model.MetricsSpec{}, model.AuditSpec{},
 	} {

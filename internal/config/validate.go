@@ -127,6 +127,60 @@ func validateSMTP(s *model.SMTPSpec, vs *[]domainerr.FieldViolation) {
 	validateSMTPAuth(&s.Auth, vs)
 	validateSMTPTLS(&s.TLS, vs)
 	validateAdmission(&s.Admission, vs)
+	validateSMTPBehavior(&s.Behavior, vs)
+}
+
+func validateSMTPBehavior(b *model.SMTPBehaviorSpec, vs *[]domainerr.FieldViolation) {
+	if b == nil {
+		return
+	}
+	if b.GreetingDelay < 0 || b.GreetingDelay > model.MaxSMTPBehaviorDelay {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    "spec.smtp.behavior.greetingDelay",
+			Code:    violationInvalidValue,
+			Message: "greetingDelay must be between 0 and 30s",
+		})
+	}
+	if b.CommandDelay < 0 || b.CommandDelay > model.MaxSMTPBehaviorDelay {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    "spec.smtp.behavior.commandDelay",
+			Code:    violationInvalidValue,
+			Message: "commandDelay must be between 0 and 30s",
+		})
+	}
+	if v := strings.TrimSpace(b.CloseAfterVerb); v != "" && !model.KnownSMTPBehaviorVerb(v) {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    "spec.smtp.behavior.closeAfterVerb",
+			Code:    violationInvalidValue,
+			Message: "closeAfterVerb must be GREETING, HELO, EHLO, MAIL, RCPT, DATA, DATA-END, RSET, NOOP, VRFY, AUTH, STARTTLS, or UNKNOWN",
+		})
+	}
+	validateReplyLine("spec.smtp.behavior.replies.greeting", b.Replies.Greeting, vs)
+	validateReplyLine("spec.smtp.behavior.replies.helo", b.Replies.Helo, vs)
+	validateReplyLine("spec.smtp.behavior.replies.ehlo", b.Replies.Ehlo, vs)
+	validateReplyLine("spec.smtp.behavior.replies.mail", b.Replies.Mail, vs)
+	validateReplyLine("spec.smtp.behavior.replies.rcpt", b.Replies.Rcpt, vs)
+	validateReplyLine("spec.smtp.behavior.replies.data", b.Replies.Data, vs)
+	validateReplyLine("spec.smtp.behavior.replies.dataEnd", b.Replies.DataEnd, vs)
+	validateReplyLine("spec.smtp.behavior.replies.rset", b.Replies.Rset, vs)
+	validateReplyLine("spec.smtp.behavior.replies.noop", b.Replies.Noop, vs)
+	validateReplyLine("spec.smtp.behavior.replies.vrfy", b.Replies.Vrfy, vs)
+	validateReplyLine("spec.smtp.behavior.replies.auth", b.Replies.Auth, vs)
+	validateReplyLine("spec.smtp.behavior.replies.starttls", b.Replies.StartTLS, vs)
+	validateReplyLine("spec.smtp.behavior.replies.unknown", b.Replies.Unknown, vs)
+}
+
+func validateReplyLine(path, raw string, vs *[]domainerr.FieldViolation) {
+	if strings.TrimSpace(raw) == "" {
+		return
+	}
+	if _, _, err := model.ParseSMTPReplyLine(raw); err != nil {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    path,
+			Code:    violationInvalidValue,
+			Message: err.Error(),
+		})
+	}
 }
 
 func validateSMTPAuth(a *model.SMTPAuthSpec, vs *[]domainerr.FieldViolation) {

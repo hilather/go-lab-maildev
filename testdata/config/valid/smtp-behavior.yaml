@@ -1,0 +1,15 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: qa-odd-smtp
+spec:
+  smtp:
+    behavior:
+      greetingDelay: 250ms
+      commandDelay: 0s
+      dropOnConnect: false
+      closeAfterVerb: EHLO
+      replies:
+        greeting: "220 odd.example ESMTP"
+        mail: "421 4.3.2 try later"
+        dataEnd: "552 5.3.4 rejected by QA"

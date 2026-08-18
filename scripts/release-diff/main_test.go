@@ -20,12 +20,14 @@ func TestValidateNotesRepoFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile(filepath.Join(root, "docs", "releases", "v1.0.0-rc.1.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := validateNotes(string(body)); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"v1.0.0-rc.1.md", "v1.0.0-rc.2.md"} {
+		body, err := os.ReadFile(filepath.Join(root, "docs", "releases", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := validateNotes(string(body)); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
 	}
 }
 

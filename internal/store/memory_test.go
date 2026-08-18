@@ -44,7 +44,7 @@ func TestMemoryInsertParseAndULID(t *testing.T) {
 	if !bytes.Equal(got.Raw, raw) {
 		t.Fatal("raw rewritten")
 	}
-	if got.Attachments != nil && len(got.Attachments) == 1 && got.Attachments[0].ID != res.ID+":0" {
+	if len(got.Attachments) == 1 && got.Attachments[0].ID != res.ID+":0" {
 		t.Fatalf("att id=%q", got.Attachments[0].ID)
 	}
 	st := s.Stats()

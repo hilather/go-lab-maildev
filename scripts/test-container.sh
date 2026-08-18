@@ -82,12 +82,19 @@ else
 	echo "docker compose plugin not available; compose file parse skipped" >&2
 fi
 
+TOKEN="${ROOT}/testdata/container/token"
+if [ ! -f "${TOKEN}" ]; then
+	echo "missing ${TOKEN}" >&2
+	exit 1
+fi
+
 docker run -d --name "${NAME}" \
 	--read-only \
 	--cap-drop=ALL \
 	--security-opt=no-new-privileges:true \
 	--tmpfs /tmp:rw,noexec,nosuid,size=16m \
 	-v "${CFG}:/etc/labmail/config.yaml:ro" \
+	-v "${TOKEN}:/etc/labmail/token:ro" \
 	-p 127.0.0.1::1025/tcp \
 	-p 127.0.0.1::1080/tcp \
 	"${IMAGE}"
@@ -199,7 +206,8 @@ with smtplib.SMTP("127.0.0.1", port, timeout=5) as s:
     s.sendmail("alice@lab.test", ["bob@lab.test"], msg.as_string())
 PY
 
-listed="$(curl -fsS "http://127.0.0.1:${mgmt_port}/v1/messages")"
+SMOKE_TOKEN="$(tr -d '\r\n' < "${TOKEN}")"
+listed="$(curl -fsS -H "Authorization: Bearer ${SMOKE_TOKEN}" "http://127.0.0.1:${mgmt_port}/v1/messages")"
 if ! printf '%s\n' "${listed}" | grep -q 'container-smoke'; then
 	echo "GET /v1/messages missing container-smoke subject: ${listed}" >&2
 	exit 1

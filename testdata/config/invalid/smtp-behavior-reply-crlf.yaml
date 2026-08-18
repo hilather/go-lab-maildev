@@ -1,0 +1,9 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: t
+spec:
+  smtp:
+    behavior:
+      replies:
+        mail: "421 later\r\n250-injected"

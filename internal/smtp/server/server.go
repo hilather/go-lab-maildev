@@ -42,7 +42,9 @@ type Options struct {
 	Address string
 	Spec    model.SMTPSpec
 	Store   store.Sink
-	// Snapshots, when set, is re-read on every MAIL, RCPT, and DATA.
+	// Snapshots, when set, is re-read on every command (and the greeting)
+	// via specNow, so live apply including smtp.behavior takes effect
+	// without restarting the session.
 	Snapshots *snapshot.Store
 	// Metrics and Logger are optional. Nil is a no-op.
 	Metrics *observability.Registry
@@ -102,7 +104,7 @@ func New(opts Options) (*Server, error) {
 }
 
 // SwapSpec replaces the fallback spec used when no snapshot store is attached.
-// Live apply prefers Snapshots.Load on the next MAIL, RCPT, and DATA.
+// Live apply prefers Snapshots.Load on the next command (or greeting).
 func (s *Server) SwapSpec(spec model.SMTPSpec) error {
 	if err := rejectUnimplemented(spec); err != nil {
 		return err

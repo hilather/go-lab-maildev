@@ -2,7 +2,7 @@
 
 Status: Implemented (MCP-001)
 Owners: MCP, Application
-Last reviewed: 2026-08-17 (SEC-001)
+Last reviewed: 2026-08-18 (SEC-001 + smtp.behavior)
 Related ADRs: 0004, 0006
 
 Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are frozen in [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Protocol pin: [docs/adr/0006-pin-mcp-protocol-versions.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md).
@@ -50,6 +50,8 @@ Resources mirror GET representations. Clients without resource support use the `
 | `mail_attachment_get` | `attachments.get` | `mail.read` |
 | `mail_audit_query` | `audit.list` | `mail.audit.read` |
 | `mail_audit_get` | `audit.get` | `mail.audit.read` |
+
+`mail_change_plan` / `mail_change_apply` accept the same closed operation set as REST, including `replaceSMTPBehavior` (`spec.smtp.behavior` QA handshake scripting). There is no dedicated MCP tool per op.
 
 Health live/ready, OpenAPI, UI assets, session/CSRF, `/v1/metrics`, `/email` compat, `/healthz`, `/config`, and `GET /v1/messages/{id}/preview` are **not** MCP tools.
 

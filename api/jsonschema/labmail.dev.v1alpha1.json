@@ -90,7 +90,43 @@
         "hideExtensions": { "type": "array", "items": { "type": "string" } },
         "auth": { "$ref": "#/$defs/smtpAuth" },
         "tls": { "$ref": "#/$defs/smtpTLS" },
-        "admission": { "$ref": "#/$defs/admission" }
+        "admission": { "$ref": "#/$defs/admission" },
+        "behavior": { "$ref": "#/$defs/smtpBehavior" }
+      }
+    },
+    "smtpBehavior": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional deterministic QA handshake scripting. Empty is a no-op. Not a random chaos engine.",
+      "properties": {
+        "greetingDelay": { "$ref": "#/$defs/duration", "description": "sleep before 220; max 30s" },
+        "commandDelay": { "$ref": "#/$defs/duration", "description": "sleep after each command line; max 30s" },
+        "dropOnConnect": { "type": "boolean", "description": "close before greeting" },
+        "closeAfterVerb": {
+          "type": "string",
+          "description": "GREETING, HELO, EHLO, MAIL, RCPT, DATA, DATA-END, RSET, NOOP, VRFY, AUTH, STARTTLS, UNKNOWN"
+        },
+        "replies": { "$ref": "#/$defs/smtpReplies" }
+      }
+    },
+    "smtpReplies": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Override first reply line as 'CODE text' (e.g. 421 4.3.2 try later).",
+      "properties": {
+        "greeting": { "type": "string" },
+        "helo": { "type": "string" },
+        "ehlo": { "type": "string" },
+        "mail": { "type": "string" },
+        "rcpt": { "type": "string" },
+        "data": { "type": "string" },
+        "dataEnd": { "type": "string" },
+        "rset": { "type": "string" },
+        "noop": { "type": "string" },
+        "vrfy": { "type": "string" },
+        "auth": { "type": "string" },
+        "starttls": { "type": "string" },
+        "unknown": { "type": "string" }
       }
     },
     "smtpAuth": {

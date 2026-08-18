@@ -72,7 +72,7 @@ func main() {
 }
 
 // requiredCIJobs are the GitHub Actions job IDs that must succeed on the tag
-// commit. container-test stays off until DEP-001 lands a Dockerfile.
+// commit. Matches CI.yml required jobs, including container-test after DEP-001.
 func requiredCIJobs() []string {
 	return []string{
 		"format",
@@ -86,6 +86,7 @@ func requiredCIJobs() []string {
 		"changelog",
 		"parity",
 		"config-compat",
+		"container-test",
 		"web",
 	}
 }

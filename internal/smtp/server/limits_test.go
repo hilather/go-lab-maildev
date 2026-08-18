@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -185,7 +186,7 @@ func TestSnapshotSwapAppliesToNextMAIL(t *testing.T) {
 	if err := srv.Start(); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = srv.Shutdown(nil) })
+	t.Cleanup(func() { _ = srv.Shutdown(context.Background()) })
 	c := dial(t, srv)
 	mustCmd(t, c, 250, "EHLO x")
 	next := spec

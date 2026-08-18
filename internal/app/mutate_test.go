@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
@@ -237,6 +238,46 @@ func TestApplyReplaceSMTPAuthRejectedUntil001b(t *testing.T) {
 	if svc.Active().Canonical.Spec.SMTP.Auth.Mode != model.SMTPAuthNone && svc.Active().Canonical.Spec.SMTP.Auth.Mode != "" {
 		t.Fatalf("auth mode=%q", svc.Active().Canonical.Spec.SMTP.Auth.Mode)
 	}
+}
+
+func TestApplyReplaceSMTPBehavior(t *testing.T) {
+	svc, boot := mustBoot(t)
+	ctx := context.Background()
+	res, err := svc.Apply(ctx, actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Reason:           "qa 421 MAIL",
+		Operations: []model.Operation{{
+			Op: model.OpReplaceSMTPBehavior,
+			Behavior: &model.SMTPBehaviorSpec{
+				Replies: model.SMTPReplyOverrides{Mail: "421 4.3.2 try later"},
+			},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Applied {
+		t.Fatal("expected apply")
+	}
+	got := svc.Active().Canonical.Spec.SMTP.Behavior.Replies.Mail
+	if got != "421 4.3.2 try later" {
+		t.Fatalf("mail override=%q", got)
+	}
+
+	_, err = svc.Apply(ctx, actor(), ChangeIn{
+		ExpectedRevision: res.RuntimeRevision,
+		Operations:       []model.Operation{{Op: model.OpReplaceSMTPBehavior}},
+	})
+	requireCode(t, err, domainerr.CodeValidationFailed)
+
+	_, err = svc.Apply(ctx, actor(), ChangeIn{
+		ExpectedRevision: res.RuntimeRevision,
+		Operations: []model.Operation{{
+			Op:       model.OpReplaceSMTPBehavior,
+			Behavior: &model.SMTPBehaviorSpec{GreetingDelay: 31 * time.Second},
+		}},
+	})
+	requireCode(t, err, domainerr.CodeValidationFailed)
 }
 
 func TestValidateUnknownOp(t *testing.T) {

@@ -6,6 +6,7 @@ const (
 	OpReplaceStoreCaps      = "replaceStoreCaps"
 	OpReplaceHideExtensions = "replaceHideExtensions"
 	OpReplaceAdmission      = "replaceAdmission"
+	OpReplaceSMTPBehavior   = "replaceSMTPBehavior"
 )
 
 // ChangeSet is the LabDNS-shaped plan/apply envelope.
@@ -19,11 +20,12 @@ type ChangeSet struct {
 
 // Operation is one typed config mutation.
 type Operation struct {
-	Op             string         `json:"op"`
-	Auth           *SMTPAuthSpec  `json:"auth,omitempty"`
-	Store          *StoreCaps     `json:"store,omitempty"`
-	HideExtensions []string       `json:"hideExtensions,omitempty"`
-	Admission      *AdmissionSpec `json:"admission,omitempty"`
+	Op             string            `json:"op"`
+	Auth           *SMTPAuthSpec     `json:"auth,omitempty"`
+	Store          *StoreCaps        `json:"store,omitempty"`
+	HideExtensions []string          `json:"hideExtensions,omitempty"`
+	Admission      *AdmissionSpec    `json:"admission,omitempty"`
+	Behavior       *SMTPBehaviorSpec `json:"behavior,omitempty"`
 }
 
 // StoreCaps is the replaceStoreCaps body.
@@ -36,7 +38,7 @@ type StoreCaps struct {
 // KnownOp reports whether op is a v1alpha1 plan/apply verb.
 func KnownOp(op string) bool {
 	switch op {
-	case OpReplaceSMTPAuth, OpReplaceStoreCaps, OpReplaceHideExtensions, OpReplaceAdmission:
+	case OpReplaceSMTPAuth, OpReplaceStoreCaps, OpReplaceHideExtensions, OpReplaceAdmission, OpReplaceSMTPBehavior:
 		return true
 	default:
 		return false

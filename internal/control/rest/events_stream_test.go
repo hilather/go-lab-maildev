@@ -41,7 +41,7 @@ func TestEventsStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if !strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
 		t.Fatalf("content-type=%s", resp.Header.Get("Content-Type"))
 	}

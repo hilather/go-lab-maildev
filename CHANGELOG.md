@@ -20,6 +20,28 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 - None.
 
+## 1.0.0-rc.2
+
+Second candidate. Tag only on a green CI SHA via the Release `tag-gate`. Notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md). Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md).
+
+### Added
+
+- Optional `spec.smtp.behavior` and live `replaceSMTPBehavior` for QA handshake scripting: greeting/command delays (max 30s), drop-on-connect, close-after-verb, and per-verb first-line reply overrides (`CODE text`). Empty is a no-op. 4xx/5xx overrides skip the success path (no MAIL/RCPT state change, no DATA store, no AUTH success, no STARTTLS handshake). Existing sessions pick up a live apply on the next command. This is deterministic scripting, not a LabDNS-style random chaos engine (D16).
+
+### Changed
+
+- Container contract test authenticates `GET /v1/messages` with a dedicated smoke token. Ready stays unauthenticated.
+- Release `tag-gate` now requires the `container-test` CI job.
+
+### Fixed
+
+- golangci-lint `errcheck` on `Body.Close` in `labmail healthcheck` and several tests; staticcheck findings (`Shutdown(nil)`, nil `len` check, empty HEAD branch, deprecated `parser.ParseDir`).
+- RSET 4xx/5xx behavior overrides no longer clear the transaction before the reply.
+
+### Removed or deprecated
+
+- None.
+
 ## 1.0.0-rc.1
 
 Candidate identity for the first tag. Tag only on a green CI SHA via the Release `tag-gate`. Notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md). Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md).

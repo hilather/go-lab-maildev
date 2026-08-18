@@ -44,7 +44,21 @@ type session struct {
 
 func (s *session) run() {
 	defer s.finish()
-	if err := s.reply(220, s.spec().Hostname+" LabMail ready"); err != nil {
+	beh := s.spec().Behavior
+	if beh.DropOnConnect {
+		s.endResult = "behavior"
+		return
+	}
+	if beh.GreetingDelay > 0 {
+		time.Sleep(beh.GreetingDelay)
+	}
+	if handled, keep := s.applyErrorOverride("GREETING"); handled {
+		if !keep {
+			s.endResult = "behavior"
+			return
+		}
+	} else if !s.replyKeyed("GREETING", 220, s.spec().Hostname+" LabMail ready") {
+		s.endResult = "behavior"
 		return
 	}
 	for {
@@ -61,6 +75,7 @@ func (s *session) run() {
 			}
 			return
 		}
+		s.applyCommandDelay()
 		verb, arg := codec.SplitVerb(line)
 		if !s.dispatch(verb, arg) {
 			return
@@ -71,58 +86,84 @@ func (s *session) run() {
 func (s *session) dispatch(verb, arg string) bool {
 	switch verb {
 	case "HELO":
-		s.cmdHello(arg, false)
+		return s.cmdHello(arg, false)
 	case "EHLO":
-		s.cmdHello(arg, true)
+		return s.cmdHello(arg, true)
 	case "MAIL":
-		s.cmdMail(arg)
+		return s.cmdMail(arg)
 	case "RCPT":
-		s.cmdRcpt(arg)
+		return s.cmdRcpt(arg)
 	case "DATA":
 		return s.cmdData()
 	case "RSET":
-		s.cmdRset()
+		return s.cmdRset()
 	case "NOOP":
-		_ = s.reply(250, "2.0.0 OK")
+		return s.replyKeyed("NOOP", 250, "2.0.0 OK")
 	case "QUIT":
 		_ = s.reply(221, "2.0.0 Bye")
 		return false
 	case "HELP":
 		_ = s.reply(214, "HELO EHLO MAIL RCPT DATA RSET NOOP QUIT HELP VRFY", "End of HELP")
+		return true
 	case "VRFY":
-		_ = s.reply(252, "2.5.2 Cannot VRFY user")
+		return s.replyKeyed("VRFY", 252, "2.5.2 Cannot VRFY user")
 	case "EXPN":
 		_ = s.reply(502, "5.5.1 EXPN not implemented")
+		return true
 	case "AUTH":
 		return s.cmdAuth(arg)
 	case "STARTTLS":
 		return s.cmdStartTLS()
 	case "BDAT":
 		_ = s.reply(502, "5.5.1 BDAT not implemented")
+		return true
 	case "ETRN", "ATRN", "TURN":
 		_ = s.reply(502, "5.5.1 "+verb+" not implemented")
+		return true
 	case "":
-		_ = s.reply(500, "5.5.1 Command unrecognized")
+		if handled, keep := s.applyErrorOverride("UNKNOWN"); handled {
+			return keep
+		}
+		return s.replyKeyed("UNKNOWN", 500, "5.5.1 Command unrecognized")
 	default:
-		_ = s.reply(500, "5.5.1 Command unrecognized")
+		if handled, keep := s.applyErrorOverride("UNKNOWN"); handled {
+			return keep
+		}
+		return s.replyKeyed("UNKNOWN", 500, "5.5.1 Command unrecognized")
 	}
-	return true
 }
 
-func (s *session) cmdHello(arg string, ehlo bool) {
+func (s *session) cmdHello(arg string, ehlo bool) bool {
+	verb := "HELO"
+	if ehlo {
+		verb = "EHLO"
+	}
 	domain := strings.TrimSpace(arg)
 	if domain == "" {
 		_ = s.reply(501, "5.5.4 Missing domain")
-		return
+		return true
+	}
+	if handled, keep := s.applyErrorOverride(verb); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
 	}
 	s.resetTxn()
 	s.helo = domain
 	s.state = stateHelloed
 	if !ehlo {
-		_ = s.reply(250, "2.0.0 "+s.spec().Hostname)
-		return
+		if !s.replyKeyed("HELO", 250, "2.0.0 "+s.spec().Hostname) {
+			s.endResult = "behavior"
+			return false
+		}
+		return true
 	}
-	_ = s.reply(250, s.ehloLines()...)
+	if !s.replyKeyed("EHLO", 250, s.ehloLines()...) {
+		s.endResult = "behavior"
+		return false
+	}
+	return true
 }
 
 func (s *session) ehloLines() []string {
@@ -150,68 +191,94 @@ func (s *session) ehloLines() []string {
 	return lines
 }
 
-func (s *session) cmdMail(arg string) {
+func (s *session) cmdMail(arg string) bool {
 	spec := s.spec()
 	if s.state == stateGreeting {
 		_ = s.reply(503, "5.5.1 HELO/EHLO first")
-		return
+		return true
 	}
 	if s.state != stateHelloed {
 		_ = s.reply(503, "5.5.1 Nested MAIL")
-		return
+		return true
+	}
+	if handled, keep := s.applyErrorOverride("MAIL"); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
 	}
 	if !s.policyOK() {
-		return
+		return true
 	}
 	path, params, err := parsePathArg(arg, "FROM:")
 	if err != nil {
 		_ = s.reply(501, "5.5.4 Syntax error in parameters")
-		return
+		return true
 	}
 	size, sizeSet, err := parseMailParams(params)
 	if err != nil {
 		_ = s.reply(501, "5.5.4 Syntax error in parameters")
-		return
+		return true
 	}
 	if sizeSet && size > spec.MaxMessageBytes {
 		_ = s.reply(552, "5.3.4 Message too large")
-		return
+		return true
 	}
 	s.from = path
 	s.declaredSize = size
 	s.sizeSet = sizeSet
 	s.rcpt = s.rcpt[:0]
 	s.state = stateMail
-	_ = s.reply(250, "2.1.0 OK")
+	if !s.replyKeyed("MAIL", 250, "2.1.0 OK") {
+		s.endResult = "behavior"
+		return false
+	}
+	return true
 }
 
-func (s *session) cmdRcpt(arg string) {
+func (s *session) cmdRcpt(arg string) bool {
 	spec := s.spec()
 	if s.state != stateMail && s.state != stateRcpt {
 		_ = s.reply(503, "5.5.1 Need MAIL")
-		return
+		return true
+	}
+	if handled, keep := s.applyErrorOverride("RCPT"); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
 	}
 	if !s.policyOK() {
-		return
+		return true
 	}
 	path, _, err := parsePathArg(arg, "TO:")
 	if err != nil {
 		_ = s.reply(501, "5.5.4 Syntax error in parameters")
-		return
+		return true
 	}
 	if len(s.rcpt) >= spec.MaxRecipients {
 		_ = s.reply(452, "4.5.3 Too many recipients")
-		return
+		return true
 	}
 	s.rcpt = append(s.rcpt, path)
 	s.state = stateRcpt
-	_ = s.reply(250, "2.1.5 OK")
+	if !s.replyKeyed("RCPT", 250, "2.1.5 OK") {
+		s.endResult = "behavior"
+		return false
+	}
+	return true
 }
 
 func (s *session) cmdData() bool {
 	if s.state != stateRcpt || len(s.rcpt) == 0 {
 		_ = s.reply(503, "5.5.1 Need RCPT")
 		return true
+	}
+	if handled, keep := s.applyErrorOverride("DATA"); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
 	}
 	if !s.policyOK() {
 		return true
@@ -229,7 +296,8 @@ func (s *session) cmdData() bool {
 	defer s.srv.gate.releaseData(reserve)
 
 	epoch := s.srv.store.Epoch()
-	if err := s.reply(354, "Start mail input; end with <CRLF>.<CRLF>"); err != nil {
+	if !s.replyKeyed("DATA", 354, "Start mail input; end with <CRLF>.<CRLF>") {
+		s.endResult = "behavior"
 		return false
 	}
 
@@ -270,6 +338,13 @@ func (s *session) cmdData() bool {
 		RemoteAddr: s.conn.RemoteAddr().String(),
 	}
 	msg.Size = len(raw)
+	if handled, keep := s.applyErrorOverride("DATA-END"); handled {
+		s.resetToHelloed()
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
+	}
 	res, err := s.srv.store.Insert(context.Background(), epoch, msg)
 	if err != nil {
 		switch {
@@ -287,10 +362,13 @@ func (s *session) cmdData() bool {
 		s.resetToHelloed()
 		return true
 	}
-	_ = s.reply(250, "2.0.0 Queued as "+res.ID)
+	keep := s.replyKeyed("DATA-END", 250, "2.0.0 Queued as "+res.ID)
 	s.noteMessage("accepted", 250, res.ID)
+	if !keep {
+		s.endResult = "behavior"
+	}
 	s.resetToHelloed()
-	return true
+	return keep
 }
 
 func (s *session) noteMessage(result string, code int, id string) {
@@ -366,12 +444,22 @@ func (s *session) readData(max int64) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *session) cmdRset() {
+func (s *session) cmdRset() bool {
+	if handled, keep := s.applyErrorOverride("RSET"); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
+	}
 	s.resetTxn()
 	if s.state != stateGreeting {
 		s.state = stateHelloed
 	}
-	_ = s.reply(250, "2.0.0 OK")
+	if !s.replyKeyed("RSET", 250, "2.0.0 OK") {
+		s.endResult = "behavior"
+		return false
+	}
+	return true
 }
 
 func (s *session) resetTxn() {

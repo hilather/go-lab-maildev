@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-17 (STA-001)
+Last reviewed: 2026-08-18 (STA-001 + smtp.behavior)
 Related ADRs: 0003
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -52,6 +52,25 @@ spec:
       sessionTimeout: 10m
       commandIdle: 120s
       dataIdle: 180s
+    behavior:                       # optional; omit or leave empty = normal SMTP
+      greetingDelay: 0s             # 0–30s before 220
+      commandDelay: 0s              # 0–30s after each command line
+      dropOnConnect: false          # close before greeting
+      closeAfterVerb: ""            # GREETING|HELO|EHLO|MAIL|RCPT|DATA|DATA-END|RSET|NOOP|VRFY|AUTH|STARTTLS|UNKNOWN
+      replies:                      # first line only; "CODE text"; empty = default
+        greeting: ""
+        helo: ""
+        ehlo: ""
+        mail: ""
+        rcpt: ""
+        data: ""
+        dataEnd: ""
+        rset: ""
+        noop: ""
+        vrfy: ""
+        auth: ""
+        starttls: ""
+        unknown: ""
 
   store:
     maxMessages: 1000
@@ -147,7 +166,7 @@ Config mutations (plan/apply) use `expectedRevision` = `runtimeRevision`. Inbox 
 3. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
 4. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
 5. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
-6. Existing SMTP sessions re-load the new snapshot on the next MAIL/RCPT/DATA (or die on QUIT/timeout).
+6. Existing SMTP sessions re-load the new snapshot on the next command (or die on QUIT/timeout). New sessions pick up `smtp.behavior` on the greeting.
 7. Audit `state.reset`.
 
 Restart is equivalent: process memory dies; spill dir is wiped on next start.
@@ -177,6 +196,7 @@ Envelope (LabDNS-shaped):
 | `replaceStoreCaps` | `store`: `{maxMessages, maxBytes, fullPolicy}` | Shrink + `reject` fails unless `force` |
 | `replaceHideExtensions` | `hideExtensions`: string[] | |
 | `replaceAdmission` | `admission`: admission object | |
+| `replaceSMTPBehavior` | `behavior`: `{greetingDelay, commandDelay, dropOnConnect, closeAfterVerb, replies}` | `behavior` is required. `{}` clears scripting back to stock SMTP. Omitted/empty fields inside a present object are the runtime no-op. Delays max 30s. Not a random chaos engine (D16). Live on the next command. |
 
 `:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
 

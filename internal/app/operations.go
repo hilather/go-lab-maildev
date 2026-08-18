@@ -49,6 +49,12 @@ func applyOne(st *model.State, op model.Operation, i int) error {
 				domainerr.FieldViolation{Path: path + ".admission", Code: "required", Message: "replaceAdmission requires admission"})
 		}
 		st.Spec.SMTP.Admission = *op.Admission
+	case model.OpReplaceSMTPBehavior:
+		if op.Behavior == nil {
+			return domainerr.ValidationFailed("missing behavior",
+				domainerr.FieldViolation{Path: path + ".behavior", Code: "required", Message: "replaceSMTPBehavior requires behavior"})
+		}
+		st.Spec.SMTP.Behavior = *op.Behavior
 	default:
 		return domainerr.ValidationFailed("unknown operation",
 			domainerr.FieldViolation{Path: path + ".op", Code: "invalid_value", Message: "unknown op"})

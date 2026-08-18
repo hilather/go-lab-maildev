@@ -61,13 +61,42 @@ type ListenerTLS struct {
 
 // SMTPSpec is the receive-only SMTP posture.
 type SMTPSpec struct {
-	Hostname        string        `json:"hostname"`
-	MaxMessageBytes int64         `json:"maxMessageBytes"`
-	MaxRecipients   int           `json:"maxRecipients"`
-	HideExtensions  []string      `json:"hideExtensions"`
-	Auth            SMTPAuthSpec  `json:"auth"`
-	TLS             SMTPTLSSpec   `json:"tls"`
-	Admission       AdmissionSpec `json:"admission"`
+	Hostname        string           `json:"hostname"`
+	MaxMessageBytes int64            `json:"maxMessageBytes"`
+	MaxRecipients   int              `json:"maxRecipients"`
+	HideExtensions  []string         `json:"hideExtensions"`
+	Auth            SMTPAuthSpec     `json:"auth"`
+	TLS             SMTPTLSSpec      `json:"tls"`
+	Admission       AdmissionSpec    `json:"admission"`
+	Behavior        SMTPBehaviorSpec `json:"behavior"`
+}
+
+// SMTPBehaviorSpec is optional QA handshake scripting. Zero value is stock
+// SMTP. Delays are capped at MaxSMTPBehaviorDelay.
+type SMTPBehaviorSpec struct {
+	GreetingDelay  time.Duration      `json:"greetingDelay"`
+	CommandDelay   time.Duration      `json:"commandDelay"`
+	DropOnConnect  bool               `json:"dropOnConnect"`
+	CloseAfterVerb string             `json:"closeAfterVerb"`
+	Replies        SMTPReplyOverrides `json:"replies"`
+}
+
+// SMTPReplyOverrides replace the first reply line for a verb. Each value is
+// "CODE text" (e.g. "421 4.3.2 try later"). Empty keeps the default reply.
+type SMTPReplyOverrides struct {
+	Greeting string `json:"greeting"`
+	Helo     string `json:"helo"`
+	Ehlo     string `json:"ehlo"`
+	Mail     string `json:"mail"`
+	Rcpt     string `json:"rcpt"`
+	Data     string `json:"data"`
+	DataEnd  string `json:"dataEnd"`
+	Rset     string `json:"rset"`
+	Noop     string `json:"noop"`
+	Vrfy     string `json:"vrfy"`
+	Auth     string `json:"auth"`
+	StartTLS string `json:"starttls"`
+	Unknown  string `json:"unknown"`
 }
 
 // SMTPAuthSpec is optional SMTP AUTH.

@@ -8,7 +8,7 @@ Systems under test deliver RFC 5321 SMTP here. LabMail captures, indexes, and ex
 [![Go](https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
-Status: **v1.0.0-rc.1 candidate** (foundation + fail-closed YAML + SMTP sink with optional AUTH/STARTTLS + bounded inbox + native `/v1` REST + Streamable HTTP MCP + maildev `/email` compat + lab static bearer + observability + hardened image + sandboxed inbox UI + fuzz/soak/tag-gate). The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1`, `POST /mcp`, `/email`, slog JSON, OpenMetrics, and the SPA at `/`). LabMail is a lab sink, **not** a public MTA. Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md).
+Status: **v1.0.0-rc.2 candidate** (rc.1 plus deterministic `spec.smtp.behavior` QA handshake scripting). The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, `healthcheck`, `mcp-stdio`, and `serve` (SMTP plus `/v1`, `POST /mcp`, `/email`, slog JSON, OpenMetrics, and the SPA at `/`). LabMail is a lab sink, **not** a public MTA. Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
 
 Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
@@ -93,7 +93,7 @@ The numbered pack is normative after FND-001. Cross-file links are absolute.
 | [docs/12-maildev-compat.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/12-maildev-compat.md) | `/email` mapping |
 | [docs/13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md) | mcp-integration-lab swap |
 | [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md) | 1.0 residuals (not a public MTA) |
-| [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md) | rc.1 notes; tag only on green CI |
+| [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md) | rc.2 notes; tag only on green CI |
 | [tasks/00-program-board.md](https://github.com/hilather/go-lab-maildev/blob/main/tasks/00-program-board.md) | PRs 1–14 |
 | [CHANGELOG.md](https://github.com/hilather/go-lab-maildev/blob/main/CHANGELOG.md) | Curated history |
 

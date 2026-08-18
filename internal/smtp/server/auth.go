@@ -40,6 +40,12 @@ func (s *session) cmdAuth(arg string) bool {
 		_ = s.reply(503, "5.5.1 Already authenticated")
 		return true
 	}
+	if handled, keep := s.applyErrorOverride("AUTH"); handled {
+		if !keep {
+			s.endResult = "behavior"
+		}
+		return keep
+	}
 	mech, init, hasInit := splitAuthArg(arg)
 	switch strings.ToUpper(mech) {
 	case "PLAIN":
@@ -134,7 +140,10 @@ func (s *session) finishAuth(user, pass string) bool {
 	passOK := constEq(pass, wantPass)
 	if userOK && passOK {
 		s.authed = true
-		_ = s.reply(235, authOKText)
+		if !s.replyKeyed("AUTH", 235, authOKText) {
+			s.endResult = "behavior"
+			return false
+		}
 		return true
 	}
 	_ = s.reply(535, authFailText)

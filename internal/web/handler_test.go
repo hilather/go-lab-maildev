@@ -1,7 +1,6 @@
 package web
 
 import (
-	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -117,8 +116,7 @@ func TestHEADIndex(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("HEAD / code=%d", rec.Code)
 	}
-	body, _ := io.ReadAll(rec.Result().Body)
-	if rec.Code == http.StatusOK && len(body) != 0 && rec.Body.Len() != 0 {
-		// ServeContent omits the body for HEAD; either view is acceptable.
+	if rec.Body.Len() != 0 {
+		t.Fatalf("HEAD / leaked body len=%d", rec.Body.Len())
 	}
 }

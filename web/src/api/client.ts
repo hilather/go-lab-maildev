@@ -121,18 +121,56 @@ export async function deleteSession(): Promise<void> {
   clearMemoryCSRF();
 }
 
-export async function listMessages(query: { subjectContains?: string } = {}): Promise<MessageList> {
+// Native list default is 50; the store cap is 1000. Walk at MaxListLimit so
+// the inbox is not silently truncated to the first page.
+export const LIST_PAGE_LIMIT = 200;
+const LIST_MAX_PAGES = 16;
+
+export async function listMessages(
+  query: { subjectContains?: string; cursor?: string; limit?: number } = {},
+): Promise<MessageList> {
   const params = new URLSearchParams();
   if (query.subjectContains) {
     params.set("subjectContains", query.subjectContains);
   }
-  const qs = params.toString();
-  return readJSON<MessageList>(await apiFetch(qs === "" ? "/v1/messages" : `/v1/messages?${qs}`));
+  if (query.cursor) {
+    params.set("cursor", query.cursor);
+  }
+  params.set("limit", String(query.limit ?? LIST_PAGE_LIMIT));
+  return readJSON<MessageList>(await apiFetch(`/v1/messages?${params.toString()}`));
 }
 
-export async function getMessage(id: string, markRead = false): Promise<Message> {
-  const qs = markRead ? "?markRead=true" : "";
-  return readJSON<Message>(await apiFetch(`/v1/messages/${encodeURIComponent(id)}${qs}`));
+export async function listAllMessages(query: { subjectContains?: string } = {}): Promise<MessageList> {
+  const items: Message[] = [];
+  let cursor: string | undefined;
+  let generation = 0;
+  let revision = "";
+  for (let page = 0; page < LIST_MAX_PAGES; page += 1) {
+    const next: { subjectContains?: string; cursor?: string; limit: number } = {
+      limit: LIST_PAGE_LIMIT,
+    };
+    if (query.subjectContains) {
+      next.subjectContains = query.subjectContains;
+    }
+    if (cursor) {
+      next.cursor = cursor;
+    }
+    const chunk = await listMessages(next);
+    items.push(...chunk.items);
+    generation = chunk.storeGeneration;
+    revision = chunk.revision;
+    if (!chunk.nextCursor) {
+      return { revision, storeGeneration: generation, items, nextCursor: null };
+    }
+    cursor = chunk.nextCursor;
+  }
+  return { revision, storeGeneration: generation, items, nextCursor: cursor ?? null };
+}
+
+export async function getMessage(id: string): Promise<Message> {
+  // Native GET defaults markRead=false. The SPA must not flip the read bit
+  // on a CSRF-exempt GET (compat GET /email/:id still marks read).
+  return readJSON<Message>(await apiFetch(`/v1/messages/${encodeURIComponent(id)}`));
 }
 
 export async function getMessageRaw(id: string): Promise<string> {

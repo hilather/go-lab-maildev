@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POLL_INTERVAL_MS, useInboxLive } from "./useInboxLive";
 
@@ -7,6 +7,7 @@ class FakeEventSource {
   static instances: FakeEventSource[] = [];
   onopen: ((ev: Event) => void) | null = null;
   onerror: ((ev: Event) => void) | null = null;
+  closed = false;
   readonly listeners = new Map<string, Set<(ev: MessageEvent<string>) => void>>();
 
   constructor(public readonly url: string) {
@@ -23,7 +24,10 @@ class FakeEventSource {
   }
 
   removeEventListener(): void {}
-  close(): void {}
+
+  close(): void {
+    this.closed = true;
+  }
 }
 
 describe("useInboxLive", () => {
@@ -34,25 +38,78 @@ describe("useInboxLive", () => {
     vi.useRealTimers();
   });
 
-  it("uses EventSource when it opens", async () => {
+  it("uses EventSource when it opens", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
     const onChange = vi.fn();
     const { result } = renderHook(() => useInboxLive(onChange, true));
-    FakeEventSource.instances[0]?.onopen?.(new Event("open"));
-    await waitFor(() => {
-      expect(result.current).toBe("sse");
+    act(() => {
+      FakeEventSource.instances[0]?.onopen?.(new Event("open"));
     });
+    expect(result.current).toBe("sse");
     expect(FakeEventSource.instances[0]?.url).toBe("/v1/events/stream");
+    expect(FakeEventSource.instances[0]?.closed).toBe(false);
   });
 
-  it("falls back to a 3s poll when EventSource cannot be constructed", async () => {
+  it("polls every 3s when EventSource cannot be constructed", () => {
     FakeEventSource.fail = true;
     vi.stubGlobal("EventSource", FakeEventSource);
+    vi.useFakeTimers();
     const onChange = vi.fn();
     const { result } = renderHook(() => useInboxLive(onChange, true));
-    await waitFor(() => {
-      expect(result.current).toBe("poll");
+    expect(result.current).toBe("poll");
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
     });
-    expect(POLL_INTERVAL_MS).toBe(3000);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    act(() => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes EventSource on error and switches exclusively to poll", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { result } = renderHook(() => useInboxLive(onChange, true));
+    const inst = FakeEventSource.instances[0];
+    if (!inst) {
+      throw new Error("expected EventSource");
+    }
+    act(() => {
+      inst.onopen?.(new Event("open"));
+    });
+    expect(result.current).toBe("sse");
+    act(() => {
+      inst.onerror?.(new Event("error"));
+    });
+    expect(inst.closed).toBe(true);
+    expect(result.current).toBe("poll");
+    act(() => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("watchdog closes a never-opened EventSource and starts poll", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const { result } = renderHook(() => useInboxLive(onChange, true));
+    const inst = FakeEventSource.instances[0];
+    if (!inst) {
+      throw new Error("expected EventSource");
+    }
+    expect(result.current).toBe("idle");
+    act(() => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+    expect(inst.closed).toBe(true);
+    expect(result.current).toBe("poll");
+    act(() => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 });

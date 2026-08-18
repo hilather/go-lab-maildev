@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CSRF_HEADER,
+  LIST_PAGE_LIMIT,
   apiFetch,
   basicAuthorization,
   bearerAuthorization,
   clearMemoryCSRF,
   createSession,
+  listAllMessages,
   setMemoryCSRF,
 } from "./client";
 import { resetClientState } from "../test/render";
@@ -69,5 +71,35 @@ describe("API client", () => {
     }
     expect(new Headers(init.headers).has(CSRF_HEADER)).toBe(false);
     clearMemoryCSRF();
+  });
+
+  it("walks nextCursor so a 51st message is not dropped", async () => {
+    const page1 = Array.from({ length: 50 }, (_, i) => ({ id: `m${i + 1}`, subject: `s${i + 1}` }));
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async (input) => {
+      const url = new URL(String(input), "http://lab.invalid");
+      expect(url.searchParams.get("limit")).toBe(String(LIST_PAGE_LIMIT));
+      if (!url.searchParams.get("cursor")) {
+        return new Response(
+          JSON.stringify({ revision: "r", storeGeneration: 2, items: page1, nextCursor: "cur-2" }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      expect(url.searchParams.get("cursor")).toBe("cur-2");
+      return new Response(
+        JSON.stringify({
+          revision: "r",
+          storeGeneration: 2,
+          items: [{ id: "m51", subject: "older" }],
+          nextCursor: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const list = await listAllMessages();
+    expect(list.items).toHaveLength(51);
+    expect(list.items[50]?.id).toBe("m51");
+    expect(list.nextCursor).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

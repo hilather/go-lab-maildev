@@ -28,6 +28,16 @@ export function useInboxLive(onChange: () => void, enabled: boolean): LiveMode {
       poll = window.setInterval(refresh, POLL_INTERVAL_MS);
     };
 
+    // Exclusive fallback: close EventSource so the browser cannot keep
+    // reconnecting while poll is the live path.
+    const fallbackToPoll = () => {
+      if (es !== null) {
+        es.close();
+        es = null;
+      }
+      startPoll();
+    };
+
     try {
       es = new EventSource("/v1/events/stream");
       es.addEventListener("mail.received", refresh);
@@ -38,7 +48,7 @@ export function useInboxLive(onChange: () => void, enabled: boolean): LiveMode {
         setMode("sse");
       };
       es.onerror = () => {
-        startPoll();
+        fallbackToPoll();
       };
     } catch {
       startPoll();
@@ -46,7 +56,7 @@ export function useInboxLive(onChange: () => void, enabled: boolean): LiveMode {
 
     const watchdog = window.setTimeout(() => {
       if (!opened) {
-        startPoll();
+        fallbackToPoll();
       }
     }, POLL_INTERVAL_MS);
 

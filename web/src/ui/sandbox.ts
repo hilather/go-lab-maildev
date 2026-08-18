@@ -3,12 +3,12 @@
 // and cannot mint blob: URLs; cid: parts are inlined as data: by the server.
 export const PREVIEW_SANDBOX = "";
 
-const FORBIDDEN_TOKENS = ["allow-scripts", "allow-same-origin", "allow-popups-to-escape-sandbox"];
-
 export function sandboxTokens(value: string): string[] {
   return value.split(/\s+/).filter((t) => t !== "");
 }
 
-export function isSafePreviewSandbox(value: string): boolean {
-  return sandboxTokens(value).every((t) => !FORBIDDEN_TOKENS.includes(t));
+// Only the frozen empty sandbox is safe. allow-forms / allow-popups / a
+// missing attribute must not pass.
+export function isSafePreviewSandbox(value: string | null): boolean {
+  return value === PREVIEW_SANDBOX;
 }

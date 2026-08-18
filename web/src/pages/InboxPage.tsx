@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { APIError, clearMessages, listMessages } from "../api/client";
+import { APIError, clearMessages, listAllMessages } from "../api/client";
 import type { Message } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { SCOPE_WRITE, formatAddress } from "../auth/scopes";
@@ -17,7 +17,7 @@ export function InboxPage() {
   const refresh = useCallback(() => {
     void (async () => {
       try {
-        const list = await listMessages(filter === "" ? {} : { subjectContains: filter });
+        const list = await listAllMessages(filter === "" ? {} : { subjectContains: filter });
         setItems(list.items);
         setGeneration(list.storeGeneration);
         setError("");
@@ -79,23 +79,26 @@ export function InboxPage() {
       {items.length === 0 ? (
         <p>No messages.</p>
       ) : (
-        <ul className="mail-list">
-          {items.map((m) => (
-            <li key={m.id}>
-              <Link to={`/messages/${encodeURIComponent(m.id)}`}>
-                <span className="unread-dot" data-read={m.read ? "true" : "false"} aria-hidden="true" />
-                <span>
-                  <span className="subject">{m.subject || "(no subject)"}</span>
-                  <span className="muted">
-                    {" "}
-                    {m.from.map((a) => formatAddress(a.name, a.address)).join(", ") || m.envelope.from}
+        <>
+          <p className="muted">Showing {items.length} messages.</p>
+          <ul className="mail-list">
+            {items.map((m) => (
+              <li key={m.id}>
+                <Link to={`/messages/${encodeURIComponent(m.id)}`}>
+                  <span className="unread-dot" data-read={m.read ? "true" : "false"} aria-hidden="true" />
+                  <span>
+                    <span className="subject">{m.subject || "(no subject)"}</span>
+                    <span className="muted">
+                      {" "}
+                      {m.from.map((a) => formatAddress(a.name, a.address)).join(", ") || m.envelope.from}
+                    </span>
                   </span>
-                </span>
-                <time dateTime={m.receivedAt}>{m.receivedAt}</time>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  <time dateTime={m.receivedAt}>{m.receivedAt}</time>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </main>
   );

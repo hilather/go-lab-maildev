@@ -57,10 +57,13 @@ describe("MessagePage", () => {
     await user.click(screen.getByRole("tab", { name: /HTML preview/i }));
     const frame = await screen.findByTitle("HTML preview");
     expect(frame).toHaveAttribute("src", "/v1/messages/01JTEST/preview");
+    expect(frame.hasAttribute("sandbox")).toBe(true);
+    expect(frame.getAttribute("sandbox")).toBe("");
     expect(frame.getAttribute("sandbox")).toBe(PREVIEW_SANDBOX);
-    expect(isSafePreviewSandbox(frame.getAttribute("sandbox") ?? "missing")).toBe(true);
+    expect(isSafePreviewSandbox(frame.getAttribute("sandbox"))).toBe(true);
     await waitFor(() => {
       expect(fetchMock.mock.calls.some((c) => String(c[0]).includes("/v1/messages/01JTEST"))).toBe(true);
     });
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes("markRead=true"))).toBe(false);
   });
 });

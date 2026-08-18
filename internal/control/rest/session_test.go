@@ -70,6 +70,9 @@ func TestSessionCookieAndCSRF(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+testBearerToken)
 	rec := doRaw(h, req)
 	requireStatus(t, rec, http.StatusOK)
+	if rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("POST /v1/session cache=%q", rec.Header().Get("Cache-Control"))
+	}
 	m := decodeJSON(t, rec)
 	csrf, _ := m["csrf"].(string)
 	if len(csrf) < 64 || m["expiresAt"] == "" {
@@ -92,6 +95,9 @@ func TestSessionCookieAndCSRF(t *testing.T) {
 	get.AddCookie(&http.Cookie{Name: auth.CookieName, Value: cookie})
 	grec := doRaw(h, get)
 	requireStatus(t, grec, http.StatusOK)
+	if grec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("GET /v1/session cache=%q", grec.Header().Get("Cache-Control"))
+	}
 	gm := decodeJSON(t, grec)
 	if gm["id"] != "admin" || gm["role"] != model.RoleAdministrator {
 		t.Fatalf("get session=%s", grec.Body.String())

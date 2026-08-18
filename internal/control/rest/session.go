@@ -50,6 +50,7 @@ func (s *Server) handleSessionDelete(w http.ResponseWriter, r *http.Request, ins
 		s.cfg.Sessions.Delete(c.Value)
 	}
 	http.SetCookie(w, auth.ClearSessionCookie(s.cookieSecure(r)))
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
 	_ = instance
 	_ = actor

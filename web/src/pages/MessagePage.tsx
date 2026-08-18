@@ -29,7 +29,7 @@ export function MessagePage() {
     let cancelled = false;
     void (async () => {
       try {
-        const next = await getMessage(id, canWrite);
+        const next = await getMessage(id);
         if (!cancelled) {
           setMsg(next);
           setError("");
@@ -43,7 +43,7 @@ export function MessagePage() {
     return () => {
       cancelled = true;
     };
-  }, [id, canWrite]);
+  }, [id]);
 
   useEffect(() => {
     if (tab !== "raw" || id === "") {

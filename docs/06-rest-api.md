@@ -135,7 +135,7 @@ POST   /v1/session     Authorization: Bearer | Basic
 GET    /v1/session     cookie or bearer → { "id", "role", "scopes", "expiresAt", "csrf"? }
                        csrf is returned for a valid cookie so the UI can recover
                        after reload; cookie-authenticated POST /v1/session still
-                       requires X-LabMail-CSRF.
+                       requires X-LabMail-CSRF. Session JSON is Cache-Control: no-store.
 DELETE /v1/session     clears cookie
 ```
 

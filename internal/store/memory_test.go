@@ -588,6 +588,43 @@ func TestReplaceCapsEvictOldestPolicy(t *testing.T) {
 	}
 }
 
+func TestConfigureRejectOverDoesNotMutate(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("a", "one")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("b", "two")); err != nil {
+		t.Fatal(err)
+	}
+	err := s.Configure(Options{MaxMessages: 1, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	if !errors.Is(err, ErrOverNewCap) {
+		t.Fatalf("err=%v", err)
+	}
+	if s.Stats().MessageCount != 2 {
+		t.Fatal("configure reject evicted")
+	}
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("c", "three")); err != nil {
+		t.Fatalf("old caps should still accept: %v", err)
+	}
+}
+
+func TestCheckOptionsBadSpill(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "file")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := CheckOptions(Options{
+		MaxMessages:    1,
+		MaxBytes:       1024,
+		FullPolicy:     model.FullPolicyReject,
+		SpillDirectory: filepath.Join(blocker, "spill"),
+	})
+	if err == nil {
+		t.Fatal("expected spill mkdir failure")
+	}
+}
+
 func TestNewRejectsBadCaps(t *testing.T) {
 	if _, err := New(Options{}); err == nil {
 		t.Fatal("empty options")

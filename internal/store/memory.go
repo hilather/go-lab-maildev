@@ -112,17 +112,37 @@ func New(opts Options) (*Memory, error) {
 	return m, nil
 }
 
+func ensureSpillDir(dir string) error {
+	if dir == "" {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("store: spill directory: %w", err)
+	}
+	return nil
+}
+
+// CheckOptions validates caps and creates the spill directory when set.
+// It does not unlink files and does not mutate an inbox.
+func CheckOptions(opts Options) (Options, error) {
+	opts, err := normalizeOptions(opts)
+	if err != nil {
+		return opts, err
+	}
+	if err := ensureSpillDir(opts.SpillDirectory); err != nil {
+		return opts, err
+	}
+	return opts, nil
+}
+
 func (m *Memory) prepareSpill() error {
+	if err := ensureSpillDir(m.spillDir); err != nil {
+		return err
+	}
 	if m.spillDir == "" {
 		return nil
 	}
-	if err := os.MkdirAll(m.spillDir, 0o700); err != nil {
-		return fmt.Errorf("store: spill directory: %w", err)
-	}
-	if err := m.unlinkAllSpill(); err != nil {
-		return err
-	}
-	return nil
+	return m.unlinkAllSpill()
 }
 
 // Insert parses MIME if needed, assigns a ULID, and charges resident bytes.
@@ -570,8 +590,44 @@ func (m *Memory) ReplaceCaps(opts Options, force bool) error {
 	return nil
 }
 
-// Configure replaces all store options. Call after Wipe on reset.
+// Configure replaces all store options. Occupancy is checked against the
+// new caps before any field is mutated. The new spill directory is created
+// (not unlinked) before the swap so a mkdir failure cannot leave new caps
+// on an old inbox.
 func (m *Memory) Configure(opts Options) error {
+	if m == nil {
+		return errors.New("store: nil Memory")
+	}
+	opts, err := normalizeOptions(opts)
+	if err != nil {
+		return err
+	}
+	if err := ensureSpillDir(opts.SpillDirectory); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	over := len(m.byID) > opts.MaxMessages || m.bytes > opts.MaxBytes
+	if over && opts.FullPolicy != model.FullPolicyEvictOldest {
+		return ErrOverNewCap
+	}
+	m.maxMessages = opts.MaxMessages
+	m.maxBytes = opts.MaxBytes
+	m.fullPolicy = opts.FullPolicy
+	m.maxWait = opts.MaxWait
+	m.spillDir = opts.SpillDirectory
+	m.spillThreshold = opts.SpillThreshold
+	if over {
+		if err := m.evictUntilUnderCapsLocked(); err != nil {
+			return ErrOverNewCap
+		}
+	}
+	return nil
+}
+
+// ResetTo wipes the inbox and installs opts under one lock so Insert cannot
+// land between Wipe and the new caps. Callers must CheckOptions first.
+func (m *Memory) ResetTo(opts Options) error {
 	if m == nil {
 		return errors.New("store: nil Memory")
 	}
@@ -581,26 +637,19 @@ func (m *Memory) Configure(opts Options) error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.epoch++
+	m.generation++
+	m.byID = make(map[string]*record)
+	m.order = nil
+	m.bytes = 0
+	_ = m.unlinkAllSpill()
 	m.maxMessages = opts.MaxMessages
 	m.maxBytes = opts.MaxBytes
 	m.fullPolicy = opts.FullPolicy
 	m.maxWait = opts.MaxWait
-	spillChanged := m.spillDir != opts.SpillDirectory || m.spillThreshold != opts.SpillThreshold
 	m.spillDir = opts.SpillDirectory
 	m.spillThreshold = opts.SpillThreshold
-	if spillChanged && m.spillDir != "" {
-		if err := m.prepareSpill(); err != nil {
-			return err
-		}
-	}
-	if len(m.byID) > m.maxMessages || m.bytes > m.maxBytes {
-		if m.fullPolicy != model.FullPolicyEvictOldest {
-			return ErrOverNewCap
-		}
-		if err := m.evictUntilUnderCapsLocked(); err != nil {
-			return ErrOverNewCap
-		}
-	}
+	m.cond.Broadcast()
 	return nil
 }
 

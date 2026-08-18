@@ -135,6 +135,41 @@ func TestFailedResetLeavesInboxAndSnapshot(t *testing.T) {
 	}
 }
 
+func TestResetBadSpillLeavesInboxAndSnapshot(t *testing.T) {
+	svc, _ := mustBoot(t)
+	ctx := context.Background()
+	id := insertRaw(t, svc, "stay")
+	live := svc.Active()
+	epoch := svc.Inbox().Epoch()
+
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	spill := filepath.Join(blocker, "spill")
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: lab-sink\nspec:\n  store:\n    spillDirectory: " + spill + "\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc.bootstrapPath = cfg
+
+	_, err := svc.Reset(ctx, actor(), ResetIn{Reason: "bad spill"})
+	if err == nil {
+		t.Fatal("expected reset to fail on unwritable spill")
+	}
+	if svc.Active() != live {
+		t.Fatal("failed reset swapped snapshot")
+	}
+	if svc.Inbox().Epoch() != epoch {
+		t.Fatal("failed reset bumped epoch")
+	}
+	if _, err := svc.Inbox().Get(id, false); err != nil {
+		t.Fatalf("message gone after failed reset: %v", err)
+	}
+}
+
 func isNotFound(err error) bool {
 	return err != nil && (err.Error() == "message not found" || err == store.ErrNotFound)
 }

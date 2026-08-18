@@ -29,6 +29,7 @@ type Store interface {
 	// ReplaceCaps applies maxMessages/maxBytes/fullPolicy. Shrink + reject
 	// fails with ErrOverNewCap unless force (or the new policy is evict_oldest).
 	ReplaceCaps(opts Options, force bool) error
-	// Configure replaces all store options. Used after Wipe on reset.
+	// Configure replaces all store options. Occupancy is checked against
+	// the new caps before mutation (reject overflow does not change caps).
 	Configure(opts Options) error
 }

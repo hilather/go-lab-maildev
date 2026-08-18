@@ -94,8 +94,8 @@ func TestReplaceStoreCapsRejectWithoutForce(t *testing.T) {
 func TestReplaceStoreCapsForceEvicts(t *testing.T) {
 	svc, boot := mustBoot(t)
 	ctx := context.Background()
-	insertRaw(t, svc, "one")
-	insertRaw(t, svc, "two")
+	first := insertRaw(t, svc, "one")
+	second := insertRaw(t, svc, "two")
 	res, err := svc.Apply(ctx, actor(), ChangeIn{
 		ExpectedRevision: boot.Revision,
 		Force:            true,
@@ -110,6 +110,14 @@ func TestReplaceStoreCapsForceEvicts(t *testing.T) {
 	if svc.Inbox().Stats().MessageCount != 1 {
 		t.Fatalf("count=%d", svc.Inbox().Stats().MessageCount)
 	}
+	if _, err := svc.GetMessage(ctx, actor(), first, false); err == nil {
+		t.Fatal("oldest should be evicted")
+	} else {
+		requireCode(t, err, domainerr.CodeNotFound)
+	}
+	if _, err := svc.GetMessage(ctx, actor(), second, false); err != nil {
+		t.Fatalf("newest should remain: %v", err)
+	}
 	if svc.Active().Canonical.Spec.Store.MaxMessages != 1 {
 		t.Fatal("caps not applied")
 	}
@@ -117,8 +125,8 @@ func TestReplaceStoreCapsForceEvicts(t *testing.T) {
 
 func TestReplaceStoreCapsEvictOldest(t *testing.T) {
 	svc, boot := mustBoot(t)
-	insertRaw(t, svc, "one")
-	insertRaw(t, svc, "two")
+	first := insertRaw(t, svc, "one")
+	second := insertRaw(t, svc, "two")
 	_, err := svc.Apply(context.Background(), actor(), ChangeIn{
 		ExpectedRevision: boot.Revision,
 		Operations:       []model.Operation{shrinkStore(1, model.FullPolicyEvictOldest)},
@@ -128,6 +136,106 @@ func TestReplaceStoreCapsEvictOldest(t *testing.T) {
 	}
 	if svc.Inbox().Stats().MessageCount != 1 {
 		t.Fatalf("count=%d", svc.Inbox().Stats().MessageCount)
+	}
+	if _, err := svc.GetMessage(context.Background(), actor(), first, false); err == nil {
+		t.Fatal("oldest should be evicted")
+	} else {
+		requireCode(t, err, domainerr.CodeNotFound)
+	}
+	if _, err := svc.GetMessage(context.Background(), actor(), second, false); err != nil {
+		t.Fatalf("newest should remain: %v", err)
+	}
+}
+
+func TestPlanReplaceStoreCapsRejectWithoutForce(t *testing.T) {
+	svc, boot := mustBoot(t)
+	insertRaw(t, svc, "one")
+	insertRaw(t, svc, "two")
+	_, err := svc.Plan(context.Background(), actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Operations:       []model.Operation{shrinkStore(1, model.FullPolicyReject)},
+	})
+	requireCode(t, err, domainerr.CodeStoreOverNewCap)
+	if svc.Inbox().Stats().MessageCount != 2 {
+		t.Fatal("plan must not evict")
+	}
+	if svc.Active().Revision != boot.Revision {
+		t.Fatal("plan swapped")
+	}
+}
+
+func TestPlanReplaceStoreCapsDoesNotEvict(t *testing.T) {
+	svc, boot := mustBoot(t)
+	insertRaw(t, svc, "one")
+	insertRaw(t, svc, "two")
+	plan, err := svc.Plan(context.Background(), actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Operations:       []model.Operation{shrinkStore(1, model.FullPolicyEvictOldest)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if svc.Inbox().Stats().MessageCount != 2 {
+		t.Fatal("plan must not evict")
+	}
+	saw := false
+	for _, w := range plan.Warnings {
+		if w.Code == "store_evict" {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Fatalf("missing store_evict warning: %+v", plan.Warnings)
+	}
+}
+
+func TestReplaceStoreCapsLastOpWins(t *testing.T) {
+	svc, boot := mustBoot(t)
+	first := insertRaw(t, svc, "one")
+	second := insertRaw(t, svc, "two")
+	_, err := svc.Apply(context.Background(), actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Operations: []model.Operation{
+			shrinkStore(1, model.FullPolicyReject),
+			shrinkStore(1000, model.FullPolicyReject),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if svc.Inbox().Stats().MessageCount != 2 {
+		t.Fatalf("count=%d", svc.Inbox().Stats().MessageCount)
+	}
+	if _, err := svc.GetMessage(context.Background(), actor(), first, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.GetMessage(context.Background(), actor(), second, false); err != nil {
+		t.Fatal(err)
+	}
+	if svc.Active().Canonical.Spec.Store.MaxMessages != 1000 {
+		t.Fatalf("maxMessages=%d", svc.Active().Canonical.Spec.Store.MaxMessages)
+	}
+}
+
+func TestApplyReplaceSMTPAuthRejectedUntil001b(t *testing.T) {
+	svc, boot := mustBoot(t)
+	_, err := svc.Apply(context.Background(), actor(), ChangeIn{
+		ExpectedRevision: boot.Revision,
+		Operations: []model.Operation{{
+			Op: model.OpReplaceSMTPAuth,
+			Auth: &model.SMTPAuthSpec{
+				Mode:         model.SMTPAuthPlainLogin,
+				Username:     "lab",
+				PasswordFile: "/tmp/does-not-need-to-exist",
+			},
+		}},
+	})
+	requireCode(t, err, domainerr.CodeValidationFailed)
+	if svc.Active().Revision != boot.Revision {
+		t.Fatal("AUTH apply swapped")
+	}
+	if svc.Active().Canonical.Spec.SMTP.Auth.Mode != model.SMTPAuthNone && svc.Active().Canonical.Spec.SMTP.Auth.Mode != "" {
+		t.Fatalf("auth mode=%q", svc.Active().Canonical.Spec.SMTP.Auth.Mode)
 	}
 }
 

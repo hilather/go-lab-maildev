@@ -322,7 +322,7 @@ STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` a
 - SMTP AUTH is PLAIN/LOGIN only. Implicit SMTPS is 1.1.
 - Healthcheck plane in compose changes from SMTP TCP (`node`) to HTTP `/v1/health/ready` (ready still requires SMTP bound).
 - Worst-case RSS ≈ stored `maxBytes` (256 MiB) + `maxInFlightDataBytes` (64 MiB) + ~64 MiB slack ≈ **384 MiB**. Caps are stacked: in-flight does not reduce inbox capacity. Spill on tmpfs does not add a second disk budget — it is still RAM.
-- SMTP AUTH and STARTTLS are not implemented until SMTP-001b; `serve` fail-closes those YAML modes.
+- SMTP AUTH and STARTTLS are not implemented until SMTP-001b; `serve`, live apply, and reset fail-close those YAML modes.
 - Single replica; no shared inbox.
 - MCP clients requiring OAuth PRM cannot authorize. MCPJungle needs `allowLegacyClients: true` (D17).
 - HTML preview blocks remote `https:` images (no tracking pixels).

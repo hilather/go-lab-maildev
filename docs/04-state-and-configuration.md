@@ -144,10 +144,11 @@ Config mutations (plan/apply) use `expectedRevision` = `runtimeRevision`. Inbox 
 
 1. Re-read bootstrap path (never write it).
 2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`.
-3. `store.Wipe()` — **the only epoch bump**. Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
-4. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
-5. Existing SMTP sessions re-load the new snapshot on the next MAIL/RCPT/DATA (or die on QUIT/timeout).
-6. Audit `state.reset`.
+3. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
+4. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
+5. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
+6. Existing SMTP sessions re-load the new snapshot on the next MAIL/RCPT/DATA (or die on QUIT/timeout).
+7. Audit `state.reset`.
 
 Restart is equivalent: process memory dies; spill dir is wiped on next start.
 

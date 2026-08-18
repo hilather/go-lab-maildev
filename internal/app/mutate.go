@@ -138,6 +138,9 @@ func (s *App) Validate(ctx context.Context, actor Actor, in ValidateIn) (*Plan, 
 	if err := applyOperations(base, in.Operations); err != nil {
 		return nil, err
 	}
+	if err := rejectUnimplementedSMTP(base.Spec.SMTP); err != nil {
+		return nil, err
+	}
 	next, err := compileCandidate(ctx, base, prev, s.now())
 	if err != nil {
 		return nil, asDomain(err)
@@ -183,6 +186,9 @@ func (s *App) buildCandidate(ctx context.Context, in ChangeIn, requireRev bool) 
 	if err := applyOperations(copied, in.Operations); err != nil {
 		return nil, err
 	}
+	if err := rejectUnimplementedSMTP(copied.Spec.SMTP); err != nil {
+		return nil, err
+	}
 	next, err := compileCandidate(ctx, copied, prev, s.now())
 	if err != nil {
 		return nil, asDomain(err)
@@ -200,24 +206,27 @@ func (s *App) buildCandidate(ctx context.Context, in ChangeIn, requireRev bool) 
 }
 
 func (s *App) checkStoreCaps(cand *candidate, force, apply bool) error {
-	caps := hasReplaceStoreCaps(cand.ops)
-	if caps == nil || s.inbox == nil {
+	if s.inbox == nil || cand == nil || cand.next == nil || cand.next.Canonical == nil {
 		return nil
 	}
+	if !anyReplaceStoreCaps(cand.ops) {
+		return nil
+	}
+	spec := cand.next.Canonical.Spec.Store
 	stats := s.inbox.Stats()
-	over := stats.MessageCount > caps.MaxMessages || stats.Bytes > caps.MaxBytes
+	over := stats.MessageCount > spec.MaxMessages || stats.Bytes > spec.MaxBytes
 	if !over {
 		if apply {
-			if err := s.inbox.ReplaceCaps(store.OptionsFromSpec(cand.next.Canonical.Spec.Store), force); err != nil {
+			if err := s.inbox.ReplaceCaps(store.OptionsFromSpec(spec), force); err != nil {
 				return mapStoreCapErr(err)
 			}
 		}
 		return nil
 	}
-	if caps.FullPolicy != model.FullPolicyEvictOldest && !force {
+	if spec.FullPolicy != model.FullPolicyEvictOldest && !force {
 		return domainerr.StoreOverNewCap("inbox occupancy exceeds the new store caps")
 	}
-	n := stats.MessageCount - caps.MaxMessages
+	n := stats.MessageCount - spec.MaxMessages
 	if n < 0 {
 		n = 0
 	}
@@ -226,7 +235,7 @@ func (s *App) checkStoreCaps(cand *candidate, force, apply bool) error {
 		Message: fmt.Sprintf("apply evicts oldest messages to fit new caps (at least %d)", n),
 	})
 	if apply {
-		if err := s.inbox.ReplaceCaps(store.OptionsFromSpec(cand.next.Canonical.Spec.Store), force); err != nil {
+		if err := s.inbox.ReplaceCaps(store.OptionsFromSpec(spec), force); err != nil {
 			return mapStoreCapErr(err)
 		}
 	}

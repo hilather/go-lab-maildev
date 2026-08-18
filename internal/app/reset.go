@@ -39,10 +39,18 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 		return nil, err
 	}
 
-	// Wipe is the only epoch bump. Do this only after compile succeeds.
+	if err := rejectUnimplementedSMTP(next.Canonical.Spec.SMTP); err != nil {
+		return nil, err
+	}
+
+	// Validate new store options (including creatable spill dir) before
+	// Wipe so a failed Reset cannot empty the inbox under the old snapshot.
 	if s.inbox != nil {
-		s.inbox.Wipe()
-		if err := s.inbox.Configure(store.OptionsFromSpec(next.Canonical.Spec.Store)); err != nil {
+		opts, err := store.CheckOptions(store.OptionsFromSpec(next.Canonical.Spec.Store))
+		if err != nil {
+			return nil, asDomain(err)
+		}
+		if err := s.inbox.ResetTo(opts); err != nil {
 			return nil, asDomain(err)
 		}
 	}

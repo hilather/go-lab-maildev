@@ -56,11 +56,11 @@ func applyOne(st *model.State, op model.Operation, i int) error {
 	return nil
 }
 
-func hasReplaceStoreCaps(ops []model.Operation) *model.StoreCaps {
+func anyReplaceStoreCaps(ops []model.Operation) bool {
 	for i := range ops {
-		if ops[i].Op == model.OpReplaceStoreCaps && ops[i].Store != nil {
-			return ops[i].Store
+		if ops[i].Op == model.OpReplaceStoreCaps {
+			return true
 		}
 	}
-	return nil
+	return false
 }

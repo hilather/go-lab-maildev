@@ -19,7 +19,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
-- None.
+- Reset preflights store options (including a creatable spill directory) and installs new caps under one lock, so a failed reset cannot empty the inbox under the old snapshot.
 
 ### Removed or deprecated
 

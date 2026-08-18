@@ -118,7 +118,7 @@ The one-release `internal/maildev` flag shim matrix lives in [docs/13-integratio
 2. Unauthenticated `GET /email` → **401**.
 3. Basic-authenticated `GET /email` eventually contains the sent `subject`.
 
-Goldens for `subject`/`from`/`to` plus attachment `fileName` (no `stream`) live in `testdata/compat/`. `TestMaildevScenarioCompat` in `internal/control/compat/scenario_test.go` (401 + Basic + subject + `SendMail`) is mandatory; the lab swap copies that name. Overlay files: [docs/13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md).
+Goldens for `subject`/`from`/`to` plus attachment `fileName` (no `stream`) live in `testdata/compat/`. `TestMaildevScenarioCompat` in `internal/control/compat/scenario_test.go` (401 + Basic + subject + `SendMail`) is mandatory; the lab swap copies that name. `TestSideBySideMaildev221` in `cmd/labmail` runs the same `compatcheck.Probe` client against shipped `labmail serve` and, when Docker is available, live `maildev/maildev:2.2.1`. Shared-shape fields (`subject`, `from`/`to` address+name, `priority`, header `from`/`to`/`subject`, attachment `fileName`) must match. Overlay files: [docs/13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md).
 
 ## Compatibility promise
 

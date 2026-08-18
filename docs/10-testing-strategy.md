@@ -37,7 +37,7 @@ make test-parity test-config-compat test-docs
 make test-container security-scan test-changelog
 ```
 
-FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat`. `generate`, `verify-generated`, `test-parity`, `test-container`, and `test-changelog` fail closed until their owning PR.
+FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-fuzz-smoke`, `test-docs`, and `security-scan`. CFG-001 implements `test-config-compat` and extends `test-fuzz-smoke` with `FuzzDecode`. `generate`, `verify-generated`, `test-parity`, `test-container`, and `test-changelog` fail closed until their owning PR.
 
 ## Required CI (FND-001)
 

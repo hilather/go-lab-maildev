@@ -9,7 +9,7 @@ Desired state is YAML. The inbox is not. Config revision is a content hash of th
 
 ## YAML bootstrap schema
 
-One document. UTF-8. No aliases/anchors. No duplicate keys. No multi-doc streams. Max file size 1 MiB. Unknown fields are errors (`yaml.Decoder.KnownFields(true)`). Durations use Go syntax (`30s`, `5m`). Byte sizes use binary units (`10MiB`, `256KiB`) via a typed `config.ByteSize` (bare numbers are rejected). Secret values are **file references**, never inline (except optional dev-only `environment:` when `LABMAIL_ALLOW_ENV_SECRETS=1`, default off in the image).
+One document. UTF-8. No aliases/anchors. No duplicate keys. No multi-doc streams. Max file size 1 MiB. Unknown fields are errors (`yaml.Decoder.KnownFields(true)`). Durations use Go syntax (`30s`, `5m`). Byte sizes use binary units (`10MiB`, `256KiB`) via a typed `config.ByteSize` (bare numbers are rejected). Secret values are **file references** only. CFG-001 / 1.0 reject `environment:` as an unknown field (`validation_failed`); there is no `LABMAIL_ALLOW_ENV_SECRETS` gate. Inline env secrets need a later ADR. Keep `additionalProperties: false`.
 
 ```yaml
 apiVersion: labmail.dev/v1alpha1

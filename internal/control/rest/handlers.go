@@ -12,6 +12,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 )
 
 func (s *Server) dispatch(w http.ResponseWriter, r *http.Request, instance string, actor app.Actor, rt compiledRoute, params map[string]string) {
@@ -115,7 +116,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request, instance s
 		return
 	}
 	out := statusResponse{
-		Ready:     st.Ready,
+		Ready:     s.isReady(ctx),
 		Revisions: rev,
 		Listeners: []listenerJSON{},
 		Store: storeStatsJSON{
@@ -304,6 +305,9 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, instance 
 		s.writeProblem(w, r, instance, domainerr.NotFound("metrics public path is disabled"))
 		return
 	}
-	s.writeBytes(w, http.StatusOK, "text/plain; version=0.0.4; charset=utf-8", []byte("# LabMail OpenMetrics catalog lands in OBS-001.\n# EOF\n"))
+	w.Header().Set("Content-Type", observability.OpenMetricsContentType)
+	w.WriteHeader(http.StatusOK)
+	_ = s.metrics.WriteOpenMetrics(w)
 	_ = r
+	_ = instance
 }

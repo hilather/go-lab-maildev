@@ -46,13 +46,19 @@ func copyDefaults(t *testing.T) string {
 	return path
 }
 
-func newTestServer(t *testing.T) (*Server, *app.App) {
+func bootTestApp(t *testing.T) *app.App {
 	t.Helper()
 	svc, err := app.Boot(context.Background(), app.Options{BootstrapPath: copyDefaults(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(svc.Close)
+	return svc
+}
+
+func newTestServer(t *testing.T) (*Server, *app.App) {
+	t.Helper()
+	svc := bootTestApp(t)
 	s, err := New(Config{Service: svc, RatePerSec: -1})
 	if err != nil {
 		t.Fatal(err)

@@ -500,7 +500,7 @@
     },
     "/v1/health/ready": {
       "get": {
-        "description": "Readiness (valid snapshot, listeners bound). Not an MCP tool.",
+        "description": "SMTP bound, store initialized, and management bound or explicitly off. Not an MCP tool.",
         "operationId": "get_v1_health_ready",
         "parameters": [],
         "responses": {

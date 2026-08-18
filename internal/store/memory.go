@@ -15,6 +15,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/mimeparse"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 )
 
 var spillName = regexp.MustCompile(`(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}(-[0-9]+)?\.(raw|att)(\.tmp)?$`)
@@ -61,6 +62,9 @@ type Memory struct {
 	byID       map[string]*record
 	order      []string
 	subs       []*subscriber
+	waiters    int
+	metrics    *observability.Registry
+	logger     *observability.Logger
 }
 
 type record struct {
@@ -111,6 +115,34 @@ func New(opts Options) (*Memory, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+// SetTelemetry attaches optional metrics and slog events. Nil is a no-op.
+func (m *Memory) SetTelemetry(r *observability.Registry, l *observability.Logger) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.metrics = r
+	m.logger = l
+	m.publishLocked()
+}
+
+func (m *Memory) publishLocked() {
+	if m.metrics == nil {
+		return
+	}
+	m.metrics.Set(observability.MetricStoreMessages, nil, float64(len(m.byID)))
+	m.metrics.Set(observability.MetricStoreBytes, nil, float64(m.bytes))
+	m.metrics.Set(observability.MetricStoreWaiters, nil, float64(m.waiters))
+}
+
+func (m *Memory) logStore(rec observability.Record) {
+	if m == nil || m.logger == nil || rec.Event == "" {
+		return
+	}
+	m.logger.Log(rec)
 }
 
 func ensureSpillDir(dir string) error {
@@ -193,12 +225,19 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 		}
 	}()
 
+	var recLog observability.Record
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer func() {
+		m.mu.Unlock()
+		m.logStore(recLog)
+	}()
 	if epoch != m.epoch {
 		return model.InsertResult{}, ErrStaleEpoch
 	}
 	if err := m.canAcceptLocked(candidate); err != nil {
+		if errors.Is(err, ErrFull) {
+			recLog = observability.Record{Event: observability.EventStoreFull, Component: "store", Result: "store_full"}
+		}
 		return model.InsertResult{}, err
 	}
 	rec := &record{msg: prepared, resident: candidate}
@@ -215,6 +254,14 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 	m.generation++
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventMailReceived, ID: id, Subject: prepared.Subject, Generation: m.generation})
+	m.publishLocked()
+	recLog = observability.Record{
+		Event:           observability.EventStoreInserted,
+		Component:       "store",
+		MessageID:       id,
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	}
 	committed = true
 	return model.InsertResult{ID: id, Generation: m.generation}, nil
 }
@@ -420,26 +467,36 @@ func newerThanCursor(msg *model.Message, cur cursorPos) bool {
 
 // Delete removes one message.
 func (m *Memory) Delete(id string) error {
+	var recLog observability.Record
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if _, ok := m.byID[id]; !ok {
+		m.mu.Unlock()
 		return ErrNotFound
 	}
-	m.removeLocked(id, false)
+	recLog = m.removeLocked(id, false)
+	m.mu.Unlock()
+	m.logStore(recLog)
 	return nil
 }
 
 // DeleteAll empties the inbox without bumping epoch.
 func (m *Memory) DeleteAll() (int, error) {
+	var recs []observability.Record
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	n := len(m.byID)
 	if n == 0 {
+		m.mu.Unlock()
 		return 0, nil
 	}
 	ids := append([]string(nil), m.order...)
 	for _, id := range ids {
-		m.removeLocked(id, false)
+		if rec := m.removeLocked(id, false); rec.Event != "" {
+			recs = append(recs, rec)
+		}
+	}
+	m.mu.Unlock()
+	for _, rec := range recs {
+		m.logStore(rec)
 	}
 	return n, nil
 }
@@ -515,7 +572,14 @@ func (m *Memory) Wait(ctx context.Context, filter model.MessageFilter) (*model.M
 			m.mu.Unlock()
 			return nil, err
 		}
+		m.waiters++
+		m.publishLocked()
 		m.cond.Wait()
+		m.waiters--
+		if m.waiters < 0 {
+			m.waiters = 0
+		}
+		m.publishLocked()
 	}
 }
 
@@ -638,7 +702,6 @@ func (m *Memory) ResetTo(opts Options) error {
 		return err
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.epoch++
 	m.generation++
 	m.byID = make(map[string]*record)
@@ -653,6 +716,15 @@ func (m *Memory) ResetTo(opts Options) error {
 	m.spillThreshold = opts.SpillThreshold
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
+	m.publishLocked()
+	recLog := observability.Record{
+		Event:           observability.EventStoreWiped,
+		Component:       "store",
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	}
+	m.mu.Unlock()
+	m.logStore(recLog)
 	return nil
 }
 
@@ -662,7 +734,6 @@ func (m *Memory) Wipe() {
 		return
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.epoch++
 	m.generation++
 	m.byID = make(map[string]*record)
@@ -671,12 +742,21 @@ func (m *Memory) Wipe() {
 	_ = m.unlinkAllSpill()
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
+	m.publishLocked()
+	recLog := observability.Record{
+		Event:           observability.EventStoreWiped,
+		Component:       "store",
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	}
+	m.mu.Unlock()
+	m.logStore(recLog)
 }
 
-func (m *Memory) removeLocked(id string, eviction bool) {
+func (m *Memory) removeLocked(id string, eviction bool) observability.Record {
 	rec, ok := m.byID[id]
 	if !ok {
-		return
+		return observability.Record{}
 	}
 	delete(m.byID, id)
 	for i, oid := range m.order {
@@ -693,6 +773,9 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 	m.generation++
 	if eviction {
 		m.evictions++
+		if m.metrics != nil {
+			m.metrics.Inc(observability.MetricStoreEvictions, nil, 1)
+		}
 	}
 	m.cond.Broadcast()
 	subj := ""
@@ -700,6 +783,17 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 		subj = rec.msg.Subject
 	}
 	m.emitLocked(Event{Type: EventMailDeleted, ID: id, Subject: subj, Generation: m.generation})
+	m.publishLocked()
+	if eviction {
+		return observability.Record{}
+	}
+	return observability.Record{
+		Event:           observability.EventStoreDeleted,
+		Component:       "store",
+		MessageID:       id,
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	}
 }
 
 type recSnap struct {

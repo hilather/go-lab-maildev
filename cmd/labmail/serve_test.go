@@ -7,6 +7,7 @@ import (
 	"net/smtp"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -77,10 +78,24 @@ func TestServeAcceptsAuthMode(t *testing.T) {
 	}
 }
 
+func writeServeConfig(t *testing.T, metricsListen string, publicPath bool) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  observability:\n    metrics:\n      listen: " + strconvQuote(metricsListen) + "\n      publicPath: " + strconv.FormatBool(publicPath) + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func strconvQuote(s string) string {
+	return `"` + s + `"`
+}
+
 func TestServeSendMail(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	path := testdataConfig(t, "valid", "defaults.yaml")
+	path := writeServeConfig(t, "", false)
 	pid := filepath.Join(t.TempDir(), "labmail.pid")
 	var stdout, stderr safeBuffer
 	done := make(chan int, 1)
@@ -124,7 +139,7 @@ func TestServeSendMail(t *testing.T) {
 func TestServeBindsManagement(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	path := testdataConfig(t, "valid", "defaults.yaml")
+	path := writeServeConfig(t, "", false)
 	var stdout, stderr safeBuffer
 	done := make(chan int, 1)
 	go func() {
@@ -186,6 +201,19 @@ func TestServeBindsManagement(t *testing.T) {
 	_ = mcpResp.Body.Close()
 	if mcpResp.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("mcp GET status=%d want 405", mcpResp.StatusCode)
+	}
+	hidden := doHTTP(t, "http://"+mgmt+"/v1/metrics")
+	defer hidden.Body.Close()
+	if hidden.StatusCode != http.StatusNotFound {
+		t.Fatalf("publicPath false: metrics status=%d", hidden.StatusCode)
+	}
+
+	var hcOut, hcErr bytes.Buffer
+	if code := healthcheckCmd([]string{"--url", "http://" + mgmt + "/v1/health/ready"}, &hcOut, &hcErr); code != 0 {
+		t.Fatalf("healthcheck exit %d stderr=%q", code, hcErr.String())
+	}
+	if !strings.Contains(hcOut.String(), "ok") {
+		t.Fatalf("healthcheck stdout=%q", hcOut.String())
 	}
 	cancel()
 	select {
@@ -258,6 +286,133 @@ func TestServeCompatDisabled(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("serve did not exit")
+	}
+}
+
+func TestServeMetricsListenAndPublicPath(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	path := writeServeConfig(t, "127.0.0.1:0", true)
+	var stdout, stderr safeBuffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serveCmd(ctx, []string{
+			"--config", path,
+			"--smtp-listen", "127.0.0.1:0",
+			"--management-listen", "127.0.0.1:0",
+		}, &stdout, &stderr)
+	}()
+	_ = waitSMTPListen(t, &stdout)
+	mgmt := waitPrefix(t, &stdout, "labmail management listen=")
+	metricsAddr := waitPrefix(t, &stdout, "labmail metrics listen=")
+
+	pub := waitHTTP(t, "http://"+mgmt+"/v1/metrics")
+	defer pub.Body.Close()
+	if pub.StatusCode != 200 {
+		t.Fatalf("publicPath true: status=%d", pub.StatusCode)
+	}
+	if !strings.Contains(pub.Header.Get("Content-Type"), "openmetrics") {
+		t.Fatalf("content-type=%s", pub.Header.Get("Content-Type"))
+	}
+
+	scrape := waitHTTP(t, "http://"+metricsAddr+"/metrics")
+	defer scrape.Body.Close()
+	if scrape.StatusCode != 200 {
+		t.Fatalf("scrape status=%d", scrape.StatusCode)
+	}
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("serve exit %d stderr=%q", code, stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not exit")
+	}
+}
+
+func waitHTTP(t *testing.T, url string) *http.Response {
+	t.Helper()
+	var resp *http.Response
+	var err error
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err = http.Get(url)
+		if err == nil {
+			return resp
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("GET %s: %v", url, err)
+	return nil
+}
+
+func doHTTP(t *testing.T, url string) *http.Response {
+	t.Helper()
+	return waitHTTP(t, url)
+}
+
+func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
+	ctx := context.Background()
+	path := writeServeConfig(t, "", false)
+	rt, err := serveFromConfig(ctx, serveFlags{
+		Config:           path,
+		SMTPListen:       "127.0.0.1:0",
+		ManagementListen: "127.0.0.1:0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		shctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = rt.shutdown(shctx)
+	})
+	readyURL := "http://" + rt.http.Addr() + "/v1/health/ready"
+	statusURL := "http://" + rt.http.Addr() + "/v1/status"
+	got := waitHTTP(t, readyURL)
+	if got.StatusCode != http.StatusOK {
+		got.Body.Close()
+		t.Fatalf("ready before smtp stop: %d", got.StatusCode)
+	}
+	got.Body.Close()
+
+	shctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	if err := rt.smtp.Shutdown(shctx); err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	cancel()
+	if rt.smtp.Accepting() {
+		t.Fatal("SMTP still accepting after Shutdown")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	var ready *http.Response
+	for time.Now().Before(deadline) {
+		ready, err = http.Get(readyURL)
+		if err == nil && ready.StatusCode == http.StatusServiceUnavailable {
+			break
+		}
+		if ready != nil {
+			ready.Body.Close()
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ready.Body.Close()
+	if ready.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("ready after smtp stop: %d", ready.StatusCode)
+	}
+	st := waitHTTP(t, statusURL)
+	defer st.Body.Close()
+	if st.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", st.StatusCode)
 	}
 }
 

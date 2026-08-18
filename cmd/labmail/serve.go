@@ -14,10 +14,12 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
+	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/control/compat"
 	"github.com/hilather/go-lab-maildev/internal/control/mcp"
 	"github.com/hilather/go-lab-maildev/internal/control/rest"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/smtp/server"
 )
 
@@ -69,6 +71,9 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 	} else {
 		_, _ = fmt.Fprintf(stdout, "labmail management listen=%s\n", rt.http.Addr())
 	}
+	if rt.metrics != nil && rt.metrics.Addr() != "" {
+		_, _ = fmt.Fprintf(stdout, "labmail metrics listen=%s\n", rt.metrics.Addr())
+	}
 	<-ctx.Done()
 	deadline := flags.ShutdownTimeout
 	if deadline <= 0 {
@@ -82,19 +87,36 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 }
 
 type serveRuntime struct {
-	smtp    *server.Server
-	http    *rest.Server
-	svc     *app.App
-	pidPath string
+	smtp     *server.Server
+	http     *rest.Server
+	svc      *app.App
+	metrics  *observability.Listener
+	stopLogs context.CancelFunc
+	pidPath  string
 }
 
 func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, error) {
-	svc, err := app.Boot(ctx, app.Options{BootstrapPath: flags.Config})
+	st, err := config.LoadFile(flags.Config)
 	if err != nil {
+		return nil, fmt.Errorf("load %s: %w", flags.Config, err)
+	}
+	reg := observability.NewRegistry()
+	log := observability.NewLogger(os.Stderr, observability.ParseLevel(st.Spec.Observability.LogLevel)).
+		WithQueue(observability.DefaultQueueSize).WithMetrics(reg)
+	logCtx, stopLogs := context.WithCancel(context.Background())
+	go log.Serve(logCtx)
+	svc, err := app.Boot(ctx, app.Options{
+		BootstrapPath: flags.Config,
+		Metrics:       reg,
+		Logger:        log,
+	})
+	if err != nil {
+		stopLogs()
 		return nil, fmt.Errorf("load %s: %w", flags.Config, err)
 	}
 	snap := svc.Active()
 	if snap == nil || snap.Canonical == nil {
+		stopLogs()
 		svc.Close()
 		return nil, fmt.Errorf("compile: no snapshot")
 	}
@@ -107,26 +129,45 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 		Spec:      snap.Canonical.Spec.SMTP,
 		Store:     svc.Inbox(),
 		Snapshots: svc.Snapshots(),
+		Metrics:   reg,
+		Logger:    log,
 	})
 	if err != nil {
+		stopLogs()
 		svc.Close()
 		return nil, err
 	}
 	if err := srv.Start(); err != nil {
+		stopLogs()
 		svc.Close()
 		return nil, err
 	}
-	rt := &serveRuntime{smtp: srv, svc: svc, pidPath: flags.PIDFile}
+	rt := &serveRuntime{smtp: srv, svc: svc, stopLogs: stopLogs, pidPath: flags.PIDFile}
 	mgmt, unbound := managementListen(flags.ManagementListen, snap.Canonical.Spec.Listeners.Management.Address)
 	if !unbound {
-		hs, err := startManagement(svc, srv, mgmt, snap.Canonical.Spec)
+		hs, err := startManagement(svc, mgmt, snap.Canonical.Spec, reg, log)
 		if err != nil {
+			stopLogs()
 			_ = srv.Shutdown(context.Background())
 			svc.Close()
 			return nil, err
 		}
 		rt.http = hs
 	}
+	svc.SetHealth(func() observability.Facts {
+		return observability.Facts{
+			SMTPBound: srv.Accepting(),
+			StoreUp:   svc.Inbox() != nil,
+			MgmtBound: rt.http != nil,
+			MgmtOff:   unbound,
+		}
+	})
+	ml, err := observability.Listen(snap.Canonical.Spec.Observability.Metrics.Listen, reg)
+	if err != nil {
+		_ = rt.shutdown(context.Background())
+		return nil, fmt.Errorf("metrics listen: %w", err)
+	}
+	rt.metrics = ml
 	if err := writePIDFile(flags.PIDFile); err != nil {
 		_ = rt.shutdown(context.Background())
 		return nil, fmt.Errorf("pid-file: %w", err)
@@ -134,7 +175,7 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 	return rt, nil
 }
 
-func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.Spec) (*rest.Server, error) {
+func startManagement(svc *app.App, addr string, spec model.Spec, reg *observability.Registry, log *observability.Logger) (*rest.Server, error) {
 	if addr == "" {
 		addr = rest.DefaultAddr
 	}
@@ -142,7 +183,9 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 	if err != nil {
 		return nil, err
 	}
-	ready := func() bool { return smtp.Addr() != nil }
+	ready := func() bool {
+		return observability.Evaluate(svc.HealthFacts()).Ready
+	}
 	mcpPath := spec.Listeners.Management.MCPPath
 	if mcpPath == "" {
 		mcpPath = mcp.DefaultPath
@@ -178,6 +221,8 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 		RatePerSec:     float64(spec.Management.RequestsPerSecond),
 		RateBurst:      float64(spec.Management.Burst),
 		PublicMetrics:  spec.Observability.Metrics.PublicPath,
+		Metrics:        reg,
+		Logger:         log,
 		Mounts:         mounts,
 		Ready:          ready,
 	})
@@ -234,8 +279,17 @@ func (r *serveRuntime) shutdown(ctx context.Context) error {
 			first = err
 		}
 	}
+	if r.metrics != nil {
+		if err := r.metrics.Shutdown(ctx); err != nil && first == nil {
+			first = err
+		}
+	}
 	if r.svc != nil {
 		r.svc.Close()
+	}
+	if r.stopLogs != nil {
+		r.stopLogs()
+		r.stopLogs = nil
 	}
 	if r.pidPath != "" {
 		_ = os.Remove(r.pidPath)

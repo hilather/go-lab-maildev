@@ -9,6 +9,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
@@ -75,6 +76,14 @@ func (s *App) resetLocked(ctx context.Context, actor Actor, in ResetIn) (*ApplyR
 		Applied:         true,
 		Generation:      next.Generation,
 		RuntimeRevision: next.Revision,
+	}
+	if s.logger != nil {
+		s.logger.Log(observability.Record{
+			Event:           observability.EventStateReset,
+			Component:       "app",
+			Result:          "ok",
+			StoreGeneration: storeGeneration(s.inbox),
+		})
 	}
 	res.AuditEventID = s.recordAudit(ctx, audit.Event{
 		Time:            s.now(),

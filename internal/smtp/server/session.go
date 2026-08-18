@@ -11,6 +11,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/mimeparse"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/smtp/codec"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
@@ -38,20 +39,25 @@ type session struct {
 	sizeSet      bool
 	tls          bool
 	authed       bool
+	endResult    string
 }
 
 func (s *session) run() {
+	defer s.finish()
 	if err := s.reply(220, s.spec().Hostname+" LabMail ready"); err != nil {
 		return
 	}
 	for {
 		if err := s.setIdle(s.spec().Admission.CommandIdle); err != nil {
+			s.endResult = "timeout"
 			return
 		}
 		line, err := s.rd.ReadCommandLine()
 		if err != nil {
 			if errors.Is(err, codec.ErrLineTooLong) {
 				_ = s.reply(500, "5.5.2 Line too long")
+			} else if isTimeout(err) {
+				s.endResult = "timeout"
 			}
 			return
 		}
@@ -232,10 +238,12 @@ func (s *session) cmdData() bool {
 		switch {
 		case errors.Is(err, errMessageTooLarge):
 			_ = s.reply(552, "5.3.4 Message too large")
+			s.noteMessage("too_large", 552, "")
 			s.resetToHelloed()
 			return true
 		case errors.Is(err, errDiscardBudget):
 			_ = s.reply(552, "5.3.4 Message too large")
+			s.noteMessage("too_large", 552, "")
 			s.resetToHelloed()
 			return false
 		case errors.Is(err, codec.ErrLineTooLong):
@@ -244,6 +252,7 @@ func (s *session) cmdData() bool {
 			return false
 		case isTimeout(err):
 			_ = s.reply(451, "4.4.2 Timeout")
+			s.endResult = "timeout"
 			s.resetToHelloed()
 			return false
 		default:
@@ -268,8 +277,10 @@ func (s *session) cmdData() bool {
 			_ = s.reply(451, "4.3.2 Requested action aborted")
 		case errors.Is(err, store.ErrFull):
 			_ = s.reply(452, "4.3.1 Insufficient storage")
+			s.noteMessage("store_full", 452, "")
 		case errors.Is(err, store.ErrTooLarge):
 			_ = s.reply(552, "5.3.4 Message too large")
+			s.noteMessage("too_large", 552, "")
 		default:
 			_ = s.reply(451, "4.3.2 Requested action aborted")
 		}
@@ -277,8 +288,41 @@ func (s *session) cmdData() bool {
 		return true
 	}
 	_ = s.reply(250, "2.0.0 Queued as "+res.ID)
+	s.noteMessage("accepted", 250, res.ID)
 	s.resetToHelloed()
 	return true
+}
+
+func (s *session) noteMessage(result string, code int, id string) {
+	s.srv.incMessage(result)
+	ev := observability.EventSMTPRejected
+	if result == "accepted" {
+		ev = observability.EventSMTPAccepted
+	}
+	s.srv.logSMTP(observability.Record{
+		Event:     ev,
+		Component: "smtp",
+		MessageID: id,
+		SMTPCode:  code,
+		Result:    result,
+		Remote:    s.conn.RemoteAddr().String(),
+	})
+}
+
+func (s *session) finish() {
+	result := s.endResult
+	if result == "" {
+		result = "ok"
+	}
+	s.srv.incSession(result)
+	s.srv.observeSession(time.Since(s.started))
+	s.srv.logSMTP(observability.Record{
+		Event:      observability.EventSMTPSessionEnd,
+		Component:  "smtp",
+		Result:     result,
+		DurationMS: float64(time.Since(s.started).Milliseconds()),
+		Remote:     s.conn.RemoteAddr().String(),
+	})
 }
 
 func (s *session) readData(max int64) ([]byte, error) {

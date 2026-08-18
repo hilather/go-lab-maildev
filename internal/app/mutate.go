@@ -8,6 +8,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/audit"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
@@ -88,6 +89,13 @@ func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*Apply
 		Applied:         true,
 		Generation:      cand.next.Generation,
 		RuntimeRevision: cand.next.Revision,
+	}
+	if s.logger != nil {
+		s.logger.Log(observability.Record{
+			Event:     observability.EventStateApply,
+			Component: "app",
+			Result:    "ok",
+		})
 	}
 	res.AuditEventID = s.recordAudit(ctx, audit.Event{
 		Time:       s.now(),

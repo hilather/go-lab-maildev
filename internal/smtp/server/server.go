@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/smtp/codec"
 	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
@@ -43,15 +44,20 @@ type Options struct {
 	Store   store.Sink
 	// Snapshots, when set, is re-read on every MAIL, RCPT, and DATA.
 	Snapshots *snapshot.Store
+	// Metrics and Logger are optional. Nil is a no-op.
+	Metrics *observability.Registry
+	Logger  *observability.Logger
 }
 
 // Server is a plain SMTP receive listener.
 type Server struct {
-	addr  string
-	spec  atomic.Pointer[model.SMTPSpec]
-	snaps *snapshot.Store
-	store store.Sink
-	gate  *gate
+	addr    string
+	spec    atomic.Pointer[model.SMTPSpec]
+	snaps   *snapshot.Store
+	store   store.Sink
+	gate    *gate
+	metrics *observability.Registry
+	logger  *observability.Logger
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -81,13 +87,15 @@ func New(opts Options) (*Server, error) {
 	spec := withSpecDefaults(opts.Spec)
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
-		addr:   opts.Address,
-		snaps:  opts.Snapshots,
-		store:  sink,
-		gate:   newGate(),
-		ctx:    ctx,
-		cancel: cancel,
-		conns:  make(map[net.Conn]struct{}),
+		addr:    opts.Address,
+		snaps:   opts.Snapshots,
+		store:   sink,
+		gate:    newGate(),
+		metrics: opts.Metrics,
+		logger:  opts.Logger,
+		ctx:     ctx,
+		cancel:  cancel,
+		conns:   make(map[net.Conn]struct{}),
 	}
 	s.spec.Store(&spec)
 	return s, nil
@@ -138,7 +146,9 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Addr is the bound address, or nil before Start.
+// Addr is the last bound address, or nil before Start. It stays set after
+// Shutdown so callers can log the former listen address. Use Accepting to
+// decide whether new sessions are still admitted.
 func (s *Server) Addr() net.Addr {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -146,6 +156,17 @@ func (s *Server) Addr() net.Addr {
 		return nil
 	}
 	return s.ln.Addr()
+}
+
+// Accepting is true after Start and before Shutdown begins (listener still
+// admits connections). Ready probes must use this, not Addr() != nil.
+func (s *Server) Accepting() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.started && !s.stopped && s.ln != nil
 }
 
 // Shutdown stops accepts, closes sessions, and waits up to ctx.
@@ -248,9 +269,21 @@ func (s *Server) serveConn(conn net.Conn) {
 	if err := s.gate.acquire(ip, spec.Admission); err != nil {
 		_ = conn.SetDeadline(time.Now().Add(writeWait))
 		_ = codec.WriteReply(conn, 421, "4.3.2 Too many connections")
+		s.incSession("rejected")
+		s.logSMTP(observability.Record{
+			Event:     observability.EventSMTPRejected,
+			Component: "smtp",
+			SMTPCode:  421,
+			Result:    "rejected",
+			Remote:    conn.RemoteAddr().String(),
+		})
 		return
 	}
-	defer s.gate.release(ip)
+	defer func() {
+		s.gate.release(ip)
+		s.setActive()
+	}()
+	s.setActive()
 
 	sess := &session{
 		srv:     s,
@@ -260,6 +293,45 @@ func (s *Server) serveConn(conn net.Conn) {
 		state:   stateGreeting,
 	}
 	sess.run()
+}
+
+func (s *Server) incSession(result string) {
+	if s == nil || s.metrics == nil {
+		return
+	}
+	s.metrics.Inc(observability.MetricSMTPSessionsTotal, map[string]string{
+		"result": observability.SMTPSessionResult(result),
+	}, 1)
+}
+
+func (s *Server) incMessage(result string) {
+	if s == nil || s.metrics == nil {
+		return
+	}
+	s.metrics.Inc(observability.MetricSMTPMessagesTotal, map[string]string{
+		"result": observability.SMTPMessageResult(result),
+	}, 1)
+}
+
+func (s *Server) setActive() {
+	if s == nil || s.metrics == nil {
+		return
+	}
+	s.metrics.Set(observability.MetricSMTPSessionsActive, nil, float64(s.gate.Sessions()))
+}
+
+func (s *Server) observeSession(d time.Duration) {
+	if s == nil || s.metrics == nil {
+		return
+	}
+	s.metrics.Observe(observability.MetricSMTPSessionDuration, nil, d.Seconds())
+}
+
+func (s *Server) logSMTP(rec observability.Record) {
+	if s == nil || s.logger == nil {
+		return
+	}
+	s.logger.Log(rec)
 }
 
 func withSpecDefaults(s model.SMTPSpec) model.SMTPSpec {

@@ -11,6 +11,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
@@ -29,6 +30,8 @@ type Options struct {
 	IdempotencyMax int
 	AuditMax       int
 	Auditor        audit.Sink
+	Metrics        *observability.Registry
+	Logger         *observability.Logger
 }
 
 // App is the process-local Service implementation.
@@ -41,6 +44,10 @@ type App struct {
 	idemp         *idempCache
 	audit         *audit.Fanout
 	resetHooks    []func()
+	metrics       *observability.Registry
+	logger        *observability.Logger
+	healthMu      sync.Mutex
+	health        func() observability.Facts
 }
 
 var _ Service = (*App)(nil)
@@ -65,6 +72,9 @@ func New(opts Options) *App {
 			auditMax = defaultAuditMax
 		}
 	}
+	if opts.Inbox != nil {
+		opts.Inbox.SetTelemetry(opts.Metrics, opts.Logger)
+	}
 	return &App{
 		snaps:         opts.Snapshots,
 		inbox:         opts.Inbox,
@@ -72,6 +82,8 @@ func New(opts Options) *App {
 		bootstrapPath: opts.BootstrapPath,
 		idemp:         newIdempCache(idempMax),
 		audit:         audit.NewFanout(auditMax, opts.Auditor),
+		metrics:       opts.Metrics,
+		logger:        opts.Logger,
 	}
 }
 
@@ -133,6 +145,35 @@ func (s *App) Close() {
 		return
 	}
 	s.inbox.Wipe()
+}
+
+// SetHealth installs live listener facts for Status.Ready / Evaluate.
+// A nil fn restores the store-only default (listeners assumed up).
+func (s *App) SetHealth(fn func() observability.Facts) {
+	if s == nil {
+		return
+	}
+	s.healthMu.Lock()
+	s.health = fn
+	s.healthMu.Unlock()
+}
+
+// HealthFacts is the input to observability.Evaluate. Without SetHealth,
+// Ready means the inbox exists (HTTP-less / httptest default).
+func (s *App) HealthFacts() observability.Facts {
+	if s == nil {
+		return observability.Facts{}
+	}
+	s.healthMu.Lock()
+	fn := s.health
+	s.healthMu.Unlock()
+	storeUp := s.inbox != nil
+	if fn != nil {
+		f := fn()
+		f.StoreUp = storeUp
+		return f
+	}
+	return observability.Facts{StoreUp: storeUp, SMTPBound: storeUp, MgmtBound: storeUp}
 }
 
 func (s *App) requireCtx(ctx context.Context) error {

@@ -1,0 +1,369 @@
+{
+  "id": "labmail.dev/metrics/v1alpha1",
+  "version": "v1alpha1",
+  "allowedLabels": [
+    "capability",
+    "code_class",
+    "component",
+    "event",
+    "reason",
+    "result",
+    "tool"
+  ],
+  "forbiddenLabels": [
+    "actor",
+    "actor_id",
+    "address",
+    "authorization",
+    "body",
+    "client",
+    "client_ip",
+    "data",
+    "detail",
+    "err",
+    "error",
+    "error_text",
+    "from",
+    "idempotency",
+    "idempotency_key",
+    "message",
+    "password",
+    "peer",
+    "raw",
+    "remote_addr",
+    "source_ip",
+    "src",
+    "src_ip",
+    "subject",
+    "to"
+  ],
+  "metrics": [
+    {
+      "name": "labmail_audit_events_total",
+      "kind": "counter",
+      "help": "Audit ring records.",
+      "labels": [
+        "event"
+      ]
+    },
+    {
+      "name": "labmail_auth_failures_total",
+      "kind": "counter",
+      "help": "Management authentication failures.",
+      "labels": [
+        "reason"
+      ]
+    },
+    {
+      "name": "labmail_http_request_duration_seconds",
+      "kind": "histogram",
+      "help": "Management HTTP latency.",
+      "labels": [
+        "capability"
+      ],
+      "unit": "seconds"
+    },
+    {
+      "name": "labmail_http_requests_total",
+      "kind": "counter",
+      "help": "Management HTTP requests.",
+      "labels": [
+        "capability",
+        "code_class"
+      ]
+    },
+    {
+      "name": "labmail_mcp_calls_total",
+      "kind": "counter",
+      "help": "MCP tool invocations.",
+      "labels": [
+        "result",
+        "tool"
+      ]
+    },
+    {
+      "name": "labmail_smtp_messages_total",
+      "kind": "counter",
+      "help": "SMTP DATA outcomes.",
+      "labels": [
+        "result"
+      ]
+    },
+    {
+      "name": "labmail_smtp_session_duration_seconds",
+      "kind": "histogram",
+      "help": "SMTP session lifetime.",
+      "labels": null,
+      "unit": "seconds"
+    },
+    {
+      "name": "labmail_smtp_sessions_active",
+      "kind": "gauge",
+      "help": "Currently admitted SMTP sessions.",
+      "labels": null
+    },
+    {
+      "name": "labmail_smtp_sessions_total",
+      "kind": "counter",
+      "help": "SMTP sessions that ended.",
+      "labels": [
+        "result"
+      ]
+    },
+    {
+      "name": "labmail_store_bytes",
+      "kind": "gauge",
+      "help": "Resident inbox bytes (raw + decoded).",
+      "labels": null
+    },
+    {
+      "name": "labmail_store_evictions_total",
+      "kind": "counter",
+      "help": "Oldest-message evictions.",
+      "labels": null
+    },
+    {
+      "name": "labmail_store_messages",
+      "kind": "gauge",
+      "help": "Messages currently in the inbox.",
+      "labels": null
+    },
+    {
+      "name": "labmail_store_waiters",
+      "kind": "gauge",
+      "help": "Blocked Wait callers.",
+      "labels": null
+    },
+    {
+      "name": "labmail_telemetry_dropped_total",
+      "kind": "counter",
+      "help": "Telemetry samples dropped under backpressure or policy.",
+      "labels": [
+        "reason"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "auth.failure",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "auth.success",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "http.request",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "mcp.call",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "smtp.accepted",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "smtp.rejected",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "smtp.session_end",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "state.apply",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "state.reset",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "store.deleted",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "store.full",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "store.inserted",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    },
+    {
+      "name": "store.wiped",
+      "fields": [
+        "timestamp",
+        "level",
+        "event",
+        "component",
+        "request_id",
+        "message_id",
+        "smtp_code",
+        "capability",
+        "result",
+        "error_code",
+        "duration_ms",
+        "store_generation"
+      ]
+    }
+  ]
+}

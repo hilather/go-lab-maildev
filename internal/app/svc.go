@@ -11,6 +11,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 	"github.com/hilather/go-lab-maildev/internal/snapshot"
 	"github.com/hilather/go-lab-maildev/internal/store"
 )
@@ -29,6 +30,8 @@ type Options struct {
 	IdempotencyMax int
 	AuditMax       int
 	Auditor        audit.Sink
+	Metrics        *observability.Registry
+	Logger         *observability.Logger
 }
 
 // App is the process-local Service implementation.
@@ -41,6 +44,8 @@ type App struct {
 	idemp         *idempCache
 	audit         *audit.Fanout
 	resetHooks    []func()
+	metrics       *observability.Registry
+	logger        *observability.Logger
 }
 
 var _ Service = (*App)(nil)
@@ -65,6 +70,9 @@ func New(opts Options) *App {
 			auditMax = defaultAuditMax
 		}
 	}
+	if opts.Inbox != nil {
+		opts.Inbox.SetTelemetry(opts.Metrics, opts.Logger)
+	}
 	return &App{
 		snaps:         opts.Snapshots,
 		inbox:         opts.Inbox,
@@ -72,6 +80,8 @@ func New(opts Options) *App {
 		bootstrapPath: opts.BootstrapPath,
 		idemp:         newIdempCache(idempMax),
 		audit:         audit.NewFanout(auditMax, opts.Auditor),
+		metrics:       opts.Metrics,
+		logger:        opts.Logger,
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/mimeparse"
 	"github.com/hilather/go-lab-maildev/internal/model"
+	"github.com/hilather/go-lab-maildev/internal/observability"
 )
 
 var spillName = regexp.MustCompile(`(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}(-[0-9]+)?\.(raw|att)(\.tmp)?$`)
@@ -61,6 +62,9 @@ type Memory struct {
 	byID       map[string]*record
 	order      []string
 	subs       []*subscriber
+	waiters    int
+	metrics    *observability.Registry
+	logger     *observability.Logger
 }
 
 type record struct {
@@ -111,6 +115,34 @@ func New(opts Options) (*Memory, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+// SetTelemetry attaches optional metrics and slog events. Nil is a no-op.
+func (m *Memory) SetTelemetry(r *observability.Registry, l *observability.Logger) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.metrics = r
+	m.logger = l
+	m.publishLocked()
+}
+
+func (m *Memory) publishLocked() {
+	if m.metrics == nil {
+		return
+	}
+	m.metrics.Set(observability.MetricStoreMessages, nil, float64(len(m.byID)))
+	m.metrics.Set(observability.MetricStoreBytes, nil, float64(m.bytes))
+	m.metrics.Set(observability.MetricStoreWaiters, nil, float64(m.waiters))
+}
+
+func (m *Memory) logStore(rec observability.Record) {
+	if m == nil || m.logger == nil {
+		return
+	}
+	m.logger.Log(rec)
 }
 
 func ensureSpillDir(dir string) error {
@@ -199,6 +231,9 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 		return model.InsertResult{}, ErrStaleEpoch
 	}
 	if err := m.canAcceptLocked(candidate); err != nil {
+		if errors.Is(err, ErrFull) {
+			m.logStore(observability.Record{Event: observability.EventStoreFull, Component: "store", Result: "store_full"})
+		}
 		return model.InsertResult{}, err
 	}
 	rec := &record{msg: prepared, resident: candidate}
@@ -215,6 +250,14 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 	m.generation++
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventMailReceived, ID: id, Subject: prepared.Subject, Generation: m.generation})
+	m.publishLocked()
+	m.logStore(observability.Record{
+		Event:           observability.EventStoreInserted,
+		Component:       "store",
+		MessageID:       id,
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	})
 	committed = true
 	return model.InsertResult{ID: id, Generation: m.generation}, nil
 }
@@ -515,7 +558,14 @@ func (m *Memory) Wait(ctx context.Context, filter model.MessageFilter) (*model.M
 			m.mu.Unlock()
 			return nil, err
 		}
+		m.waiters++
+		m.publishLocked()
 		m.cond.Wait()
+		m.waiters--
+		if m.waiters < 0 {
+			m.waiters = 0
+		}
+		m.publishLocked()
 	}
 }
 
@@ -653,6 +703,13 @@ func (m *Memory) ResetTo(opts Options) error {
 	m.spillThreshold = opts.SpillThreshold
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
+	m.publishLocked()
+	m.logStore(observability.Record{
+		Event:           observability.EventStoreWiped,
+		Component:       "store",
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	})
 	return nil
 }
 
@@ -671,6 +728,13 @@ func (m *Memory) Wipe() {
 	_ = m.unlinkAllSpill()
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
+	m.publishLocked()
+	m.logStore(observability.Record{
+		Event:           observability.EventStoreWiped,
+		Component:       "store",
+		Result:          "ok",
+		StoreGeneration: m.generation,
+	})
 }
 
 func (m *Memory) removeLocked(id string, eviction bool) {
@@ -693,6 +757,9 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 	m.generation++
 	if eviction {
 		m.evictions++
+		if m.metrics != nil {
+			m.metrics.Inc(observability.MetricStoreEvictions, nil, 1)
+		}
 	}
 	m.cond.Broadcast()
 	subj := ""
@@ -700,6 +767,16 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 		subj = rec.msg.Subject
 	}
 	m.emitLocked(Event{Type: EventMailDeleted, ID: id, Subject: subj, Generation: m.generation})
+	m.publishLocked()
+	if !eviction {
+		m.logStore(observability.Record{
+			Event:           observability.EventStoreDeleted,
+			Component:       "store",
+			MessageID:       id,
+			Result:          "ok",
+			StoreGeneration: m.generation,
+		})
+	}
 }
 
 type recSnap struct {

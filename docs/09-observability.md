@@ -2,12 +2,12 @@
 
 Status: Proposed normative behavior
 Owners: Observability, SMTP, Control Plane
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (OBS-001)
 Related ADRs: 0001
 
 ## Logs (`log/slog` JSON)
 
-Frozen event names in `api/metrics/v1alpha1.json` (artifact lands with OBS-001):
+Frozen event names in [`api/metrics/v1alpha1.json`](https://github.com/hilather/go-lab-maildev/blob/main/api/metrics/v1alpha1.json) (`labmail.dev/metrics/v1alpha1`; generated from `internal/observability`):
 
 ```
 smtp.accepted smtp.rejected smtp.session_end
@@ -21,7 +21,7 @@ Fields: `timestamp`, `level`, `event`, `component`, `request_id`, `message_id`, 
 
 ## Metrics (hand-rolled OpenMetrics)
 
-Same exposition style as LabDNS `internal/observability`: write OpenMetrics text; **do not** import `github.com/prometheus/*`. `spec.observability.metrics.listen` default `127.0.0.1:9090` (empty disables). A lab overlay that needs compose scraping sets `listen: ":9090"` (or `0.0.0.0:9090`). `publicPath: true` exposes authenticated `GET /v1/metrics` on the management listener; default `false`.
+Same exposition style as LabDNS `internal/observability`: write OpenMetrics text; **do not** import `github.com/prometheus/*`. Go source of truth: `internal/observability`. `make generate` / `make verify-generated` keep [`api/metrics/v1alpha1.json`](https://github.com/hilather/go-lab-maildev/blob/main/api/metrics/v1alpha1.json) current. `spec.observability.metrics.listen` default `127.0.0.1:9090` (empty disables). A lab overlay that needs compose scraping sets `listen: ":9090"` (or `0.0.0.0:9090`). `publicPath: true` exposes authenticated `GET /v1/metrics` on the management listener; default `false`. The scrape listener serves `/metrics` unauthenticated (bind loopback unless the overlay needs compose scraping).
 
 Bounded labels only. Do not put subjects or addresses in metric labels.
 
@@ -40,6 +40,7 @@ Bounded labels only. Do not put subjects or addresses in metric labels.
 | `labmail_mcp_calls_total` | counter | `tool`, `result` |
 | `labmail_auth_failures_total` | counter | `reason` |
 | `labmail_audit_events_total` | counter | `event` |
+| `labmail_telemetry_dropped_total` | counter | `reason` |
 
 ## Health
 

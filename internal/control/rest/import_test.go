@@ -12,14 +12,15 @@ import (
 func TestRESTImportDAG(t *testing.T) {
 	fset := token.NewFileSet()
 	allowed := map[string]bool{
-		"github.com/hilather/go-lab-maildev/internal/app":          true,
-		"github.com/hilather/go-lab-maildev/internal/audit":        true,
-		"github.com/hilather/go-lab-maildev/internal/buildinfo":    true,
-		"github.com/hilather/go-lab-maildev/internal/capabilities": true,
-		"github.com/hilather/go-lab-maildev/internal/config":       true,
-		"github.com/hilather/go-lab-maildev/internal/domainerr":    true,
-		"github.com/hilather/go-lab-maildev/internal/model":        true,
-		"github.com/hilather/go-lab-maildev/internal/preview":      true,
+		"github.com/hilather/go-lab-maildev/internal/app":           true,
+		"github.com/hilather/go-lab-maildev/internal/audit":         true,
+		"github.com/hilather/go-lab-maildev/internal/buildinfo":     true,
+		"github.com/hilather/go-lab-maildev/internal/capabilities":  true,
+		"github.com/hilather/go-lab-maildev/internal/config":        true,
+		"github.com/hilather/go-lab-maildev/internal/domainerr":     true,
+		"github.com/hilather/go-lab-maildev/internal/model":         true,
+		"github.com/hilather/go-lab-maildev/internal/observability": true,
+		"github.com/hilather/go-lab-maildev/internal/preview":       true,
 	}
 	forbiddenPref := []string{
 		"github.com/emersion",

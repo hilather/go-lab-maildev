@@ -41,6 +41,30 @@ func TestServeInvalidDoesNotBind(t *testing.T) {
 	}
 }
 
+func TestServeRejectsAuthMode(t *testing.T) {
+	dir := t.TempDir()
+	pw := filepath.Join(dir, "smtp.pass")
+	if err := os.WriteFile(pw, []byte("secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  smtp:\n    auth:\n      mode: plain_login\n      username: lab\n      passwordFile: " + pw + "\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := serveCmd(context.Background(), []string{"--config", cfg, "--smtp-listen", "127.0.0.1:0"}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d want 1 stderr=%q", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "smtp listen=") {
+		t.Fatalf("AUTH YAML bound SMTP: %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "smtp.auth.mode") {
+		t.Fatalf("stderr=%q", stderr.String())
+	}
+}
+
 func TestServeSendMail(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

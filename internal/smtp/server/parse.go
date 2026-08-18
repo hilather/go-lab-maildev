@@ -9,6 +9,7 @@ import (
 var (
 	errSyntax          = errors.New("smtp: bad arguments")
 	errMessageTooLarge = errors.New("smtp: message too large")
+	errDiscardBudget   = errors.New("smtp: discard budget exceeded")
 )
 
 func parsePathArg(arg, keyword string) (path, params string, err error) {

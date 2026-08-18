@@ -27,7 +27,6 @@ func TestReceiveOnlyImportBoundary(t *testing.T) {
 		"github.com/hilather/go-lab-maildev/internal/smtptest",
 		"github.com/hilather/go-lab-maildev/internal/web",
 	}
-	forbiddenIdents := []string{"DialTimeout"}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -68,14 +67,9 @@ func TestReceiveOnlyImportBoundary(t *testing.T) {
 			t.Errorf("%s contains a forbidden outbound ident", rel)
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
-			id, ok := n.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			for _, bad := range forbiddenIdents {
-				if id.Name == bad {
-					t.Errorf("%s references %s", rel, bad)
-				}
+			name, ok := outboundCallName(n)
+			if ok {
+				t.Errorf("%s references %s", rel, name)
 			}
 			return true
 		})
@@ -84,6 +78,25 @@ func TestReceiveOnlyImportBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+var outboundSelectors = map[string]bool{
+	"Dial": true, "DialTimeout": true, "DialContext": true,
+}
+
+func outboundCallName(n ast.Node) (string, bool) {
+	switch x := n.(type) {
+	case *ast.SelectorExpr:
+		if x.Sel != nil && outboundSelectors[x.Sel.Name] {
+			return x.Sel.Name, true
+		}
+	case *ast.CallExpr:
+		id, ok := x.Fun.(*ast.Ident)
+		if ok && outboundSelectors[id.Name] {
+			return id.Name, true
+		}
+	}
+	return "", false
 }
 
 func inReceiveOnly(rel string) bool {

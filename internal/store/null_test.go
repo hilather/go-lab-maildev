@@ -14,16 +14,21 @@ func TestNullInsertAndEpoch(t *testing.T) {
 	if n.Epoch() != 1 {
 		t.Fatalf("epoch=%d", n.Epoch())
 	}
-	res, err := n.Insert(context.Background(), &model.Message{Raw: []byte("x")})
+	res, err := n.Insert(context.Background(), n.Epoch(), &model.Message{Raw: []byte("x")})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(res.ID, "null-") {
 		t.Fatalf("id=%q", res.ID)
 	}
+	old := n.Epoch()
 	n.Wipe()
 	if n.Epoch() != 2 {
 		t.Fatalf("epoch after wipe=%d", n.Epoch())
+	}
+	_, err = n.Insert(context.Background(), old, &model.Message{Raw: []byte("y")})
+	if !errors.Is(err, ErrStaleEpoch) {
+		t.Fatalf("stale insert err=%v", err)
 	}
 }
 
@@ -31,7 +36,7 @@ func TestNullInsertCanceled(t *testing.T) {
 	n := NewNull()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := n.Insert(ctx, &model.Message{})
+	_, err := n.Insert(ctx, n.Epoch(), &model.Message{})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err=%v", err)
 	}
@@ -39,7 +44,7 @@ func TestNullInsertCanceled(t *testing.T) {
 
 func TestNullInsertNilMessage(t *testing.T) {
 	n := NewNull()
-	_, err := n.Insert(context.Background(), nil)
+	_, err := n.Insert(context.Background(), n.Epoch(), nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}

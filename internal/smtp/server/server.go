@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +31,8 @@ const (
 	defaultDataIdle      = 180 * time.Second
 	writeWait            = 30 * time.Second
 	dataDiscardSlack     = int64(1 << 20)
+	acceptBackoffMin     = 5 * time.Millisecond
+	acceptBackoffMax     = 200 * time.Millisecond
 )
 
 // Options construct a Server.
@@ -64,6 +67,9 @@ func New(opts Options) (*Server, error) {
 	if opts.Address == "" {
 		return nil, errors.New("smtp/server: Address is required")
 	}
+	if err := rejectUnimplemented(opts.Spec); err != nil {
+		return nil, err
+	}
 	sink := opts.Store
 	if sink == nil {
 		sink = store.NewNull()
@@ -83,9 +89,13 @@ func New(opts Options) (*Server, error) {
 }
 
 // SwapSpec replaces the snapshot used by the next MAIL, RCPT, and DATA.
-func (s *Server) SwapSpec(spec model.SMTPSpec) {
+func (s *Server) SwapSpec(spec model.SMTPSpec) error {
+	if err := rejectUnimplemented(spec); err != nil {
+		return err
+	}
 	spec = withSpecDefaults(spec)
 	s.spec.Store(&spec)
+	return nil
 }
 
 func (s *Server) specNow() model.SMTPSpec {
@@ -168,6 +178,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 func (s *Server) accept() {
 	defer s.wg.Done()
+	backoff := acceptBackoffMin
 	for {
 		conn, err := s.ln.Accept()
 		if err != nil {
@@ -176,11 +187,19 @@ func (s *Server) accept() {
 				return
 			default:
 			}
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
-				continue
+			if acceptShouldStop(err) {
+				return
 			}
-			return
+			time.Sleep(backoff)
+			if backoff < acceptBackoffMax {
+				backoff *= 2
+				if backoff > acceptBackoffMax {
+					backoff = acceptBackoffMax
+				}
+			}
+			continue
 		}
+		backoff = acceptBackoffMin
 		s.mu.Lock()
 		if s.stopped {
 			s.mu.Unlock()
@@ -192,6 +211,16 @@ func (s *Server) accept() {
 		s.mu.Unlock()
 		go s.serveConn(conn)
 	}
+}
+
+func acceptShouldStop(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	return strings.Contains(err.Error(), "use of closed network connection")
 }
 
 func (s *Server) serveConn(conn net.Conn) {
@@ -207,7 +236,7 @@ func (s *Server) serveConn(conn net.Conn) {
 	ip := remoteIP(conn.RemoteAddr())
 	if err := s.gate.acquire(ip, spec.Admission); err != nil {
 		_ = conn.SetDeadline(time.Now().Add(writeWait))
-		_ = codec.WriteReply(conn, 421, spec.Hostname+" Too many connections")
+		_ = codec.WriteReply(conn, 421, "4.3.2 Too many connections")
 		return
 	}
 	defer s.gate.release(ip)
@@ -259,4 +288,21 @@ func withSpecDefaults(s model.SMTPSpec) model.SMTPSpec {
 	}
 	s.Admission = ad
 	return s
+}
+
+func rejectUnimplemented(spec model.SMTPSpec) error {
+	switch spec.Auth.Mode {
+	case "", model.SMTPAuthNone:
+	default:
+		return fmt.Errorf("smtp/server: smtp.auth.mode %q is not implemented until SMTP-001b", spec.Auth.Mode)
+	}
+	switch spec.TLS.Mode {
+	case "", model.TLSModeOff:
+	default:
+		return fmt.Errorf("smtp/server: smtp.tls.mode %q is not implemented until SMTP-001b", spec.TLS.Mode)
+	}
+	if spec.TLS.Required {
+		return fmt.Errorf("smtp/server: smtp.tls.required is not implemented until SMTP-001b")
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"net"
 	"net/netip"
+	"syscall"
 	"testing"
 
 	"github.com/hilather/go-lab-maildev/internal/model"
@@ -59,5 +60,17 @@ func TestRemoteIP(t *testing.T) {
 	ip = remoteIP(mapped)
 	if ip.String() != "10.1.2.3" {
 		t.Fatalf("unmap %v", ip)
+	}
+}
+
+func TestAcceptShouldStop(t *testing.T) {
+	if !acceptShouldStop(net.ErrClosed) {
+		t.Fatal("closed listener must stop")
+	}
+	if acceptShouldStop(syscall.EMFILE) || acceptShouldStop(syscall.ENFILE) {
+		t.Fatal("EMFILE/ENFILE must keep accepting")
+	}
+	if acceptShouldStop(nil) {
+		t.Fatal("nil")
 	}
 }

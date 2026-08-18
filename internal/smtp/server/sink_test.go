@@ -15,7 +15,10 @@ type stubSink struct {
 	last  *model.Message
 }
 
-func (s *stubSink) Insert(_ context.Context, msg *model.Message) (model.InsertResult, error) {
+func (s *stubSink) Insert(_ context.Context, epoch uint64, msg *model.Message) (model.InsertResult, error) {
+	if s.epoch != 0 && epoch != s.epoch {
+		return model.InsertResult{}, store.ErrStaleEpoch
+	}
 	s.last = msg
 	if s.err != nil {
 		return model.InsertResult{}, s.err
@@ -76,5 +79,23 @@ func TestNewRequiresAddress(t *testing.T) {
 	_, err := New(Options{})
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestNewRejectsAuthAndTLS(t *testing.T) {
+	spec := defaultSMTPSpec(t)
+	spec.Auth.Mode = model.SMTPAuthPlainLogin
+	if _, err := New(Options{Address: "127.0.0.1:0", Spec: spec}); err == nil {
+		t.Fatal("plain_login should fail closed")
+	}
+	spec = defaultSMTPSpec(t)
+	spec.TLS.Mode = model.TLSModeStartTLS
+	if _, err := New(Options{Address: "127.0.0.1:0", Spec: spec}); err == nil {
+		t.Fatal("starttls should fail closed")
+	}
+	spec = defaultSMTPSpec(t)
+	spec.TLS.Required = true
+	if _, err := New(Options{Address: "127.0.0.1:0", Spec: spec}); err == nil {
+		t.Fatal("tls.required should fail closed")
 	}
 }

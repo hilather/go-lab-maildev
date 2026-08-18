@@ -18,7 +18,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Compat | PR 7: array + relay 403 + `/healthz` (fake principal). PR 9: `TestMaildevScenarioCompat` (401 + Basic + subject) | `internal/control/compat` |
 | MCP | 2026-07-28 initialize, tools/list, tool call, origin, bearer | `internal/control/mcp` |
 | Parity | every `PARITY_REQUIRED` capability: same input types, scopes, errors, side effects | `internal/capabilities` + rest/mcp tests (`make test-parity`) |
-| Receive-only | reserved YAML; no relay; import boundary | `internal/config`, `compat`, `tools/importboundary` |
+| Receive-only | reserved YAML; no relay; import boundary | `internal/config`, `internal/smtp/import_test.go`, `internal/store/import_test.go`, `internal/smtptest/isolation_test.go` |
 | Fuzz | SMTP command lines, YAML, MIME | codec + config + mimeparse |
 | Race | store insert/delete/wait; snapshot swap | `make test-race` |
 | Container | non-root, read-only, no caps, healthcheck | `scripts/test-container.sh` |

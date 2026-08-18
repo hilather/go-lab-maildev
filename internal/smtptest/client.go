@@ -60,7 +60,12 @@ func (c *Client) WriteLine(s string) error {
 
 // ReadReply reads a single- or multi-line SMTP reply.
 func (c *Client) ReadReply() (code int, lines []string, err error) {
-	_ = c.conn.SetDeadline(time.Now().Add(10 * time.Second))
+	return c.ReadReplyTimeout(10 * time.Second)
+}
+
+// ReadReplyTimeout is ReadReply with a caller-chosen deadline.
+func (c *Client) ReadReplyTimeout(d time.Duration) (code int, lines []string, err error) {
+	_ = c.conn.SetDeadline(time.Now().Add(d))
 	for {
 		raw, e := c.br.ReadString('\n')
 		if e != nil {

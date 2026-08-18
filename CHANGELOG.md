@@ -17,7 +17,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
-- None.
+- `labmail serve` and `smtp/server.New` fail closed when compiled YAML asks for SMTP AUTH or TLS (those land in SMTP-001b).
 
 ### Removed or deprecated
 

@@ -216,6 +216,10 @@ func (s *session) cmdData() bool {
 			_ = s.reply(552, "5.3.4 Message too large")
 			s.resetToHelloed()
 			return true
+		case errors.Is(err, errDiscardBudget):
+			_ = s.reply(552, "5.3.4 Message too large")
+			s.resetToHelloed()
+			return false
 		case errors.Is(err, codec.ErrLineTooLong):
 			_ = s.reply(500, "5.5.2 Line too long")
 			s.resetToHelloed()
@@ -229,11 +233,6 @@ func (s *session) cmdData() bool {
 			return false
 		}
 	}
-	if s.srv.store.Epoch() != epoch {
-		_ = s.reply(451, "4.3.2 Requested action aborted")
-		s.resetToHelloed()
-		return true
-	}
 
 	msg := &model.Message{
 		ReceivedAt: time.Now().UTC(),
@@ -246,7 +245,7 @@ func (s *session) cmdData() bool {
 		Raw:  raw,
 		Size: len(raw),
 	}
-	res, err := s.srv.store.Insert(context.Background(), msg)
+	res, err := s.srv.store.Insert(context.Background(), epoch, msg)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrStaleEpoch):
@@ -287,7 +286,7 @@ func (s *session) readData(max int64) ([]byte, error) {
 		if over {
 			discarded += need
 			if discarded > dataDiscardSlack {
-				return nil, codec.ErrLineTooLong
+				return nil, errDiscardBudget
 			}
 			continue
 		}

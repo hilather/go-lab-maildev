@@ -7,7 +7,7 @@ Related ADRs: 0003
 
 Package `internal/store`. Captured mail is runtime evidence, not desired state. Restart or reset wipes the inbox.
 
-SMTP-001a implements `store.Sink` and `store.Null` only: `Insert` assigns a discard id and retains nothing. `Wipe` bumps `Epoch` so in-flight DATA is aborted with `451 4.3.2`. The queryable `Store` (ULID ids, list/get/wait, caps, spill) is STORE-001.
+SMTP-001a implements `store.Sink` and `store.Null` only. `Insert(ctx, epoch, msg)` assigns a discard id and retains nothing. The `epoch` argument is the value captured at DATA start; a mismatch under the insert lock returns `store.ErrStaleEpoch` (`451 4.3.2`). `Wipe` bumps `Epoch`. The queryable `Store` (ULID ids, list/get/wait, caps, spill) is STORE-001.
 
 ## Interface
 

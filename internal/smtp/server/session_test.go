@@ -6,7 +6,6 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtptest"
-	"github.com/hilather/go-lab-maildev/internal/store"
 )
 
 func TestGreetingHasNoMaildev(t *testing.T) {
@@ -94,7 +93,7 @@ func TestEmptyReversePath(t *testing.T) {
 }
 
 func TestDotUnstuff(t *testing.T) {
-	sink := store.NewNull()
+	sink := &stubSink{epoch: 1}
 	c := dial(t, startServer(t, model.SMTPSpec{}, sink))
 	mustCmd(t, c, 250, "EHLO x")
 	mustCmd(t, c, 250, "MAIL FROM:<a@b>")
@@ -109,6 +108,13 @@ func TestDotUnstuff(t *testing.T) {
 	code, _, err := c.ReadReply()
 	if err != nil || code != 250 {
 		t.Fatalf("code=%d err=%v", code, err)
+	}
+	if sink.last == nil {
+		t.Fatal("no insert")
+	}
+	raw := string(sink.last.Raw)
+	if !strings.Contains(raw, ".hidden") || strings.Contains(raw, "..hidden") {
+		t.Fatalf("raw=%q", raw)
 	}
 }
 

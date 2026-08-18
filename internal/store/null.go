@@ -22,7 +22,7 @@ func NewNull() *Null {
 }
 
 // Insert assigns a discard id and drops the message.
-func (n *Null) Insert(ctx context.Context, msg *model.Message) (model.InsertResult, error) {
+func (n *Null) Insert(ctx context.Context, epoch uint64, msg *model.Message) (model.InsertResult, error) {
 	if n == nil {
 		return model.InsertResult{}, errors.New("store: nil Null")
 	}
@@ -33,9 +33,12 @@ func (n *Null) Insert(ctx context.Context, msg *model.Message) (model.InsertResu
 		return model.InsertResult{}, errors.New("store: nil message")
 	}
 	n.mu.Lock()
+	defer n.mu.Unlock()
+	if epoch != n.epoch {
+		return model.InsertResult{}, ErrStaleEpoch
+	}
 	n.seq++
 	id := fmt.Sprintf("null-%d", n.seq)
-	n.mu.Unlock()
 	return model.InsertResult{ID: id}, nil
 }
 

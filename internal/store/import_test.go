@@ -1,6 +1,7 @@
 package store
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -48,6 +49,7 @@ func TestStoreImportDAG(t *testing.T) {
 }
 
 func TestStoreNoOutboundIdents(t *testing.T) {
+	fset := token.NewFileSet()
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -60,14 +62,44 @@ func TestStoreNoOutboundIdents(t *testing.T) {
 			return err
 		}
 		s := string(b)
-		for _, bad := range []string{"net.Dial", "DialTimeout", "Dialer"} {
+		for _, bad := range []string{"net.Dial", "Dialer"} {
 			if strings.Contains(s, bad) {
 				t.Errorf("%s contains %q", path, bad)
 			}
 		}
+		f, err := parser.ParseFile(fset, path, b, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			name, ok := storeOutboundCallName(n)
+			if ok {
+				t.Errorf("%s references %s", path, name)
+			}
+			return true
+		})
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+var storeOutboundSelectors = map[string]bool{
+	"Dial": true, "DialTimeout": true, "DialContext": true,
+}
+
+func storeOutboundCallName(n ast.Node) (string, bool) {
+	switch x := n.(type) {
+	case *ast.SelectorExpr:
+		if x.Sel != nil && storeOutboundSelectors[x.Sel.Name] {
+			return x.Sel.Name, true
+		}
+	case *ast.CallExpr:
+		id, ok := x.Fun.(*ast.Ident)
+		if ok && storeOutboundSelectors[id.Name] {
+			return id.Name, true
+		}
+	}
+	return "", false
 }

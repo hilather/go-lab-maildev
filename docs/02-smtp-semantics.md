@@ -79,8 +79,8 @@ state: greeting -> helloed -> mail -> rcpt+ -> data -> helloed
 | Session lifetime | 10m | close |
 | Command idle | 120s | close |
 | DATA idle | 180s | `451 4.4.2 Timeout`, abort |
-| Concurrent sessions | 256 | refuse `421` |
-| Concurrent sessions per source IP | 32 | refuse `421` |
+| Concurrent sessions | 256 | refuse `421 4.3.2` |
+| Concurrent sessions per source IP | 32 | refuse `421 4.3.2` |
 | In-flight DATA transactions | 8 | `421` |
 | In-flight DATA reserved bytes | 64 MiB (`maxInFlightDataBytes`) | `452 4.3.1` |
 

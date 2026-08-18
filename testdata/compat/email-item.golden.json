@@ -1,0 +1,18 @@
+{
+  "from": [
+    {
+      "address": "alice@lab.test",
+      "name": "Alice"
+    }
+  ],
+  "to": [
+    {
+      "address": "bob@lab.test",
+      "name": "Bob"
+    }
+  ],
+  "subject": "hello lab",
+  "read": false,
+  "messageId": "1412535729.simple@fbi.gov",
+  "priority": "normal"
+}

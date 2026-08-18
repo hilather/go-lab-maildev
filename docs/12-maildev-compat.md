@@ -2,12 +2,12 @@
 
 Status: Proposed normative behavior
 Owners: Compat, REST, Application
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (COMPAT-001)
 Related ADRs: 0005, 0007
 
-Native management API is `/v1` + `POST /mcp`. Maildev `/email` is a **compat adapter** (`REST_ONLY_PROTOCOL` plus parity-required native twins). See [docs/adr/0007-compat-email-surface.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0007-compat-email-surface.md).
+Native management API is `/v1` + `POST /mcp`. Maildev `/email` is a **compat adapter** (`REST_ONLY_PROTOCOL` plus parity-required native twins) in `internal/control/compat`. See [docs/adr/0007-compat-email-surface.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0007-compat-email-surface.md).
 
-Enabled when `spec.listeners.management.compatEnabled` is true (default). Auth: same middleware as `/v1` (Basic and/or Bearer).
+Enabled when `spec.listeners.management.compatEnabled` is true (default). The adapter is mounted on the same management listener as `/v1`. Auth is stubbed via a fake principal injector in COMPAT-001 (do **not** claim 401 here). SEC-001 adds Basic/Bearer and `TestMaildevScenarioCompat`.
 
 The lab does **not** track maildev v3 (`/api`, optional MCP). LabMail’s native API is the family `/v1` + `/mcp` design.
 
@@ -19,9 +19,9 @@ The lab does **not** track maildev v3 (`/api`, optional MCP). LabMail’s native
 | `GET /email/:id` | same | `Messages.Get` with `markRead=true` (maildev) |
 | `DELETE /email/:id` | same | `Messages.Delete` |
 | `DELETE /email/all` | same | `Messages.Clear` |
-| `GET /email/:id/html` | same | HTML body; same CSP headers as `/v1/.../preview` when used as a document |
-| `GET /email/:id/attachment/:filename` | same | lookup by sanitized filename; first match |
-| `POST /email/:id/relay` | same path | **403** `receive_only`. Body explains receive-only. No-op must not look like success. |
+| `GET /email/:id/html` | same | HTML document: same CSP + `cid:` → `data:` rewrite as `/v1/.../preview`. Marks read (maildev `getEmailHtml`). |
+| `GET /email/:id/attachment/:filename` | same | lookup by sanitized filename; first match. A filename containing `relay` is still a download. |
+| `POST /email/:id/relay` | same path | **403** `receive_only` when the path **segment** after `/email/{id}/` is `relay` (optional `/relay/{to}`). Not a substring match. |
 | `GET /config` | same | Redacted LabMail shape (below). **Not** a clone of 2.2.1 `/config`. |
 | `GET /healthz` | same | 200 `{"status":"ok"}` iff ready |
 
@@ -56,11 +56,20 @@ Smoke needs `subject`; keep the 2.2.1 shape:
 
 `headers` values are strings. Header **map keys are lowercased** (maildev 2.2.1). Duplicate headers are joined with `\n`. Attachment objects **omit** maildev’s leaked `stream` Node internals; they include `fileName`, `contentType`, `contentDisposition`, `contentId`, `checksum` (**sha256** hex — maildev 2.2.1 uses md5; documented delta).
 
-`GET /email` **list** omits `html` and sets `text` to `""` (or a ≤2 KiB prefix if `?text=1`). Smoke only needs `subject`. This is an intentional maildev delta so a 1000-message inbox cannot serialize hundreds of MiB. `GET /email/:id` returns full `text`/`html`.
+`GET /email` **list** omits `html` and sets `text` to `""` (or a ≤2 KiB prefix if `?text=1`, cut on a rune boundary). Smoke only needs `subject`. This is an intentional maildev delta so a 1000-message inbox cannot serialize hundreds of MiB. `GET /email/:id` returns full `text`/`html`. Filters are exact match on flattened JSON, including booleans (`?read=false`).
 
 `GET /email` returns **all** matching messages (maildev style) up to `store.maxMessages`. Native `/v1` is the paginated API.
 
-`GET /config` is a redacted LabMail shape: `{smtp, web, receiveOnly: true, hostname}` only. Always `receiveOnly: true`.
+`GET /config` is a redacted LabMail shape: `{smtp, web, receiveOnly: true, hostname}` only. Always `receiveOnly: true`. It is **not** maildev’s `{version, smtpPort, isOutgoingEnabled, outgoingHost}`:
+
+```json
+{
+  "smtp": { "address": ":1025" },
+  "web": { "address": ":1080" },
+  "receiveOnly": true,
+  "hostname": "labmail.lab"
+}
+```
 
 ## Compat delta vs maildev 2.2.1
 
@@ -109,7 +118,7 @@ The one-release `internal/maildev` flag shim matrix lives in [docs/13-integratio
 2. Unauthenticated `GET /email` → **401**.
 3. Basic-authenticated `GET /email` eventually contains the sent `subject`.
 
-In this repo: `TestMaildevScenarioCompat` (PR 9). PR 7 implements the adapter with a fake principal and does **not** claim 401.
+COMPAT-001 implements the adapter with a fake principal and does **not** claim 401. Goldens for `subject`/`from`/`to` plus attachment `fileName` (no `stream`) live in `testdata/compat/`. `TestMaildevScenarioCompat` (401 + Basic + subject) is SEC-001 / PR 9.
 
 ## Compatibility promise
 

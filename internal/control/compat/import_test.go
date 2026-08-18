@@ -1,4 +1,4 @@
-package rest
+package compat
 
 import (
 	"go/parser"
@@ -9,15 +9,13 @@ import (
 	"testing"
 )
 
-func TestRESTImportDAG(t *testing.T) {
+func TestCompatImportDAG(t *testing.T) {
 	fset := token.NewFileSet()
 	allowed := map[string]bool{
 		"github.com/hilather/go-lab-maildev/internal/app":          true,
-		"github.com/hilather/go-lab-maildev/internal/audit":        true,
-		"github.com/hilather/go-lab-maildev/internal/buildinfo":    true,
 		"github.com/hilather/go-lab-maildev/internal/capabilities": true,
-		"github.com/hilather/go-lab-maildev/internal/config":       true,
 		"github.com/hilather/go-lab-maildev/internal/domainerr":    true,
+		"github.com/hilather/go-lab-maildev/internal/mimeparse":    true,
 		"github.com/hilather/go-lab-maildev/internal/model":        true,
 		"github.com/hilather/go-lab-maildev/internal/preview":      true,
 	}
@@ -27,8 +25,8 @@ func TestRESTImportDAG(t *testing.T) {
 		"github.com/hilather/go-lab-maildev/internal/compiler",
 		"github.com/hilather/go-lab-maildev/internal/smtp",
 		"github.com/hilather/go-lab-maildev/internal/store",
+		"github.com/hilather/go-lab-maildev/internal/control/rest",
 		"github.com/hilather/go-lab-maildev/internal/control/mcp",
-		"github.com/hilather/go-lab-maildev/internal/control/compat",
 		"github.com/hilather/go-lab-maildev/internal/web",
 		"net/smtp",
 	}

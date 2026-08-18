@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Security, SMTP, Control Plane
-Last reviewed: 2026-08-17 (SMTP-001a)
+Last reviewed: 2026-08-17 (COMPAT-001)
 Related ADRs: 0002, 0003, 0005, 0007
 
 LabMail is a lab sink, not a public MX. The critical invariant is receive-only: outbound SMTP must be unrepresentable.

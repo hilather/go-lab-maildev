@@ -156,6 +156,88 @@ func TestServeBindsManagement(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("ready status=%d", resp.StatusCode)
 	}
+
+	hz, err := http.Get("http://" + mgmt + "/healthz")
+	if err != nil {
+		t.Fatalf("healthz: %v", err)
+	}
+	if hz.StatusCode != 200 {
+		_ = hz.Body.Close()
+		t.Fatalf("healthz status=%d", hz.StatusCode)
+	}
+	_ = hz.Body.Close()
+	email, err := http.Get("http://" + mgmt + "/email")
+	if err != nil {
+		t.Fatalf("email: %v", err)
+	}
+	if email.StatusCode != 200 {
+		_ = email.Body.Close()
+		t.Fatalf("email status=%d", email.StatusCode)
+	}
+	_ = email.Body.Close()
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("serve exit %d stderr=%q", code, stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not exit")
+	}
+}
+
+func TestServeCompatDisabled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	path := testdataConfig(t, "valid", "ui-disabled.yaml")
+	var stdout, stderr safeBuffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serveCmd(ctx, []string{
+			"--config", path,
+			"--smtp-listen", "127.0.0.1:0",
+			"--management-listen", "127.0.0.1:0",
+		}, &stdout, &stderr)
+	}()
+	_ = waitSMTPListen(t, &stdout)
+	mgmt := waitPrefix(t, &stdout, "labmail management listen=")
+	var resp *http.Response
+	var err error
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err = http.Get("http://" + mgmt + "/v1/health/ready")
+		if err == nil && resp.StatusCode == 200 {
+			break
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("ready: %v stderr=%q", err, stderr.String())
+	}
+	_ = resp.Body.Close()
+	email, err := http.Get("http://" + mgmt + "/email")
+	if err != nil {
+		t.Fatalf("email: %v", err)
+	}
+	if email.StatusCode != http.StatusNotFound {
+		_ = email.Body.Close()
+		t.Fatalf("compatEnabled false: GET /email status=%d", email.StatusCode)
+	}
+	_ = email.Body.Close()
+	for _, path := range []string{"/healthz", "/config"} {
+		resp, err := http.Get("http://" + mgmt + path)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		if resp.StatusCode != http.StatusNotFound {
+			_ = resp.Body.Close()
+			t.Fatalf("compatEnabled false: GET %s status=%d", path, resp.StatusCode)
+		}
+		_ = resp.Body.Close()
+	}
 	cancel()
 	select {
 	case code := <-done:

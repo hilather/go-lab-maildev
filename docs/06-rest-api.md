@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-17 (COMPAT-001)
+Last reviewed: 2026-08-17 (COMPAT-001 + OBS-001)
 Related ADRs: 0004, 0005, 0007
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
@@ -46,6 +46,17 @@ Domain codes and HTTP mapping (LabDNS `domainerr` table, mail-specific additions
 ## Auth and origin
 
 Auth: `Authorization: Bearer <token>` or (when `bearer_and_basic`) `Authorization: Basic …`. Health live/ready skip auth. `X-Forwarded-For` is not trusted. No CORS headers. Loopback unauthenticated only when `mode: dev-loopback-unauth` (not the container default).
+
+## Health and metrics
+
+| Probe | Meaning | Auth |
+|---|---|---|
+| `GET /v1/health/live` | Process up | none |
+| `GET /v1/health/ready` | SMTP bound **and** store initialized **and** (management bound or explicitly off). Does not require MCP clients or a non-empty inbox. | none |
+| `GET /v1/status` `ready` | Same probe as `/v1/health/ready` when served over management HTTP | `mail.read` (stubbed open until SEC-001) |
+| `GET /v1/metrics` | OpenMetrics text. **404 `not_found`** unless `spec.observability.metrics.publicPath` is `true`. | `mail.read` when enabled |
+
+Ready becomes unready as soon as SMTP `Shutdown` begins (`Accepting()` is false), even while management is still draining. The process scrape listener (`spec.observability.metrics.listen`) is separate and unauthenticated; empty listen disables it.
 
 **Origin (LabDNS wording, copied):** a **present** non-loopback `Origin` is rejected unless it is on `originAllowlist` (DNS-rebinding default-deny). **Missing Origin is allowed** for official SDK, curl, and MCPJungle (the gateway typically sends no Origin). Loopback Origins are those whose host is `localhost`, `127.0.0.1`, `::1`, or any RFC 6890 loopback; `http://localhost:1080` and `http://127.0.0.1:1080` are both loopback. Published LAN UI (`http://192.168.x.x:1080`) **must** list that origin in `originAllowlist` or the browser will 403.
 

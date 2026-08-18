@@ -194,6 +194,23 @@ func (l *Logger) Dropped() int64 {
 	return l.dropped.Load()
 }
 
+// Serve writes queued records until ctx is done, then drains. Use with WithQueue
+// so Log never blocks SMTP on a slow sink.
+func (l *Logger) Serve(ctx context.Context) {
+	if l == nil || l.q == nil {
+		return
+	}
+	for {
+		select {
+		case rec := <-l.q.Recv():
+			l.write(rec)
+		case <-ctx.Done():
+			l.Drain()
+			return
+		}
+	}
+}
+
 // Drain writes queued records to the sink until q is empty.
 func (l *Logger) Drain() {
 	if l == nil || l.q == nil {

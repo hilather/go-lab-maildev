@@ -139,7 +139,7 @@ func (m *Memory) publishLocked() {
 }
 
 func (m *Memory) logStore(rec observability.Record) {
-	if m == nil || m.logger == nil {
+	if m == nil || m.logger == nil || rec.Event == "" {
 		return
 	}
 	m.logger.Log(rec)
@@ -225,14 +225,18 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 		}
 	}()
 
+	var recLog observability.Record
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer func() {
+		m.mu.Unlock()
+		m.logStore(recLog)
+	}()
 	if epoch != m.epoch {
 		return model.InsertResult{}, ErrStaleEpoch
 	}
 	if err := m.canAcceptLocked(candidate); err != nil {
 		if errors.Is(err, ErrFull) {
-			m.logStore(observability.Record{Event: observability.EventStoreFull, Component: "store", Result: "store_full"})
+			recLog = observability.Record{Event: observability.EventStoreFull, Component: "store", Result: "store_full"}
 		}
 		return model.InsertResult{}, err
 	}
@@ -251,13 +255,13 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventMailReceived, ID: id, Subject: prepared.Subject, Generation: m.generation})
 	m.publishLocked()
-	m.logStore(observability.Record{
+	recLog = observability.Record{
 		Event:           observability.EventStoreInserted,
 		Component:       "store",
 		MessageID:       id,
 		Result:          "ok",
 		StoreGeneration: m.generation,
-	})
+	}
 	committed = true
 	return model.InsertResult{ID: id, Generation: m.generation}, nil
 }
@@ -463,26 +467,36 @@ func newerThanCursor(msg *model.Message, cur cursorPos) bool {
 
 // Delete removes one message.
 func (m *Memory) Delete(id string) error {
+	var recLog observability.Record
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if _, ok := m.byID[id]; !ok {
+		m.mu.Unlock()
 		return ErrNotFound
 	}
-	m.removeLocked(id, false)
+	recLog = m.removeLocked(id, false)
+	m.mu.Unlock()
+	m.logStore(recLog)
 	return nil
 }
 
 // DeleteAll empties the inbox without bumping epoch.
 func (m *Memory) DeleteAll() (int, error) {
+	var recs []observability.Record
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	n := len(m.byID)
 	if n == 0 {
+		m.mu.Unlock()
 		return 0, nil
 	}
 	ids := append([]string(nil), m.order...)
 	for _, id := range ids {
-		m.removeLocked(id, false)
+		if rec := m.removeLocked(id, false); rec.Event != "" {
+			recs = append(recs, rec)
+		}
+	}
+	m.mu.Unlock()
+	for _, rec := range recs {
+		m.logStore(rec)
 	}
 	return n, nil
 }
@@ -688,7 +702,6 @@ func (m *Memory) ResetTo(opts Options) error {
 		return err
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.epoch++
 	m.generation++
 	m.byID = make(map[string]*record)
@@ -704,12 +717,14 @@ func (m *Memory) ResetTo(opts Options) error {
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
 	m.publishLocked()
-	m.logStore(observability.Record{
+	recLog := observability.Record{
 		Event:           observability.EventStoreWiped,
 		Component:       "store",
 		Result:          "ok",
 		StoreGeneration: m.generation,
-	})
+	}
+	m.mu.Unlock()
+	m.logStore(recLog)
 	return nil
 }
 
@@ -719,7 +734,6 @@ func (m *Memory) Wipe() {
 		return
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.epoch++
 	m.generation++
 	m.byID = make(map[string]*record)
@@ -729,18 +743,20 @@ func (m *Memory) Wipe() {
 	m.cond.Broadcast()
 	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
 	m.publishLocked()
-	m.logStore(observability.Record{
+	recLog := observability.Record{
 		Event:           observability.EventStoreWiped,
 		Component:       "store",
 		Result:          "ok",
 		StoreGeneration: m.generation,
-	})
+	}
+	m.mu.Unlock()
+	m.logStore(recLog)
 }
 
-func (m *Memory) removeLocked(id string, eviction bool) {
+func (m *Memory) removeLocked(id string, eviction bool) observability.Record {
 	rec, ok := m.byID[id]
 	if !ok {
-		return
+		return observability.Record{}
 	}
 	delete(m.byID, id)
 	for i, oid := range m.order {
@@ -768,14 +784,15 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 	}
 	m.emitLocked(Event{Type: EventMailDeleted, ID: id, Subject: subj, Generation: m.generation})
 	m.publishLocked()
-	if !eviction {
-		m.logStore(observability.Record{
-			Event:           observability.EventStoreDeleted,
-			Component:       "store",
-			MessageID:       id,
-			Result:          "ok",
-			StoreGeneration: m.generation,
-		})
+	if eviction {
+		return observability.Record{}
+	}
+	return observability.Record{
+		Event:           observability.EventStoreDeleted,
+		Component:       "store",
+		MessageID:       id,
+		Result:          "ok",
+		StoreGeneration: m.generation,
 	}
 }
 

@@ -22,7 +22,7 @@
       "id": "health.ready",
       "title": "Health ready",
       "version": "v1",
-      "description": "Readiness (valid snapshot, listeners bound). Not an MCP tool.",
+      "description": "SMTP bound, store initialized, and management bound or explicitly off. Not an MCP tool.",
       "mutating": false,
       "idempotent": true,
       "restOnly": true,

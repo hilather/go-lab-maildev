@@ -87,11 +87,12 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 }
 
 type serveRuntime struct {
-	smtp    *server.Server
-	http    *rest.Server
-	svc     *app.App
-	metrics *observability.Listener
-	pidPath string
+	smtp     *server.Server
+	http     *rest.Server
+	svc      *app.App
+	metrics  *observability.Listener
+	stopLogs context.CancelFunc
+	pidPath  string
 }
 
 func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, error) {
@@ -100,17 +101,22 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 		return nil, fmt.Errorf("load %s: %w", flags.Config, err)
 	}
 	reg := observability.NewRegistry()
-	log := observability.NewLogger(os.Stderr, observability.ParseLevel(st.Spec.Observability.LogLevel)).WithMetrics(reg)
+	log := observability.NewLogger(os.Stderr, observability.ParseLevel(st.Spec.Observability.LogLevel)).
+		WithQueue(observability.DefaultQueueSize).WithMetrics(reg)
+	logCtx, stopLogs := context.WithCancel(context.Background())
+	go log.Serve(logCtx)
 	svc, err := app.Boot(ctx, app.Options{
 		BootstrapPath: flags.Config,
 		Metrics:       reg,
 		Logger:        log,
 	})
 	if err != nil {
+		stopLogs()
 		return nil, fmt.Errorf("load %s: %w", flags.Config, err)
 	}
 	snap := svc.Active()
 	if snap == nil || snap.Canonical == nil {
+		stopLogs()
 		svc.Close()
 		return nil, fmt.Errorf("compile: no snapshot")
 	}
@@ -127,24 +133,35 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 		Logger:    log,
 	})
 	if err != nil {
+		stopLogs()
 		svc.Close()
 		return nil, err
 	}
 	if err := srv.Start(); err != nil {
+		stopLogs()
 		svc.Close()
 		return nil, err
 	}
-	rt := &serveRuntime{smtp: srv, svc: svc, pidPath: flags.PIDFile}
+	rt := &serveRuntime{smtp: srv, svc: svc, stopLogs: stopLogs, pidPath: flags.PIDFile}
 	mgmt, unbound := managementListen(flags.ManagementListen, snap.Canonical.Spec.Listeners.Management.Address)
 	if !unbound {
-		hs, err := startManagement(svc, srv, mgmt, snap.Canonical.Spec, reg, log)
+		hs, err := startManagement(svc, mgmt, snap.Canonical.Spec, reg, log)
 		if err != nil {
+			stopLogs()
 			_ = srv.Shutdown(context.Background())
 			svc.Close()
 			return nil, err
 		}
 		rt.http = hs
 	}
+	svc.SetHealth(func() observability.Facts {
+		return observability.Facts{
+			SMTPBound: srv.Accepting(),
+			StoreUp:   svc.Inbox() != nil,
+			MgmtBound: rt.http != nil,
+			MgmtOff:   unbound,
+		}
+	})
 	ml, err := observability.Listen(snap.Canonical.Spec.Observability.Metrics.Listen, reg)
 	if err != nil {
 		_ = rt.shutdown(context.Background())
@@ -158,7 +175,7 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 	return rt, nil
 }
 
-func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.Spec, reg *observability.Registry, log *observability.Logger) (*rest.Server, error) {
+func startManagement(svc *app.App, addr string, spec model.Spec, reg *observability.Registry, log *observability.Logger) (*rest.Server, error) {
 	if addr == "" {
 		addr = rest.DefaultAddr
 	}
@@ -167,11 +184,7 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 		return nil, err
 	}
 	ready := func() bool {
-		return observability.Evaluate(observability.Facts{
-			SMTPBound: smtp.Addr() != nil,
-			StoreUp:   svc.Inbox() != nil,
-			MgmtBound: true,
-		}).Ready
+		return observability.Evaluate(svc.HealthFacts()).Ready
 	}
 	mcpPath := spec.Listeners.Management.MCPPath
 	if mcpPath == "" {
@@ -273,6 +286,10 @@ func (r *serveRuntime) shutdown(ctx context.Context) error {
 	}
 	if r.svc != nil {
 		r.svc.Close()
+	}
+	if r.stopLogs != nil {
+		r.stopLogs()
+		r.stopLogs = nil
 	}
 	if r.pidPath != "" {
 		_ = os.Remove(r.pidPath)

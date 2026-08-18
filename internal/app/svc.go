@@ -46,6 +46,8 @@ type App struct {
 	resetHooks    []func()
 	metrics       *observability.Registry
 	logger        *observability.Logger
+	healthMu      sync.Mutex
+	health        func() observability.Facts
 }
 
 var _ Service = (*App)(nil)
@@ -143,6 +145,35 @@ func (s *App) Close() {
 		return
 	}
 	s.inbox.Wipe()
+}
+
+// SetHealth installs live listener facts for Status.Ready / Evaluate.
+// A nil fn restores the store-only default (listeners assumed up).
+func (s *App) SetHealth(fn func() observability.Facts) {
+	if s == nil {
+		return
+	}
+	s.healthMu.Lock()
+	s.health = fn
+	s.healthMu.Unlock()
+}
+
+// HealthFacts is the input to observability.Evaluate. Without SetHealth,
+// Ready means the inbox exists (HTTP-less / httptest default).
+func (s *App) HealthFacts() observability.Facts {
+	if s == nil {
+		return observability.Facts{}
+	}
+	s.healthMu.Lock()
+	fn := s.health
+	s.healthMu.Unlock()
+	storeUp := s.inbox != nil
+	if fn != nil {
+		f := fn()
+		f.StoreUp = storeUp
+		return f
+	}
+	return observability.Facts{StoreUp: storeUp, SMTPBound: storeUp, MgmtBound: storeUp}
 }
 
 func (s *App) requireCtx(ctx context.Context) error {

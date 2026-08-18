@@ -12,7 +12,7 @@ func catalog() []Capability {
 		},
 		{
 			ID: HealthReady, Title: "Health ready", Version: VersionTag,
-			Description: "Readiness (valid snapshot, listeners bound). Not an MCP tool.",
+			Description: "SMTP bound, store initialized, and management bound or explicitly off. Not an MCP tool.",
 			Idempotent:  true, RESTOnly: true,
 			REST: []RESTBinding{{Method: "GET", Path: "/v1/health/ready"}},
 		},

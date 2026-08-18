@@ -23,6 +23,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
+- Ready reports unready as soon as SMTP `Shutdown` begins (`Accepting()`), so `/v1/health/ready` is not 200 while the listener has stopped accepting. `GET /v1/status` `ready` follows the same probe when a Ready hook is installed.
 - MCP inbox `resources/updated` is fan-out via the official SDK on both Streamable HTTP and `mcp-stdio` (URI-only `labmail://messages`). `subscriptions/listen` stays pinned to `2026-07-28` even when `allowLegacyClients` is true.
 - Reset preflights store options (including a creatable spill directory) and installs new caps under one lock, so a failed reset cannot empty the inbox under the old snapshot.
 

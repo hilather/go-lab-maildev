@@ -61,3 +61,21 @@ func TestSMTPMetricsOnSendMail(t *testing.T) {
 		t.Fatal("logged raw subject/DATA")
 	}
 }
+
+func TestAcceptingFalseAfterShutdown(t *testing.T) {
+	srv := startServer(t, defaultSMTPSpec(t), nil)
+	if !srv.Accepting() || srv.Addr() == nil {
+		t.Fatal("expected accepting after Start")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if srv.Accepting() {
+		t.Fatal("Accepting must be false after Shutdown")
+	}
+	if srv.Addr() == nil {
+		t.Fatal("Addr stays set after Shutdown so callers can log the former bind")
+	}
+}

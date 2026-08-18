@@ -59,4 +59,9 @@ func TestReadyOverride(t *testing.T) {
 	}
 	got := doReq(t, s.Handler(), http.MethodGet, "/v1/health/ready", "")
 	requireStatus(t, got, http.StatusServiceUnavailable)
+	st := doReq(t, s.Handler(), http.MethodGet, "/v1/status", "")
+	requireStatus(t, st, http.StatusOK)
+	if decodeJSON(t, st)["ready"] != false {
+		t.Fatalf("status.ready must match health hook: %s", st.Body.String())
+	}
 }

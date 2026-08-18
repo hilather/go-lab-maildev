@@ -2,6 +2,7 @@ package observability
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -87,6 +88,27 @@ func TestLoggerQueueDropDoesNotBlock(t *testing.T) {
 	}
 	if v, ok := reg.Get(MetricTelemetryDropped, map[string]string{"reason": "log"}); !ok || v < 1 {
 		t.Fatalf("log overflow not counted: %v ok=%v", v, ok)
+	}
+}
+
+func TestLoggerServeDrainsOnCancel(t *testing.T) {
+	var buf bytes.Buffer
+	l := NewLogger(&buf, LevelInfo).WithQueue(8)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		l.Serve(ctx)
+		close(done)
+	}()
+	l.Log(Record{Event: EventStateApply, Result: "ok"})
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Serve did not exit")
+	}
+	if !strings.Contains(buf.String(), EventStateApply) {
+		t.Fatalf("missing event: %s", buf.String())
 	}
 }
 

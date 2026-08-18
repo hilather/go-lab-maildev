@@ -146,7 +146,9 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Addr is the bound address, or nil before Start.
+// Addr is the last bound address, or nil before Start. It stays set after
+// Shutdown so callers can log the former listen address. Use Accepting to
+// decide whether new sessions are still admitted.
 func (s *Server) Addr() net.Addr {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -154,6 +156,17 @@ func (s *Server) Addr() net.Addr {
 		return nil
 	}
 	return s.ln.Addr()
+}
+
+// Accepting is true after Start and before Shutdown begins (listener still
+// admits connections). Ready probes must use this, not Addr() != nil.
+func (s *Server) Accepting() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.started && !s.stopped && s.ln != nil
 }
 
 // Shutdown stops accepts, closes sessions, and waits up to ctx.

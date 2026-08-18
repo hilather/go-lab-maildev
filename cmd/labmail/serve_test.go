@@ -355,6 +355,67 @@ func doHTTP(t *testing.T, url string) *http.Response {
 	return waitHTTP(t, url)
 }
 
+func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
+	ctx := context.Background()
+	path := writeServeConfig(t, "", false)
+	rt, err := serveFromConfig(ctx, serveFlags{
+		Config:           path,
+		SMTPListen:       "127.0.0.1:0",
+		ManagementListen: "127.0.0.1:0",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		shctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = rt.shutdown(shctx)
+	})
+	readyURL := "http://" + rt.http.Addr() + "/v1/health/ready"
+	statusURL := "http://" + rt.http.Addr() + "/v1/status"
+	got := waitHTTP(t, readyURL)
+	if got.StatusCode != http.StatusOK {
+		got.Body.Close()
+		t.Fatalf("ready before smtp stop: %d", got.StatusCode)
+	}
+	got.Body.Close()
+
+	shctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	if err := rt.smtp.Shutdown(shctx); err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	cancel()
+	if rt.smtp.Accepting() {
+		t.Fatal("SMTP still accepting after Shutdown")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	var ready *http.Response
+	for time.Now().Before(deadline) {
+		ready, err = http.Get(readyURL)
+		if err == nil && ready.StatusCode == http.StatusServiceUnavailable {
+			break
+		}
+		if ready != nil {
+			ready.Body.Close()
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ready.Body.Close()
+	if ready.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("ready after smtp stop: %d", ready.StatusCode)
+	}
+	st := waitHTTP(t, statusURL)
+	defer st.Body.Close()
+	if st.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", st.StatusCode)
+	}
+}
+
 func waitSMTPListen(t *testing.T, stdout *safeBuffer) string {
 	t.Helper()
 	return waitPrefix(t, stdout, "labmail smtp listen=")

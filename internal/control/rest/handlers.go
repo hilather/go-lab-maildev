@@ -116,7 +116,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request, instance s
 		return
 	}
 	out := statusResponse{
-		Ready:     st.Ready,
+		Ready:     s.isReady(ctx),
 		Revisions: rev,
 		Listeners: []listenerJSON{},
 		Store: storeStatsJSON{

@@ -8,7 +8,7 @@ Systems under test deliver RFC 5321 SMTP here. LabMail will capture, index, and 
 [![Go](https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
-Status: **foundation + fail-closed YAML**. The `labmail` binary implements `version`, `help`, `validate`, and `canonicalize`. There is **no SMTP listener**, store, REST, MCP, auth, UI, or container image yet.
+Status: **foundation + fail-closed YAML + plain SMTP sink**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, and `serve` (SMTP only; accepted mail is discarded). There is **no queryable inbox**, REST, MCP, auth, UI, or container image yet.
 
 Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image (later) `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
@@ -31,7 +31,7 @@ The integration lab currently publishes maildev as:
 
 Those listeners, the receive-only posture, wipe-on-restart semantics, and HTTP Basic on `/email` are the swap contract. During the swap release the labinfo catalog id stays **`maildev`**.
 
-## Quick start (stub)
+## Quick start
 
 ```bash
 git clone https://github.com/hilather/go-lab-maildev.git
@@ -41,9 +41,10 @@ go build -o bin/labmail ./cmd/labmail
 ./bin/labmail version
 ./bin/labmail help
 ./bin/labmail validate --config testdata/config/valid/defaults.yaml
+./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025
 ```
 
-`serve` is not implemented. Do not expect a bind on `:1025` or `:1080`.
+`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`). Accepted messages are discarded to a Null sink. Management HTTP on `:1080` is not bound yet.
 
 ## Build and test
 

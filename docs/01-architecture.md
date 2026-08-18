@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-17 (CFG-001)
+Last reviewed: 2026-08-17 (SMTP-001a)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -295,7 +295,7 @@ labmail version
 
 Optional later: `labmail send` is **not** shipped in the production binary (it would look like a sender). Tests use `internal/smtptest`.
 
-CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
+SMTP-001a implements `serve` (SMTP bind, Null sink). Management HTTP is not bound. CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
 
 ## Invariants
 
@@ -322,6 +322,7 @@ CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 sh
 - SMTP AUTH is PLAIN/LOGIN only. Implicit SMTPS is 1.1.
 - Healthcheck plane in compose changes from SMTP TCP (`node`) to HTTP `/v1/health/ready` (ready still requires SMTP bound).
 - Worst-case RSS ≈ stored `maxBytes` (256 MiB) + `maxInFlightDataBytes` (64 MiB) + ~64 MiB slack ≈ **384 MiB**. Caps are stacked: in-flight does not reduce inbox capacity. Spill on tmpfs does not add a second disk budget — it is still RAM.
+- SMTP-001a discards accepted DATA to `store.Null`; the queryable inbox is STORE-001.
 - Single replica; no shared inbox.
 - MCP clients requiring OAuth PRM cannot authorize. MCPJungle needs `allowLegacyClients: true` (D17).
 - HTML preview blocks remote `https:` images (no tracking pixels).

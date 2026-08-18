@@ -1,0 +1,13 @@
+S: 220 labmail.lab LabMail ready
+C: FOOBAR
+S: 500 5.5.1 Command unrecognized
+C: BDAT 5
+S: 502 5.5.1 BDAT not implemented
+C: AUTH PLAIN
+S: 502 5.5.1 AUTH not implemented
+C: STARTTLS
+S: 502 5.5.1 STARTTLS not implemented
+C: ETRN
+S: 502 5.5.1 ETRN not implemented
+C: QUIT
+S: 221 2.0.0 Bye

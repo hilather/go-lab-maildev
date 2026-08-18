@@ -1,0 +1,24 @@
+S: 220 labmail.lab LabMail ready
+C: HELO client.example
+S: 250 2.0.0 labmail.lab
+C: NOOP
+S: 250 2.0.0 OK
+C: MAIL FROM:<>
+S: 250 2.1.0 OK
+C: RCPT TO:<sink@lab.test>
+S: 250 2.1.5 OK
+C: RSET
+S: 250 2.0.0 OK
+C: MAIL FROM:<a@b>
+S: 250 2.1.0 OK
+C: RCPT TO:<c@d>
+S: 250 2.1.5 OK
+C: DATA
+S: 354 Start mail input; end with <CRLF>.<CRLF>
+C: Subject: after-rset
+C:
+C: x
+C: .
+S: 250 2.0.0 Queued as *
+C: QUIT
+S: 221 2.0.0 Bye

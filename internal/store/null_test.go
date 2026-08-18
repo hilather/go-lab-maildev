@@ -1,0 +1,55 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	"github.com/hilather/go-lab-maildev/internal/model"
+)
+
+func TestNullInsertAndEpoch(t *testing.T) {
+	n := NewNull()
+	if n.Epoch() != 1 {
+		t.Fatalf("epoch=%d", n.Epoch())
+	}
+	res, err := n.Insert(context.Background(), &model.Message{Raw: []byte("x")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(res.ID, "null-") {
+		t.Fatalf("id=%q", res.ID)
+	}
+	n.Wipe()
+	if n.Epoch() != 2 {
+		t.Fatalf("epoch after wipe=%d", n.Epoch())
+	}
+}
+
+func TestNullInsertCanceled(t *testing.T) {
+	n := NewNull()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := n.Insert(ctx, &model.Message{})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestNullInsertNilMessage(t *testing.T) {
+	n := NewNull()
+	_, err := n.Insert(context.Background(), nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestSentinelErrors(t *testing.T) {
+	if ErrFull == nil || ErrStaleEpoch == nil {
+		t.Fatal("sentinels")
+	}
+	if errors.Is(ErrFull, ErrStaleEpoch) {
+		t.Fatal("sentinels must differ")
+	}
+}

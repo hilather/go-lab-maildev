@@ -1,0 +1,23 @@
+# Greeting, EHLO, MAIL, RCPT, DATA, QUIT
+S: 220 labmail.lab LabMail ready
+C: EHLO client.example
+S: 250-labmail.lab
+S: 250-SIZE 10485760
+S: 250-8BITMIME
+S: 250-SMTPUTF8
+S: 250 ENHANCEDSTATUSCODES
+C: MAIL FROM:<alice@lab.test>
+S: 250 2.1.0 OK
+C: RCPT TO:<bob@lab.test>
+S: 250 2.1.5 OK
+C: DATA
+S: 354 Start mail input; end with <CRLF>.<CRLF>
+C: From: alice@lab.test
+C: To: bob@lab.test
+C: Subject: hello
+C:
+C: body
+C: .
+S: 250 2.0.0 Queued as *
+C: QUIT
+S: 221 2.0.0 Bye

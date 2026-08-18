@@ -1,7 +1,7 @@
 # Program Board
 
-Status: in-progress (SMTP-001a next)
-Last reviewed: 2026-08-17 (FND-001)
+Status: in-progress (SMTP-001b / STORE-001 next)
+Last reviewed: 2026-08-17 (SMTP-001a)
 
 Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs/` is the source of truth.
 
@@ -11,7 +11,7 @@ Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs
 |---:|---|---|---|---|---|
 | 1 | Repository foundation | FND-001 | None | Go module, CI, Makefile, design pack, stub CLI | done |
 | 2 | Domain model and fail-closed YAML | CFG-001 | FND-001 | `labmail.dev/v1alpha1`, reserved-key reject, revisions | done |
-| 3a | In-tree SMTP core (no AUTH/TLS) | SMTP-001a | CFG-001 | Greeting, HELO/MAIL/RCPT/DATA/RSET/QUIT, limits, SendMail | not-started |
+| 3a | In-tree SMTP core (no AUTH/TLS) | SMTP-001a | CFG-001 | Greeting, HELO/MAIL/RCPT/DATA/RSET/QUIT, limits, SendMail | done |
 | 3b | SMTP AUTH and STARTTLS | SMTP-001b | SMTP-001a | AUTH PLAIN/LOGIN transcript, STARTTLS; `implicit` stays reject | not-started |
 | 4 | MIME parse and bounded store | STORE-001 | SMTP-001a | MIME adapter, ULID inbox, caps, wait, wipe, epoch | not-started |
 | 5 | Application service, snapshot, reset | STA-001 | CFG-001, STORE-001 | `app.Service`, config snapshot, reset wipes inbox | not-started |

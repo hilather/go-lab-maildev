@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Security, SMTP, Control Plane
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (SMTP-001a)
 Related ADRs: 0002, 0003, 0005, 0007
 
 LabMail is a lab sink, not a public MX. The critical invariant is receive-only: outbound SMTP must be unrepresentable.
@@ -28,7 +28,7 @@ Defense in depth:
 
 1. **Schema.** Reserved key names rejected. No type exists for an outgoing host.
 2. **Binary.** Production `internal/smtp`, `internal/store`, and `internal/app` must not import `net/smtp` and must not call `net.Dial`, `net.DialTimeout`, or `net.Dialer.Dial` **at all** (Listen/Accept only). Test helper `internal/smtptest` is allowed in `*_test.go` only.
-3. **Import boundary** (`tools/importboundary` or `internal/smtp/import_test.go`): `internal/smtp` may import `internal/model`, `internal/store`, `internal/mimeparse`, `internal/observability`. It may **not** import `internal/control`, `net/http`, or `net/smtp`. Static check fails on any `Dial` ident in those packages.
+3. **Import boundary** (`internal/smtp/import_test.go`): `internal/smtp` may import `internal/model`, `internal/store`, `internal/mimeparse`, `internal/observability`. It may **not** import `internal/control`, `net/http`, or `net/smtp`. Static check fails on any `Dial` ident in `internal/smtp`, `internal/store`, and `internal/app`.
 4. **HTTP.** `POST /email/{id}/relay` and any `/v1/**/relay` → 403 `receive_only`.
 5. **UI.** No control that implies send.
 6. **Tests.** Table-driven: every reserved YAML key; compat relay; `go list` / static check that no production `.go` file references `outgoing-host` as a feature; SMTP session cannot be configured to connect outbound.

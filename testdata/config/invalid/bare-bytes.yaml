@@ -1,0 +1,7 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: bare-bytes
+spec:
+  smtp:
+    maxMessageBytes: 10485760

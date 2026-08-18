@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (CFG-001)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -295,7 +295,7 @@ labmail version
 
 Optional later: `labmail send` is **not** shipped in the production binary (it would look like a sender). Tests use `internal/smtptest`.
 
-FND-001 implements `version` and `help` only.
+CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. FND-001 shipped `version` and `help` only.
 
 ## Invariants
 

@@ -1,0 +1,8 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: starttls-missing
+spec:
+  smtp:
+    tls:
+      mode: starttls

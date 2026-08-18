@@ -1,0 +1,8 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: alias
+spec:
+  smtp: &s
+    hostname: labmail.lab
+  store: *s

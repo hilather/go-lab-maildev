@@ -1,0 +1,6 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: reserved-forward
+spec:
+  forwardTo: inbox@example.com

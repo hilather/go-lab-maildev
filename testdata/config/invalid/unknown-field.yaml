@@ -1,0 +1,6 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: unknown
+spec:
+  notAField: true

@@ -1,0 +1,4 @@
+kind: LabMail
+metadata:
+  name: missing-api
+spec: {}

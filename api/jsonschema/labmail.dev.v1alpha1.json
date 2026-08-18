@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://labmail.dev/schema/v1alpha1",
+  "title": "LabMail v1alpha1",
+  "description": "Normative field list for apiVersion labmail.dev/v1alpha1, kind LabMail. Unknown fields are rejected. Durations use Go time.ParseDuration syntax (30s, 10m). Byte sizes use IEC units (10MiB, 256KiB). Reserved relay keys are rejected.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": { "const": "labmail.dev/v1alpha1" },
+    "kind": { "const": "LabMail" },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "spec": { "$ref": "#/$defs/spec" }
+  },
+  "$defs": {
+    "duration": {
+      "type": "string",
+      "description": "Go time.ParseDuration syntax, exported in a single-unit canonical form (30s, 5m, 1h)."
+    },
+    "byteSize": {
+      "type": "string",
+      "description": "IEC byte size (10MiB, 256KiB, 1B). Bare numbers are rejected."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "listeners": { "$ref": "#/$defs/listeners" },
+        "smtp": { "$ref": "#/$defs/smtp" },
+        "store": { "$ref": "#/$defs/store" },
+        "ui": { "$ref": "#/$defs/ui" },
+        "management": { "$ref": "#/$defs/management" },
+        "observability": { "$ref": "#/$defs/observability" }
+      }
+    },
+    "listeners": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "smtp": { "$ref": "#/$defs/smtpListener" },
+        "management": { "$ref": "#/$defs/mgmtListener" }
+      }
+    },
+    "smtpListener": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address": { "type": "string", "description": "host:port; default :1025" }
+      }
+    },
+    "mgmtListener": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address": { "type": "string", "description": "host:port; default :1080" },
+        "restPath": { "type": "string", "description": "default /v1" },
+        "mcpPath": { "type": "string", "description": "default /mcp" },
+        "compatEnabled": { "type": "boolean", "description": "default true; /email, /healthz, /config" },
+        "tls": { "$ref": "#/$defs/listenerTLS" }
+      }
+    },
+    "listenerTLS": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "certFile": { "type": "string" },
+        "keyFile": { "type": "string" }
+      }
+    },
+    "smtp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hostname": { "type": "string", "description": "default labmail.lab" },
+        "maxMessageBytes": { "$ref": "#/$defs/byteSize", "description": "default 10MiB; 0 is rejected" },
+        "maxRecipients": { "type": "integer", "minimum": 1, "description": "default 100" },
+        "hideExtensions": { "type": "array", "items": { "type": "string" } },
+        "auth": { "$ref": "#/$defs/smtpAuth" },
+        "tls": { "$ref": "#/$defs/smtpTLS" },
+        "admission": { "$ref": "#/$defs/admission" }
+      }
+    },
+    "smtpAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["none", "plain_login"], "description": "default none" },
+        "username": { "type": "string" },
+        "passwordFile": { "type": "string" }
+      }
+    },
+    "smtpTLS": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["off", "starttls", "implicit"], "description": "default off; implicit is rejected in 1.0" },
+        "required": { "type": "boolean", "description": "legal only when mode=starttls" },
+        "certFile": { "type": "string" },
+        "keyFile": { "type": "string" }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxSessions": { "type": "integer", "minimum": 1, "description": "default 256" },
+        "maxSessionsPerIP": { "type": "integer", "minimum": 1, "description": "default 32" },
+        "maxInFlightData": { "type": "integer", "minimum": 1, "description": "default 8" },
+        "maxInFlightDataBytes": { "$ref": "#/$defs/byteSize", "description": "default 64MiB" },
+        "sessionTimeout": { "$ref": "#/$defs/duration", "description": "default 10m" },
+        "commandIdle": { "$ref": "#/$defs/duration", "description": "default 120s" },
+        "dataIdle": { "$ref": "#/$defs/duration", "description": "default 180s" }
+      }
+    },
+    "store": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxMessages": { "type": "integer", "minimum": 1, "description": "default 1000" },
+        "maxBytes": { "$ref": "#/$defs/byteSize", "description": "default 256MiB" },
+        "fullPolicy": { "enum": ["reject", "evict_oldest"], "description": "default reject" },
+        "maxWait": { "$ref": "#/$defs/duration", "description": "default 60s" },
+        "spillDirectory": { "type": "string" },
+        "spillThreshold": { "$ref": "#/$defs/byteSize", "description": "default 256KiB" }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "description": "default true; false hides SPA only" }
+      }
+    },
+    "management": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auth": { "$ref": "#/$defs/mgmtAuth" },
+        "mcp": { "$ref": "#/$defs/mcp" },
+        "originAllowlist": { "type": "array", "items": { "type": "string" } },
+        "bodyLimit": { "$ref": "#/$defs/byteSize", "description": "default 1MiB" },
+        "requestsPerSecond": { "type": "integer", "minimum": 1, "description": "default 32" },
+        "burst": { "type": "integer", "minimum": 1, "description": "default 64" },
+        "maxConcurrent": { "type": "integer", "minimum": 1, "description": "default 256" }
+      }
+    },
+    "mgmtAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["bearer", "bearer_and_basic", "dev-loopback-unauth"], "description": "default bearer_and_basic" },
+        "tokens": { "type": "array", "items": { "$ref": "#/$defs/token" } },
+        "basic": { "$ref": "#/$defs/basic" }
+      }
+    },
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "secretFile": { "type": "string" },
+        "role": { "enum": ["viewer", "operator", "administrator"] },
+        "scopes": {
+          "type": "array",
+          "items": { "enum": ["mail.read", "mail.write", "mail.admin", "mail.audit.read"] }
+        }
+      }
+    },
+    "basic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "username": { "type": "string" },
+        "passwordFile": { "type": "string" },
+        "tokenRef": { "type": "string" }
+      }
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowLegacyClients": { "type": "boolean", "description": "default false" }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logLevel": { "enum": ["debug", "info", "warn", "error"], "description": "default info" },
+        "metrics": { "$ref": "#/$defs/metrics" },
+        "audit": { "$ref": "#/$defs/audit" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "listen": { "type": "string", "description": "default 127.0.0.1:9090; empty disables" },
+        "publicPath": { "type": "boolean" }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ring": { "type": "integer", "minimum": 0, "description": "default 128" }
+      }
+    }
+  }
+}

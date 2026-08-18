@@ -21,8 +21,18 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 		return nil, err
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	res, hooks, err := s.resetLocked(ctx, actor, in)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	for _, fn := range hooks {
+		fn()
+	}
+	return res, nil
+}
 
+func (s *App) resetLocked(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult, []func(), error) {
 	prev := s.snaps.Load()
 	gen := model.Generation(0)
 	if prev != nil {
@@ -31,16 +41,16 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 
 	next, err := s.loadBootstrapCandidate(ctx, gen)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	diff, _, err := diffStates(canonicalOf(prev), next.Canonical)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := rejectUnimplementedSMTP(next.Canonical.Spec.SMTP); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Validate new store options (including creatable spill dir) before
@@ -48,10 +58,10 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 	if s.inbox != nil {
 		opts, err := store.CheckOptions(store.OptionsFromSpec(next.Canonical.Spec.Store))
 		if err != nil {
-			return nil, asDomain(err)
+			return nil, nil, asDomain(err)
 		}
 		if err := s.inbox.ResetTo(opts); err != nil {
-			return nil, asDomain(err)
+			return nil, nil, asDomain(err)
 		}
 	}
 
@@ -79,10 +89,7 @@ func (s *App) Reset(ctx context.Context, actor Actor, in ResetIn) (*ApplyResult,
 		Result:          audit.ResultOK,
 		Diff:            toAuditDiff(diff),
 	})
-	for _, fn := range hooks {
-		fn()
-	}
-	return cloneApply(res), nil
+	return cloneApply(res), hooks, nil
 }
 
 func (s *App) loadBootstrapCandidate(ctx context.Context, gen model.Generation) (*snapshot.Snapshot, error) {

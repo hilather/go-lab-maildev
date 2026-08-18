@@ -1,0 +1,18 @@
+From: alice@lab.test
+To: bob@lab.test
+Subject: bad name
+Message-ID: <path@labmail.lab>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="bound-path"
+
+--bound-path
+Content-Type: text/plain
+
+body
+--bound-path
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="../../etc/passwd"
+Content-Transfer-Encoding: base64
+
+eA==
+--bound-path--

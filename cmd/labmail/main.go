@@ -54,7 +54,7 @@ const usageText = `usage: labmail <command>
 
 LabMail is a receive-only SMTP lab appliance. validate and canonicalize
 load a fail-closed labmail.dev/v1alpha1 document. serve binds SMTP and
-discards accepted mail to a Null sink. Management HTTP is not bound yet.
+stores accepted mail in a bounded memory inbox. Management HTTP is not bound yet.
 
 Commands:
   version         print build and protocol metadata

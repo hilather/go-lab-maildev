@@ -1,0 +1,10 @@
+From: Alice <alice@lab.test>
+To: Bob <bob@lab.test>
+Cc: carol@lab.test
+Subject: hello lab
+Message-ID: <1412535729.simple@fbi.gov>
+Date: Mon, 17 Aug 2026 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+plain body line

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hilather/go-lab-maildev/internal/mimeparse"
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtp/codec"
 	"github.com/hilather/go-lab-maildev/internal/store"
@@ -251,17 +252,15 @@ func (s *session) cmdData() bool {
 		}
 	}
 
-	msg := &model.Message{
-		ReceivedAt: time.Now().UTC(),
-		Envelope: model.Envelope{
-			From:       s.from,
-			To:         append([]string(nil), s.rcpt...),
-			HELO:       s.helo,
-			RemoteAddr: s.conn.RemoteAddr().String(),
-		},
-		Raw:  raw,
-		Size: len(raw),
+	msg := mimeparse.Parse(raw)
+	msg.ReceivedAt = time.Now().UTC()
+	msg.Envelope = model.Envelope{
+		From:       s.from,
+		To:         append([]string(nil), s.rcpt...),
+		HELO:       s.helo,
+		RemoteAddr: s.conn.RemoteAddr().String(),
 	}
+	msg.Size = len(raw)
 	res, err := s.srv.store.Insert(context.Background(), epoch, msg)
 	if err != nil {
 		switch {
@@ -269,6 +268,8 @@ func (s *session) cmdData() bool {
 			_ = s.reply(451, "4.3.2 Requested action aborted")
 		case errors.Is(err, store.ErrFull):
 			_ = s.reply(452, "4.3.1 Insufficient storage")
+		case errors.Is(err, store.ErrTooLarge):
+			_ = s.reply(552, "5.3.4 Message too large")
 		default:
 			_ = s.reply(451, "4.3.2 Requested action aborted")
 		}

@@ -8,7 +8,7 @@ Systems under test deliver RFC 5321 SMTP here. LabMail will capture, index, and 
 [![Go](https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
-Status: **foundation + fail-closed YAML + plain SMTP sink**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, and `serve` (SMTP only; accepted mail is discarded). There is **no queryable inbox**, REST, MCP, auth, UI, or container image yet.
+Status: **foundation + fail-closed YAML + plain SMTP sink + bounded inbox**. The `labmail` binary implements `version`, `help`, `validate`, `canonicalize`, and `serve` (SMTP stored in `store.Memory`). There is **no REST, MCP, auth, UI, or container image** yet.
 
 Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image (later) `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
@@ -44,7 +44,7 @@ go build -o bin/labmail ./cmd/labmail
 ./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025
 ```
 
-`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`). Accepted messages are discarded to a Null sink. Management HTTP on `:1080` is not bound yet.
+`serve` binds SMTP from the compiled YAML (override with `--smtp-listen`). Accepted messages are parsed and stored in a bounded memory inbox (ULID ids, stacked caps, Wipe on shutdown). Management HTTP on `:1080` is not bound yet.
 
 ## Build and test
 

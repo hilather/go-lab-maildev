@@ -1,0 +1,7 @@
+From: alice@lab.test
+To: bob@lab.test
+Subject: missing id
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+no message-id header

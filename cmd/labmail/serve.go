@@ -79,6 +79,7 @@ func serveCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 
 type serveRuntime struct {
 	smtp    *server.Server
+	inbox   *store.Memory
 	pidPath string
 }
 
@@ -95,20 +96,27 @@ func serveFromConfig(ctx context.Context, flags serveFlags) (*serveRuntime, erro
 	if flags.SMTPListen != "" {
 		addr = flags.SMTPListen
 	}
-	srv, err := server.New(server.Options{
-		Address: addr,
-		Spec:    res.Canonical.Spec.SMTP,
-		Store:   store.NewNull(),
-	})
+	inbox, err := store.New(store.OptionsFromSpec(res.Canonical.Spec.Store))
 	if err != nil {
 		return nil, err
 	}
-	if err := srv.Start(); err != nil {
+	srv, err := server.New(server.Options{
+		Address: addr,
+		Spec:    res.Canonical.Spec.SMTP,
+		Store:   inbox,
+	})
+	if err != nil {
+		inbox.Wipe()
 		return nil, err
 	}
-	rt := &serveRuntime{smtp: srv, pidPath: flags.PIDFile}
+	if err := srv.Start(); err != nil {
+		inbox.Wipe()
+		return nil, err
+	}
+	rt := &serveRuntime{smtp: srv, inbox: inbox, pidPath: flags.PIDFile}
 	if err := writePIDFile(flags.PIDFile); err != nil {
 		_ = srv.Shutdown(context.Background())
+		inbox.Wipe()
 		return nil, fmt.Errorf("pid-file: %w", err)
 	}
 	return rt, nil
@@ -123,6 +131,9 @@ func (r *serveRuntime) shutdown(ctx context.Context) error {
 		if err := r.smtp.Shutdown(ctx); err != nil {
 			first = err
 		}
+	}
+	if r.inbox != nil {
+		r.inbox.Wipe()
 	}
 	if r.pidPath != "" {
 		_ = os.Remove(r.pidPath)

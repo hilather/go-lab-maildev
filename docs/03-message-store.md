@@ -2,18 +2,20 @@
 
 Status: Proposed normative behavior
 Owners: Store, SMTP, Application
-Last reviewed: 2026-08-17 (SMTP-001a)
+Last reviewed: 2026-08-17 (STORE-001)
 Related ADRs: 0003
 
 Package `internal/store`. Captured mail is runtime evidence, not desired state. Restart or reset wipes the inbox.
 
-SMTP-001a implements `store.Sink` and `store.Null` only. `Insert(ctx, epoch, msg)` assigns a discard id and retains nothing. The `epoch` argument is the value captured at DATA start; a mismatch under the insert lock returns `store.ErrStaleEpoch` (`451 4.3.2`). `Wipe` bumps `Epoch`. The queryable `Store` (ULID ids, list/get/wait, caps, spill) is STORE-001.
+STORE-001 implements `store.Memory` (ULID ids, MIME parse via `internal/mimeparse`, stacked caps, Wait, Wipe epoch, optional spill). SMTP `Insert` takes the epoch captured at DATA start; a mismatch under the insert lock returns `store.ErrStaleEpoch` (`451 4.3.2`). `fullPolicy: reject` returns `store.ErrFull` (`452 4.3.1`). A single message whose resident size exceeds `maxBytes` returns `store.ErrTooLarge` (`552 5.3.4`). `store.Null` remains a discard Sink for tests.
+
+Malformed MIME is still stored: raw bytes are kept and `parseWarning` is set.
 
 ## Interface
 
 ```go
 type Store interface {
-    Insert(context.Context, *model.Message) (model.InsertResult, error)
+    Insert(ctx context.Context, epoch uint64, msg *model.Message) (model.InsertResult, error)
     Get(id string, markRead bool) (*model.Message, error)
     List(model.ListQuery) (model.ListResult, error)
     Delete(id string) error
@@ -61,6 +63,7 @@ insertAllowed     ⇔ storeOK ∧ inFlightOK
 - `reject`: `Insert` returns `store.ErrFull`; SMTP maps to `452 4.3.1`.
 - `evict_oldest`: delete oldest by `receivedAt` until the new message fits; emit `labmail_store_evictions_total`. If a single message’s resident size exceeds `maxBytes`, reject (`552`) — do not evict the whole inbox.
 - Spill writes raw (and optionally decoded blobs) under tmpfs. **tmpfs is still RAM.** Spill does not increase the budget; it only bounds Go heap vs kernel page cache. `Wipe` / process exit unlinks files.
+- Spill writes use temp names and are committed (rename) only after the insert is accepted. A spill write failure leaves the inbox unchanged (no evict, no generation bump). `Get` / `Wait` / `List` return `store.ErrSpill` if a recorded spill file cannot be read. Startup `New` fails if the configured spill directory cannot be cleared.
 - Startup `Wipe`s the configured spill path. Spill is not a mail-directory across restarts.
 
 Default worst-case RSS: stored `maxBytes` (256 MiB) + in-flight `maxInFlightDataBytes` (64 MiB) + ~64 MiB process/heap slack ≈ **384 MiB**. In-flight does **not** shrink inbox capacity.

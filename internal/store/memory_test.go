@@ -408,23 +408,47 @@ func TestMemoryListDeletedCursorUsesReceivedAt(t *testing.T) {
 	}
 }
 
-func TestMemoryListAfterWipeIgnoresOldCursor(t *testing.T) {
+func TestMemoryListAfterWipeOldCursorIsEmpty(t *testing.T) {
 	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
 	old, err := s.Insert(context.Background(), s.Epoch(), rawMsg("old", "a"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.Wipe()
-	neu, err := s.Insert(context.Background(), s.Epoch(), rawMsg("new", "b"))
-	if err != nil {
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("new", "b")); err != nil {
 		t.Fatal(err)
 	}
 	page, err := s.List(model.ListQuery{Cursor: old.ID, Limit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Items) != 1 || page.Items[0].ID != neu.ID {
-		t.Fatalf("items=%v", idsOf(page))
+	if len(page.Items) != 0 {
+		t.Fatalf("wipe+old cursor replayed %v", idsOf(page))
+	}
+}
+
+func TestMemoryListDeletedOldestCursorIsEmpty(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	for _, subj := range []string{"a", "b", "c"} {
+		time.Sleep(2 * time.Millisecond)
+		if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg(subj, subj)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page, err := s.List(model.ListQuery{Limit: 10})
+	if err != nil || len(page.Items) != 3 {
+		t.Fatalf("page=%+v err=%v", page, err)
+	}
+	oldest := page.Items[len(page.Items)-1].ID
+	if err := s.Delete(oldest); err != nil {
+		t.Fatal(err)
+	}
+	next, err := s.List(model.ListQuery{Cursor: oldest, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next.Items) != 0 {
+		t.Fatalf("deleted oldest cursor replayed %v", idsOf(next))
 	}
 }
 
@@ -449,9 +473,25 @@ func TestMemoryGetUnreadableSpill(t *testing.T) {
 	for _, e := range ents {
 		_ = os.Remove(filepath.Join(dir, e.Name()))
 	}
-	_, err = s.Get(res.ID, false)
+	if s.Stats().UnreadCount != 1 {
+		t.Fatalf("unread before get=%d", s.Stats().UnreadCount)
+	}
+	_, err = s.Get(res.ID, true)
 	if !errors.Is(err, ErrSpill) {
-		t.Fatalf("err=%v", err)
+		t.Fatalf("get err=%v", err)
+	}
+	if s.Stats().UnreadCount != 1 {
+		t.Fatalf("spill error marked read: unread=%d", s.Stats().UnreadCount)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err = s.Wait(ctx, model.MessageFilter{Subject: "spill"})
+	if !errors.Is(err, ErrSpill) {
+		t.Fatalf("wait err=%v", err)
+	}
+	if time.Since(start) > 100*time.Millisecond {
+		t.Fatalf("wait spun until timeout: %s", time.Since(start))
 	}
 }
 

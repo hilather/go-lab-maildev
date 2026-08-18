@@ -256,9 +256,6 @@ func (m *Memory) Get(id string, markRead bool) (*model.Message, error) {
 		m.mu.Unlock()
 		return nil, ErrNotFound
 	}
-	if markRead {
-		rec.msg.Read = true
-	}
 	snap := snapshotRecord(rec)
 	m.mu.Unlock()
 	if err := loadSpill(snap); err != nil {
@@ -271,6 +268,14 @@ func (m *Memory) Get(id string, markRead bool) (*model.Message, error) {
 			}
 		}
 		return nil, fmt.Errorf("%w: %v", ErrSpill, err)
+	}
+	if markRead {
+		m.mu.Lock()
+		if rec, ok := m.byID[id]; ok {
+			rec.msg.Read = true
+			snap.msg.Read = true
+		}
+		m.mu.Unlock()
 	}
 	return snap.msg, nil
 }
@@ -348,18 +353,13 @@ func (m *Memory) resolveCursorLocked(id string) (cursorPos, bool) {
 	}
 	u, err := ulid.Parse(id)
 	if err != nil {
-		return cursorPos{id: id}, true
+		// Not a store cursor; do not restart from newest (would replay the inbox).
+		return cursorPos{id: id}, false
 	}
-	at := ulid.Time(u.Time())
-	if len(m.order) == 0 {
-		return cursorPos{id: id, at: at}, true
-	}
-	oldest := m.byID[m.order[0]]
-	if oldest != nil && oldest.msg.ReceivedAt.After(at) {
-		// Cursor predates every remaining row (wipe / DeleteAll + new mail).
-		return cursorPos{id: id, at: at}, true
-	}
-	return cursorPos{id: id, at: at}, false
+	// Missing id: resume after this ReceivedAt/ULID time. If the cursor was
+	// the oldest current row and was deleted, every remaining row is newer
+	// and the next page is empty. Wipe/DeleteAll invalidation is generation.
+	return cursorPos{id: id, at: ulid.Time(u.Time())}, false
 }
 
 func newerThanCursor(msg *model.Message, cur cursorPos) bool {
@@ -454,6 +454,11 @@ func (m *Memory) Wait(ctx context.Context, filter model.MessageFilter) (*model.M
 			if err := loadSpill(snap); err != nil {
 				if os.IsNotExist(err) {
 					m.mu.Lock()
+					_, still := m.byID[snap.msg.ID]
+					if still {
+						m.mu.Unlock()
+						return nil, fmt.Errorf("%w: %v", ErrSpill, err)
+					}
 					continue
 				}
 				return nil, fmt.Errorf("%w: %v", ErrSpill, err)

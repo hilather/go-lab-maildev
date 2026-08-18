@@ -83,7 +83,7 @@ services:
       retries: 3
 ```
 
-`make test-container` (`scripts/test-container.sh`) builds the image, asserts UID `65532`, `CapEff=0`, Apache-2.0 label, exec-form HTTP ready healthcheck, then delivers SMTP and lists `/v1/messages`.
+`make test-container` (`scripts/test-container.sh`) builds the image, asserts UID `65532`, `CapEff=0`, Apache-2.0 label, exec-form HTTP ready healthcheck, no `/bin/sh` or busybox, read-only root, then delivers SMTP and lists `/v1/messages`. It parses `examples/compose.smoke.yaml` with `docker compose config` when the plugin is present.
 
 ## Integration-lab compose fragment
 

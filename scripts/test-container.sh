@@ -7,6 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${LABMAIL_TEST_IMAGE:-ghcr.io/hilather/labmail:test}"
 NAME="labmail-container-test-$$"
 CFG="${ROOT}/testdata/container/config.yaml"
+COMPOSE="${ROOT}/examples/compose.smoke.yaml"
 
 if ! command -v docker >/dev/null 2>&1; then
 	echo "docker is required for make test-container" >&2
@@ -45,6 +46,22 @@ case "${hc}" in
 	;;
 esac
 case "${hc}" in
+'["CMD",'*)
+	;;
+*)
+	echo "image HEALTHCHECK=${hc}, want JSON array starting with CMD" >&2
+	exit 1
+	;;
+esac
+case "${hc}" in
+*'/v1/health/ready'*)
+	;;
+*)
+	echo "image HEALTHCHECK=${hc}, want /v1/health/ready" >&2
+	exit 1
+	;;
+esac
+case "${hc}" in
 *healthcheck*)
 	;;
 *)
@@ -59,6 +76,12 @@ case "${hc}" in
 	;;
 esac
 
+if docker compose version >/dev/null 2>&1; then
+	docker compose -f "${COMPOSE}" config >/dev/null
+else
+	echo "docker compose plugin not available; compose file parse skipped" >&2
+fi
+
 docker run -d --name "${NAME}" \
 	--read-only \
 	--cap-drop=ALL \
@@ -69,21 +92,55 @@ docker run -d --name "${NAME}" \
 	-p 127.0.0.1::1080/tcp \
 	"${IMAGE}"
 
-pid="$(docker inspect --format '{{.State.Pid}}' "${NAME}")"
-if [ ! -r "/proc/${pid}/status" ]; then
-	echo "cannot read /proc/${pid}/status to verify non-root/no-caps" >&2
+readonly_root="$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "${NAME}")"
+if [ "${readonly_root}" != "true" ]; then
+	echo "HostConfig.ReadonlyRootfs=${readonly_root}, want true" >&2
 	exit 1
 fi
-uid="$(awk '/^Uid:/{print $2}' "/proc/${pid}/status")"
-if [ "${uid}" != "65532" ]; then
-	echo "runtime Uid=${uid}, want 65532" >&2
-	exit 1
-fi
-capeff="$(awk '/^CapEff:/{print $2}' "/proc/${pid}/status")"
-if [ "${capeff}" != "0000000000000000" ]; then
-	echo "CapEff=${capeff}, want 0000000000000000 (no capabilities)" >&2
-	exit 1
-fi
+
+assert_identity() {
+	local uid capeef
+	# Prefer in-container /proc/self/status (works when the client cannot
+	# see the container PID, e.g. Docker Desktop / remote DOCKER_HOST).
+	if status="$(docker exec "${NAME}" /labmail debug-status 2>/dev/null)"; then
+		uid="$(printf '%s\n' "${status}" | awk '/^Uid:/{print $2; exit}')"
+		capeef="$(printf '%s\n' "${status}" | awk '/^CapEff:/{print $2; exit}')"
+		if [ "${uid}" = "65532" ] && [ "${capeef}" = "0000000000000000" ]; then
+			return 0
+		fi
+		echo "in-container Uid=${uid} CapEff=${capeef}, want 65532 / 0000000000000000" >&2
+		return 1
+	fi
+	local pid
+	pid="$(docker inspect --format '{{.State.Pid}}' "${NAME}")"
+	if [ -r "/proc/${pid}/status" ]; then
+		uid="$(awk '/^Uid:/{print $2}' "/proc/${pid}/status")"
+		capeef="$(awk '/^CapEff:/{print $2}' "/proc/${pid}/status")"
+		if [ "${uid}" = "65532" ] && [ "${capeef}" = "0000000000000000" ]; then
+			return 0
+		fi
+		echo "host /proc Uid=${uid} CapEff=${capeef}, want 65532 / 0000000000000000" >&2
+		return 1
+	fi
+	local capdrop privileged
+	capdrop="$(docker inspect --format '{{json .HostConfig.CapDrop}}' "${NAME}")"
+	privileged="$(docker inspect --format '{{.HostConfig.Privileged}}' "${NAME}")"
+	case "${capdrop}" in
+	*ALL*)
+		;;
+	*)
+		echo "cannot read CapEff (need Linux Docker); CapDrop=${capdrop}, want ALL" >&2
+		return 1
+		;;
+	esac
+	if [ "${privileged}" != "false" ]; then
+		echo "cannot read CapEff (need Linux Docker); Privileged=${privileged}, want false" >&2
+		return 1
+	fi
+	echo "CapEff not readable from this client; accepted CapDrop=${capdrop} Privileged=${privileged}" >&2
+	return 0
+}
+assert_identity
 
 mgmt_port="$(docker port "${NAME}" 1080/tcp | head -n1 | awk -F: '{print $NF}')"
 smtp_port="$(docker port "${NAME}" 1025/tcp | head -n1 | awk -F: '{print $NF}')"
@@ -109,6 +166,18 @@ if ! docker exec "${NAME}" /labmail version >/dev/null; then
 fi
 if ! docker exec "${NAME}" /labmail healthcheck --url=http://127.0.0.1:1080/v1/health/ready >/dev/null; then
 	echo "in-container HTTP ready healthcheck failed" >&2
+	exit 1
+fi
+if docker exec "${NAME}" /bin/sh -c true >/dev/null 2>&1; then
+	echo "image has a shell at /bin/sh" >&2
+	exit 1
+fi
+if docker exec "${NAME}" /bin/busybox true >/dev/null 2>&1; then
+	echo "image has busybox" >&2
+	exit 1
+fi
+if ! docker exec "${NAME}" /labmail debug-status --check-readonly >/dev/null; then
+	echo "read-only root check failed (could write /probe-ro)" >&2
 	exit 1
 fi
 

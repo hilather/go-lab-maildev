@@ -199,6 +199,23 @@ func TestParseServeFlags(t *testing.T) {
 	}
 }
 
+func TestDebugStatus(t *testing.T) {
+	if _, err := os.Stat("/proc/self/status"); err != nil {
+		t.Skip("/proc/self/status not available")
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"labmail", "debug-status"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Uid:") {
+		t.Fatalf("stdout=%q missing Uid", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "CapEff:") {
+		t.Fatalf("stdout=%q missing CapEff", stdout.String())
+	}
+}
+
 func TestDockerfileHardening(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join(repoRoot(t), "Dockerfile"))
 	if err != nil {
@@ -235,6 +252,9 @@ func TestComposeSmokeContract(t *testing.T) {
 		`user: "65532:65532"`,
 		"read_only: true",
 		"cap_drop:",
+		"- ALL",
+		"tmpfs:",
+		"- /tmp",
 		"no-new-privileges:true",
 	} {
 		if !strings.Contains(text, want) {

@@ -17,8 +17,10 @@ import (
 	smtpserver "github.com/hilather/go-lab-maildev/internal/smtp/server"
 )
 
-// TestMaildevScenarioCompat is the mcp-integration-lab smoke twin:
-// SendMail, unauthenticated GET /email → 401, Basic → array containing subject.
+// TestMaildevScenarioCompat is the mcp-integration-lab smoke twin
+// (maildevScenario): SendMail, unauthenticated GET /email → 401, Basic →
+// array containing subject. Goldens live in testdata/compat/. The lab swap
+// PR copies this name and these three assertions.
 func TestMaildevScenarioCompat(t *testing.T) {
 	dir := t.TempDir()
 	tokenPath := filepath.Join(dir, "token")

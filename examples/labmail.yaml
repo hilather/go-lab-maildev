@@ -1,6 +1,8 @@
-# Operator-facing LabMail bootstrap for examples/compose.smoke.yaml.
-# Default container YAML is bearer_and_basic. Token/password file mounts
-# land with SEC-001 / SWAP-001; empty tokens keep this valid today.
+# mcp-integration-lab overlay: copy to profiles/default/labmail/bootstrap.yaml
+# and mount at /etc/labmail/config.yaml. allowLegacyClients is on so
+# MCPJungle (mark3labs/mcp-go v0.48) can register without a LabMail patch
+# (D17). SMTP AUTH stays off so smoke SendMail(..., nil, ...) still works.
+# Also used by examples/compose.smoke.yaml.
 apiVersion: labmail.dev/v1alpha1
 kind: LabMail
 metadata:
@@ -14,32 +16,65 @@ spec:
       restPath: /v1
       mcpPath: /mcp
       compatEnabled: true
+      tls:
+        enabled: false
+        certFile: ""
+        keyFile: ""
+
   smtp:
     hostname: labmail.lab
     maxMessageBytes: 10MiB
     maxRecipients: 100
+    hideExtensions: []
     auth:
       mode: none
+      username: ""
+      passwordFile: ""
     tls:
       mode: off
       required: false
+      certFile: ""
+      keyFile: ""
+    admission:
+      maxSessions: 256
+      maxSessionsPerIP: 32
+      maxInFlightData: 8
+      maxInFlightDataBytes: 64MiB
+      sessionTimeout: 10m
+      commandIdle: 120s
+      dataIdle: 180s
+
   store:
     maxMessages: 1000
     maxBytes: 256MiB
     fullPolicy: reject
+    maxWait: 60s
     spillDirectory: ""
+    spillThreshold: 256KiB
+
   ui:
     enabled: true
+
   management:
     auth:
       mode: bearer_and_basic
+      tokens:
+        - id: admin
+          secretFile: /run/secrets/labmail-token
+          role: administrator
+          scopes: [mail.read, mail.write, mail.admin, mail.audit.read]
+      basic:
+        username: admin
+        passwordFile: /run/secrets/maildev-web-password
+        tokenRef: admin
     mcp:
-      allowLegacyClients: false
+      allowLegacyClients: true
     originAllowlist: []
     bodyLimit: 1MiB
     requestsPerSecond: 32
     burst: 64
     maxConcurrent: 256
+
   observability:
     logLevel: info
     metrics:

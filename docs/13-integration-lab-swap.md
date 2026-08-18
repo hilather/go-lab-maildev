@@ -2,14 +2,27 @@
 
 Status: Proposed normative behavior
 Owners: Integration, Platform
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-18 (SWAP-001)
 Related ADRs: 0005, 0006, 0007
 
-This document is the bill of materials for replacing `maildev/maildev:2.2.1` in `mcp-integration-lab` with LabMail. The compose/image pin change is a follow-up in that repo after `v1.0.0-rc.1`. SWAP-001 lands examples in this repo.
+This document is the bill of materials for replacing `maildev/maildev:2.2.1` in `mcp-integration-lab` with LabMail. SWAP-001 lands the overlay in **this** repo. The compose/image pin change is a follow-up in that repo after `v1.0.0-rc.1`. DEP-001 image files are stacked later and are not required here.
 
-**Q1 closed:** keep labinfo id `maildev` for the swap release; rename to `labmail` only in a later mcp-integration-lab release (D15).
+**Q1 closed:** keep labinfo id `maildev` for the swap release; rename to `labmail` only in a later mcp-integration-lab release (D15). Do **not** rename the id in the same PR as the image pin.
 
-**Q2 closed:** 1.0 includes the inbox UI; GA is not done without PR 12.
+**Q2 closed:** 1.0 includes the inbox UI; GA is not done without PR 12 (UI-001). The swap gate (SMTP + `/email` + Basic) does not wait on the UI, but 1.0 GA does.
+
+## Overlay files in this repo
+
+Copy these into `mcp-integration-lab` at the paths in the BOM. Do not invent a second schema.
+
+| This repo | Lab destination | Role |
+|---|---|---|
+| [examples/labmail.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.yaml) | `profiles/default/labmail/bootstrap.yaml` | Lab overlay. `allowLegacyClients: true` (D17). Basic `tokenRef: admin`. SMTP AUTH off. |
+| [examples/mcpjungle/servers/labmail.json](https://github.com/hilather/go-lab-maildev/blob/main/examples/mcpjungle/servers/labmail.json) | `profiles/default/mcpjungle/servers/labmail.json` | Filename must match JSON `name` (lab AGENTS.md rule 8). URL is `http://maildev:1080/mcp`. |
+| [examples/mcpjungle/groups/integration.json](https://github.com/hilather/go-lab-maildev/blob/main/examples/mcpjungle/groups/integration.json) | `profiles/default/mcpjungle/groups/integration.json` | **Append** `"labmail"` to `included_servers`. Stage 4 is not “add a JSON file” alone. |
+| [examples/labinfo/services-maildev.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labinfo/services-maildev.yaml) | merge into `profiles/default/labinfo/services.yaml` | Catalog id stays `maildev`. Adds `/v1` + MCP. SMTP posture unchanged. |
+
+Acceptance twin the lab PR copies by **name**: `TestMaildevScenarioCompat` in `internal/control/compat/scenario_test.go`. Goldens live under `testdata/compat/`. Lab smoke `maildevScenario` must keep the same assertions.
 
 ## Current mail sink contract
 
@@ -33,9 +46,11 @@ Smoke (`internal/lab/smoke.go` `maildevScenario`) is the acceptance test the swa
 2. Unauthenticated `GET /email` → **401**.
 3. Basic-authenticated `GET /email` eventually contains the sent `subject`.
 
+That triplet is `TestMaildevScenarioCompat` here. Stage 4 may add `mail_messages_wait`; it must not rewrite those three assertions.
+
 ## Compose fragment
 
-Service name stays `maildev` (D15). Healthcheck plane change: today’s maildev probe is SMTP TCP via `node`. Scratch has no `node`; ready becomes HTTP `/v1/health/ready` (which still requires the SMTP listener bound). `depends_on` / start_period stay 3s / 12 retries.
+Service name stays `maildev` (D15). **Healthcheck plane change:** today’s maildev probe is SMTP TCP via `node`. Scratch has no `node`; ready becomes HTTP `/v1/health/ready` (which still requires the SMTP listener bound). `depends_on` / start_period stay 3s / 12 retries. Call this out in lab `docs/architecture.md`.
 
 ```yaml
   maildev:   # service name kept for one release so depends_on / docs survive
@@ -66,6 +81,8 @@ Service name stays `maildev` (D15). Healthcheck plane change: today’s maildev 
       start_period: 3s
 ```
 
+Image pin and Dockerfile land in DEP-001, then the lab follow-up. This fragment is the compose contract, not an in-tree image.
+
 ## Bill of materials
 
 Stage 4 is not “add a JSON file”; token + tool-group registration are mandatory.
@@ -88,12 +105,109 @@ Stage 4 is not “add a JSON file”; token + tool-group registration are mandat
 | `docs/architecture.md` | “MCP: none (off-the-shelf)” | LabMail MCP `http://maildev:1080/mcp`; healthcheck plane change |
 | `CHANGELOG.md` | maildev receive-only | Image swap + MCP |
 
-labinfo catalog updates (id stays `maildev` — D15):
+labinfo catalog updates (id stays `maildev` — D15 / Q1):
 
 - `urls`: Web UI, REST `/email`, **new** REST `/v1`, **new** MCP `http://${LAB_PUBLIC_HOST}:${MAILDEV_WEB_PORT}/mcp`
 - `credential`: still Basic user + password file; add bearer token file `secrets/labmail-token` for MCP/gateway
 - `connection.parameters.auth` / `tls` still describe the **SMTP** ingest posture (none / not required by default)
 - labinfo `name` becomes `Mail sink (LabMail, receive-only)`
+
+### labinfo snippet
+
+Copy from [examples/labinfo/services-maildev.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labinfo/services-maildev.yaml):
+
+```yaml
+services:
+  - id: maildev
+    name: Mail sink (LabMail, receive-only)
+    description: Receive-only SMTP sink (LabMail) with a web UI, maildev /email compat, native /v1 REST, and MCP. It never relays or sends mail outward; captured mail is wiped on restart.
+    urls:
+      - name: Web UI
+        url: http://${LAB_PUBLIC_HOST}:${MAILDEV_WEB_PORT}/
+      - name: REST API (maildev /email)
+        url: http://${LAB_PUBLIC_HOST}:${MAILDEV_WEB_PORT}/email
+      - name: REST API (native /v1)
+        url: http://${LAB_PUBLIC_HOST}:${MAILDEV_WEB_PORT}/v1
+      - name: MCP endpoint
+        url: http://${LAB_PUBLIC_HOST}:${MAILDEV_WEB_PORT}/mcp
+    note: "SMTP ingest (no auth, no TLS required): ${LAB_PUBLIC_HOST}:${MAILDEV_SMTP_PORT}. Point systems under test at it as their outbound SMTP server."
+    credential:
+      file: /run/lab-secrets/maildev-web-password
+      usage: "HTTP basic auth for the web UI and /email compat, user '${MAILDEV_WEB_USER}'"
+    connection:
+      endpoints:
+        - name: SMTP ingest
+          protocol: smtp
+          address: ${LAB_PUBLIC_HOST}:${MAILDEV_SMTP_PORT}
+          note: configure as the outbound SMTP server of the system under test; all mail is captured, none is relayed
+        - name: MCP (streamable HTTP)
+          protocol: mcp-streamable-http
+          address: http://${LAB_PUBLIC_HOST}:${MAILDEV_WEB_PORT}/mcp
+          note: bearer only; gateway interpolates LABMAIL_TOKEN
+      parameters:
+        auth: "none by default (this profile sets smtp.auth.mode=none; no incoming-user/incoming-pass)"
+        tls: "not required; plain SMTP is accepted"
+        sender_recipient: "any From/To addresses are accepted and captured"
+      credentials:
+        - name: labmail-token
+          file: /run/lab-secrets/labmail-token
+          usage: "HTTP header 'Authorization: Bearer <token>' for native /v1 and MCP; on the lab host: secrets/labmail-token"
+```
+
+`stageLabinfoCreds` in `internal/lab/secrets.go` must copy `secrets/labmail-token` into `secrets/labinfo-creds/labmail-token` so the catalog file resolves.
+
+### MCPJungle server JSON
+
+Copy from [examples/mcpjungle/servers/labmail.json](https://github.com/hilather/go-lab-maildev/blob/main/examples/mcpjungle/servers/labmail.json). Registrar env must include `LABMAIL_TOKEN` (same pattern as `LABDNS_TOKEN` in `internal/lab/register.go` `loadTokens` + compose `registrar`).
+
+```json
+{
+  "name": "labmail",
+  "transport": "streamable_http",
+  "description": "Receive-only SMTP sink (LabMail): captured mail over REST /v1 and /email, wait/extract, plan/apply/reset. Compose service name stays maildev.",
+  "url": "http://maildev:1080/mcp",
+  "bearer_token": "${LABMAIL_TOKEN}"
+}
+```
+
+`groups/integration.json` `included_servers` becomes `["labdns", "labldap", "labtacacs", "labinfo", "labmail"]`.
+
+### AGENTS.md rule 11 rewrite
+
+Replace the maildev flag-bag paragraph. Proposed text:
+
+```text
+11. **The mail sink never sends mail.** Compose service name and labinfo
+    catalog id stay `maildev` for the swap release (rename later, not in
+    the image-pin PR). The image is LabMail. Desired state is
+    `profiles/<name>/labmail/bootstrap.yaml` (`labmail.dev/v1alpha1`).
+    Receive-only is structural in LabMail: no outbound SMTP, reserved-key
+    reject, `POST /email/:id/relay` is 403. Do not reintroduce
+    `MAILDEV_ARGS` / `MAILDEV_WEB_PASS` injection in `runner.go`. Host
+    ports stay `MAILDEV_SMTP_PORT` / `MAILDEV_WEB_PORT`. Web Basic
+    (`MAILDEV_WEB_USER` + `secrets/maildev-web-password`) and bearer
+    (`secrets/labmail-token`, `LABMAIL_TOKEN`) share one principal via
+    `tokenRef`. `allowLegacyClients: true` is required for MCPJungle.
+    Do not add relay/outbound keys. Implicit SMTPS (`incoming-secure`)
+    is 1.1; do not silently map it to STARTTLS.
+```
+
+Rule 8 still applies: register through `mcpjungle/servers/labmail.json` **and** the integration tool group.
+
+### architecture.md MCP row and healthcheck
+
+Replace the services-table maildev row and the “MCP: none (off-the-shelf)” note.
+
+| Today | After swap |
+|---|---|
+| `maildev` · Receive-only SMTP sink with web UI/REST · **MCP: none (off-the-shelf; cataloged in labinfo)** · SMTP 1025, web 1080 | `maildev` (LabMail image) · Receive-only SMTP sink with web UI, `/email` compat, `/v1`, MCP · **MCP: `http://maildev:1080/mcp` (bearer; `allowLegacyClients: true`)** · SMTP 1025, web 1080 |
+
+Healthcheck plane: SMTP TCP via `node -e connect(1025)` → HTTP `GET /v1/health/ready` (`labmail healthcheck`). Ready still requires the SMTP listener bound. Interval 5s, timeout 3s, retries 12, start_period 3s stay.
+
+Also rewrite:
+
+- Configuration ownership: `maildev/maildev.yaml` flags → `labmail/bootstrap.yaml`
+- Quirks: delete “maildev is intentionally not given an MCP surface”
 
 ## Profile flag shim matrix
 
@@ -138,10 +252,20 @@ LabMail is stateless. Rolling back is an image + command-line revert. Captured m
 
 Must name:
 
-- `TestMaildevScenarioCompat`
+- `TestMaildevScenarioCompat` (`internal/control/compat/scenario_test.go`; goldens in `testdata/compat/`)
 - `runner.go` / `secrets.go`
 - registrar `LABMAIL_TOKEN`
 - `integration.json`
 - AGENTS.md rule 11
 - architecture MCP row
 - healthcheck plane change
+
+Shipped here:
+
+- Full file-level BOM above
+- `examples/labmail.yaml` with `allowLegacyClients: true`
+- labinfo snippet (`examples/labinfo/services-maildev.yaml`)
+- `examples/mcpjungle/servers/labmail.json` + group append
+- Q1 (catalog id `maildev`) and Q2 (UI required for GA) recorded
+
+Not in this PR: Dockerfile, compose smoke image, or the mcp-integration-lab pin change (DEP-001 + lab follow-up).

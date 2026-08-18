@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Compat, REST, Application
-Last reviewed: 2026-08-17 (SEC-001)
+Last reviewed: 2026-08-18 (SWAP-001)
 Related ADRs: 0005, 0007
 
 Native management API is `/v1` + `POST /mcp`. Maildev `/email` is a **compat adapter** (`REST_ONLY_PROTOCOL` plus parity-required native twins) in `internal/control/compat`. See [docs/adr/0007-compat-email-surface.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0007-compat-email-surface.md).
@@ -118,7 +118,7 @@ The one-release `internal/maildev` flag shim matrix lives in [docs/13-integratio
 2. Unauthenticated `GET /email` → **401**.
 3. Basic-authenticated `GET /email` eventually contains the sent `subject`.
 
-Goldens for `subject`/`from`/`to` plus attachment `fileName` (no `stream`) live in `testdata/compat/`. `TestMaildevScenarioCompat` (401 + Basic + subject + `SendMail`) is mandatory.
+Goldens for `subject`/`from`/`to` plus attachment `fileName` (no `stream`) live in `testdata/compat/`. `TestMaildevScenarioCompat` in `internal/control/compat/scenario_test.go` (401 + Basic + subject + `SendMail`) is mandatory; the lab swap copies that name. Overlay files: [docs/13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md).
 
 ## Compatibility promise
 

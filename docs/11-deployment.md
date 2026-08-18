@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-18 (DEP-001 + UI-001)
+Last reviewed: 2026-08-18 (DEP-001 + UI-001 + SWAP-001)
 Related ADRs: 0001, 0003
 
 DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here.
@@ -53,7 +53,7 @@ Posture:
 
 ## Reference compose
 
-Copyable smoke file: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml) with [examples/labmail.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.yaml). Healthcheck is HTTP ready (exec form). Scratch has no `node`; do not probe SMTP TCP. Secret file mounts land with SEC-001 / SWAP-001 (auth is stubbed open until then).
+Copyable smoke file: [examples/compose.smoke.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/compose.smoke.yaml) with [examples/labmail.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.yaml) (SWAP-001 overlay; `allowLegacyClients: true`, Basic `tokenRef`). Healthcheck is HTTP ready (exec form). Scratch has no `node`; do not probe SMTP TCP.
 
 ```yaml
 services:

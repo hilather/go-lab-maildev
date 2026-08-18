@@ -1,0 +1,10 @@
+S: 220 labmail.lab LabMail ready
+C: VRFY root
+S: 252 2.5.2 Cannot VRFY user
+C: EXPN staff
+S: 502 5.5.1 EXPN not implemented
+C: HELP
+S: 214-HELO EHLO MAIL RCPT DATA RSET NOOP QUIT HELP VRFY
+S: 214 End of HELP
+C: QUIT
+S: 221 2.0.0 Bye

@@ -4,14 +4,15 @@ LabMail is a receive-only SMTP lab appliance in the LabDNS / LabLDAP / TacLab fa
 
 If you want to run what exists today, stay on this page, then follow the [README](README.md). If you want to change it, read [AGENTS.md](AGENTS.md) before touching code.
 
-## Five-minute path (foundation stub)
+## Five-minute path
 
 1. Install **Go 1.26** and clone this repository.
 2. `go build -o bin/labmail ./cmd/labmail`
 3. `./bin/labmail version`
 4. `./bin/labmail help`
+5. `./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025`
 
-There is **no SMTP listener** in this slice. `validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` and `healthcheck` are planned and currently exit 2.
+`validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` binds SMTP and discards accepted mail. `healthcheck` and management HTTP are not implemented.
 
 YAML field rules, revisions, and reset live in [docs/04-state-and-configuration.md](docs/04-state-and-configuration.md). SMTP accept/reject tables live in [docs/02-smtp-semantics.md](docs/02-smtp-semantics.md). REST and MCP twins are in [docs/06-rest-api.md](docs/06-rest-api.md) and [docs/07-mcp-api.md](docs/07-mcp-api.md).
 

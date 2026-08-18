@@ -2,10 +2,12 @@
 
 Status: Proposed normative behavior
 Owners: Store, SMTP, Application
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (SMTP-001a)
 Related ADRs: 0003
 
 Package `internal/store`. Captured mail is runtime evidence, not desired state. Restart or reset wipes the inbox.
+
+SMTP-001a implements `store.Sink` and `store.Null` only. `Insert(ctx, epoch, msg)` assigns a discard id and retains nothing. The `epoch` argument is the value captured at DATA start; a mismatch under the insert lock returns `store.ErrStaleEpoch` (`451 4.3.2`). `Wipe` bumps `Epoch`. The queryable `Store` (ULID ids, list/get/wait, caps, spill) is STORE-001.
 
 ## Interface
 

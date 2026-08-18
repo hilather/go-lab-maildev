@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-17 (CFG-001)
+Last reviewed: 2026-08-17 (SMTP-001a)
 Related ADRs: 0001, 0003
 
 Dockerfile, compose, and `scripts/test-container.sh` land in DEP-001 (PR 11). This document freezes the contract so later PRs do not invent ports or image posture.
@@ -25,7 +25,7 @@ labmail version
 
 `labmail send` is **not** shipped.
 
-CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. `serve` and `healthcheck` remain unimplemented.
+CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. SMTP-001a implements `serve` for the SMTP listener only (Null sink; management HTTP and `healthcheck` remain unimplemented).
 
 ## Hardened container
 

@@ -71,14 +71,14 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
-func TestServeNotImplemented(t *testing.T) {
+func TestServeRequiresConfig(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"labmail", "serve"}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("exit %d, want 2", code)
 	}
-	if !strings.Contains(stderr.String(), "not implemented") {
-		t.Fatalf("stderr %q missing not implemented", stderr.String())
+	if !strings.Contains(stderr.String(), "--config") {
+		t.Fatalf("stderr %q missing --config", stderr.String())
 	}
 }
 

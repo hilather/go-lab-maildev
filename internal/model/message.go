@@ -59,3 +59,9 @@ type Attachment struct {
 	Size        int
 	Checksum    string
 }
+
+// InsertResult is the store acknowledgement for one accepted message.
+type InsertResult struct {
+	ID         string
+	Generation uint64
+}

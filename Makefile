@@ -24,7 +24,7 @@ help:
 		'  verify-generated    unimplemented until API-001 (PR 6); fail-closed' \
 		'  test                go test ./...' \
 		'  test-race           go test -race ./...' \
-		'  test-fuzz-smoke     buildinfo + config decode fuzz corpora (5s each)' \
+		'  test-fuzz-smoke     buildinfo + config + SMTP codec fuzz corpora (5s each)' \
 		'  test-docs           required documents, metadata, and links' \
 		'  security-scan       govulncheck' \
 		'  test-parity         unimplemented until MCP-001 (PR 8); fail-closed' \
@@ -61,6 +61,7 @@ test-race:
 test-fuzz-smoke:
 	$(GO) test ./internal/buildinfo -fuzz=FuzzInfoString -fuzztime=5s -count=1
 	$(GO) test ./internal/config -fuzz=FuzzDecode -fuzztime=5s -count=1
+	$(GO) test ./internal/smtp/codec -fuzz=FuzzReadLine -fuzztime=5s -count=1
 
 test-docs:
 	$(GO) run ./scripts/checkdocs

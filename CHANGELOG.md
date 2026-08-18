@@ -6,7 +6,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Added
 
-- None.
+- Side-by-side maildev 2.2.1 probe (`internal/compatcheck`, `TestSideBySideMaildev221`): one `net/smtp.SendMail` + `/email` + `/healthz` client against shipped `labmail serve` and, when Docker is available, live `maildev/maildev:2.2.1`. Shared-shape fields must match; ULID ids, sha256 checksums, omitted list bodies, and relay 403 stay documented deltas.
 
 ### Changed
 

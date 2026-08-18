@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
+	"github.com/hilather/go-lab-maildev/internal/control/mcp"
 	"github.com/hilather/go-lab-maildev/internal/control/rest"
 )
 
@@ -21,7 +22,7 @@ func TestPlannedFiles(t *testing.T) {
 			t.Errorf("empty %s", f.rel)
 		}
 	}
-	if !got[capabilities.ManifestRelPath] || !got[rest.OpenAPIRelPath] {
+	if !got[capabilities.ManifestRelPath] || !got[rest.OpenAPIRelPath] || !got[mcp.ManifestRelPath] {
 		t.Fatalf("planned=%v", got)
 	}
 }

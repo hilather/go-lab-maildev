@@ -2,12 +2,13 @@
 
 Status: Proposed normative behavior
 Owners: Application, REST, MCP
-Last reviewed: 2026-08-17 (COMPAT-001)
+Last reviewed: 2026-08-17 (COMPAT-001) + 2026-08-17 (MCP-001)
 Related ADRs: 0004, 0005, 0006, 0007
 
 REST and MCP are two protocol adapters over one capability model. Adapters never call each other and never contain store/SMTP business logic. See [docs/adr/0004-shared-capability-registry.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0004-shared-capability-registry.md).
 
 STA-001 implements `internal/app.Service` (HTTP-less), `internal/snapshot`, and `internal/audit`. API-001 implements `internal/capabilities` and `internal/control/rest` (`/v1`, problem+json, HMAC cursors, wait/extract, preview CSP, plan/apply). COMPAT-001 implements `internal/control/compat` (`/email` array list, `/healthz`, `/config`, relay 403) on the same management listener. Session cookie/CSRF is SEC-001. MCP is MCP-001. SMTP insert stays on the data plane.
+STA-001 implements `internal/app.Service` (HTTP-less), `internal/snapshot`, and `internal/audit`. API-001 implements `internal/capabilities` and `internal/control/rest` (`/v1`, problem+json, HMAC cursors, wait/extract, preview CSP, plan/apply). MCP-001 implements `internal/control/mcp` (Streamable HTTP `POST /mcp`, official SDK v1.7.0, protocol `2026-07-28`, `mail_*` tools, `labmail://` resources, `labmail mcp-stdio`, `make test-parity`). Session cookie/CSRF is SEC-001. Compat `/email` is COMPAT-001. SMTP insert stays on the data plane.
 
 ## Package layout
 

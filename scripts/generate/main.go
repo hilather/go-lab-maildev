@@ -1,4 +1,4 @@
-// Command generate writes api/capabilities/v1.json and api/openapi/v1.json.
+// Command generate writes api/capabilities/v1.json, api/openapi/v1.json, and api/mcp/v1.json.
 package main
 
 import (
@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
+	"github.com/hilather/go-lab-maildev/internal/control/mcp"
 	"github.com/hilather/go-lab-maildev/internal/control/rest"
 )
 
@@ -51,9 +52,14 @@ func plannedFiles() ([]artifact, error) {
 	if err != nil {
 		return nil, fmt.Errorf("openapi: %w", err)
 	}
+	mcpManifest, err := mcp.RenderManifest()
+	if err != nil {
+		return nil, fmt.Errorf("mcp: %w", err)
+	}
 	return []artifact{
 		{capabilities.ManifestRelPath, manifest},
 		{rest.OpenAPIRelPath, openapi},
+		{mcp.ManifestRelPath, mcpManifest},
 	}, nil
 }
 

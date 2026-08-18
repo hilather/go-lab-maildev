@@ -15,6 +15,7 @@ import (
 
 	"github.com/hilather/go-lab-maildev/internal/app"
 	"github.com/hilather/go-lab-maildev/internal/control/compat"
+	"github.com/hilather/go-lab-maildev/internal/control/mcp"
 	"github.com/hilather/go-lab-maildev/internal/control/rest"
 	"github.com/hilather/go-lab-maildev/internal/model"
 	"github.com/hilather/go-lab-maildev/internal/smtp/server"
@@ -142,11 +143,32 @@ func startManagement(svc *app.App, smtp *server.Server, addr string, spec model.
 		return nil, err
 	}
 	ready := func() bool { return smtp.Addr() != nil }
+	mcpPath := spec.Listeners.Management.MCPPath
+	if mcpPath == "" {
+		mcpPath = mcp.DefaultPath
+	}
+	mcpSrv, err := mcp.New(mcp.Config{
+		Service:            svc,
+		AllowedOrigins:     spec.Management.OriginAllowlist,
+		AllowLegacyClients: spec.Management.MCP.AllowLegacyClients,
+		MaxBodyBytes:       spec.Management.BodyLimit,
+		MaxConcurrent:      spec.Management.MaxConcurrent,
+		RatePerSec:         float64(spec.Management.RequestsPerSecond),
+		RateBurst:          float64(spec.Management.Burst),
+	})
+	if err != nil {
+		_ = ln.Close()
+		return nil, err
+	}
 	mounts, err := compatMounts(svc, spec, ready)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
 	}
+	if mounts == nil {
+		mounts = map[string]http.Handler{}
+	}
+	mounts[mcpPath] = mcpSrv.Handler()
 	hs, err := rest.New(rest.Config{
 		Addr:           addr,
 		Service:        svc,

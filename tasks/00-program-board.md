@@ -1,6 +1,6 @@
 # Program Board
 
-Status: in-progress (SMTP-001b / MCP-001 next)
+Status: in-progress (SMTP-001b / COMPAT-001 / SEC-001 next)
 Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001)
 
 Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs/` is the source of truth.
@@ -18,6 +18,8 @@ Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs
 | 6 | REST `/v1` and OpenAPI | API-001 | STA-001 | Native REST except UI/session; problem+json; wait/extract | done |
 | 7 | maildev 2.2.1 compat adapter | COMPAT-001 | API-001 | `/email`, `/healthz`, `/config`; relay is 403 | done |
 | 8 | MCP Streamable HTTP and parity | MCP-001 | API-001 | `mail_*` tools, `labmail://` resources, `make test-parity` | not-started |
+| 7 | maildev 2.2.1 compat adapter | COMPAT-001 | API-001 | `/email`, `/healthz`, `/config`; relay is 403 | not-started |
+| 8 | MCP Streamable HTTP and parity | MCP-001 | API-001 | `mail_*` tools, `labmail://` resources, `make test-parity` | done |
 | 9 | Auth, Basic compat, audit | SEC-001 | API-001, COMPAT-001, MCP-001 | Bearer + Basic, CSRF session, `TestMaildevScenarioCompat` | not-started |
 | 10 | Observability | OBS-001 | SMTP-001a, API-001 | slog events, hand-rolled OpenMetrics, ready semantics | not-started |
 | 11 | CLI completion, Dockerfile, compose | DEP-001 | SMTP-001a, API-001, OBS-001 | Hardened image, compose contract, healthcheck | not-started |

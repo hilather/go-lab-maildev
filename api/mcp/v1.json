@@ -1,0 +1,51 @@
+{
+  "apiVersion": "labmail.dev/mcp/v1",
+  "generatedBy": "internal/control/mcp.RenderManifest; DO NOT EDIT.",
+  "protocol": "2026-07-28",
+  "sdk": "github.com/modelcontextprotocol/go-sdk",
+  "sdkVersion": "v1.7.0",
+  "tools": [
+    "mail_version_get",
+    "mail_capabilities_get",
+    "mail_status_get",
+    "mail_schema_get",
+    "mail_state_get",
+    "mail_state_validate",
+    "mail_state_export",
+    "mail_state_reset",
+    "mail_change_plan",
+    "mail_change_apply",
+    "mail_messages_list",
+    "mail_message_get",
+    "mail_message_raw_get",
+    "mail_message_html_get",
+    "mail_message_delete",
+    "mail_messages_clear",
+    "mail_messages_read_all",
+    "mail_messages_wait",
+    "mail_message_extract",
+    "mail_attachment_get",
+    "mail_audit_query",
+    "mail_audit_get"
+  ],
+  "resources": [
+    "labmail://capabilities",
+    "labmail://status",
+    "labmail://schema/config",
+    "labmail://state",
+    "labmail://messages",
+    "labmail://messages/{id}",
+    "labmail://audit/recent"
+  ],
+  "mutatingTools": [
+    "mail_state_reset",
+    "mail_change_apply",
+    "mail_message_delete",
+    "mail_messages_clear",
+    "mail_messages_read_all"
+  ],
+  "healthNotTools": [
+    "health.live",
+    "health.ready"
+  ]
+}

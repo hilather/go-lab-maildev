@@ -175,6 +175,18 @@ func TestServeBindsManagement(t *testing.T) {
 		t.Fatalf("email status=%d", email.StatusCode)
 	}
 	_ = email.Body.Close()
+	mcpReq, reqErr := http.NewRequest(http.MethodGet, "http://"+mgmt+"/mcp", nil)
+	if reqErr != nil {
+		t.Fatal(reqErr)
+	}
+	mcpResp, err := http.DefaultClient.Do(mcpReq)
+	if err != nil {
+		t.Fatalf("mcp GET: %v", err)
+	}
+	_ = mcpResp.Body.Close()
+	if mcpResp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("mcp GET status=%d want 405", mcpResp.StatusCode)
+	}
 	cancel()
 	select {
 	case code := <-done:

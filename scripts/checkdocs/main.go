@@ -33,6 +33,8 @@ var RequiredRootDocs = []string{
 	"docs/11-deployment.md",
 	"docs/12-maildev-compat.md",
 	"docs/13-integration-lab-swap.md",
+	"docs/known-limitations.md",
+	"docs/releases/v1.0.0-rc.1.md",
 	"docs/adr/0001-use-go.md",
 	"docs/adr/0002-in-tree-smtp-receive-only.md",
 	"docs/adr/0003-ephemeral-inbox-and-gitops.md",
@@ -42,6 +44,7 @@ var RequiredRootDocs = []string{
 	"docs/adr/0007-compat-email-surface.md",
 	"tasks/00-program-board.md",
 	".github/workflows/ci.yml",
+	".github/workflows/release.yml",
 }
 
 var mdLink = regexp.MustCompile(`\[[^\]]*\]\(([^)]+)\)`)

@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-18 (UI-001 + SWAP-001)
+Last reviewed: 2026-08-18 (UI-001 + SWAP-001 + GA-001)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
 
 ## Problem statement
@@ -313,6 +313,8 @@ STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` a
 8. `internal/smtp` does not import management packages.
 
 ## Residual limitations (1.0)
+
+Operator-facing copy of this list: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). rc.1 notes: [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md). LabMail is a lab sink, not a public MTA.
 
 - Not a complete MTA. No DSN, CHUNKING, PIPELINING, Sieve, quotas per recipient, or greylisting.
 - MIME parse of pathological messages may yield empty text/html with `parseWarning`; raw is still stored.

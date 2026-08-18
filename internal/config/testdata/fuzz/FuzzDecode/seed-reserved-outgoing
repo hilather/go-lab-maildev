@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: reserved-outgoing\nspec:\n  outgoingHost: smtp.example.com\n")

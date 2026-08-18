@@ -117,3 +117,17 @@ func str(v any) string {
 	s, _ := v.(string)
 	return s
 }
+
+// FormatTranscript is a one-line swap-gate record for logs.
+func FormatTranscript(r Report) string {
+	id := ""
+	if r.ListItem != nil {
+		id = str(r.ListItem["id"])
+	}
+	listText := ""
+	if r.ListItem != nil {
+		listText = str(r.ListItem["text"])
+	}
+	return fmt.Sprintf("%s smtp+http probe subject=%q unauth=%d healthz=%d list=%d array=%v subject_hit=%v id=%s list_text_empty=%v get=%d relay=%d",
+		r.Name, r.Subject, r.UnauthStatus, r.HealthzStatus, r.ListStatus, r.ListIsArray, r.ListSubjectHit, id, listText == "", r.GetStatus, r.RelayStatus)
+}

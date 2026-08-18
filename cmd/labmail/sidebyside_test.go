@@ -41,6 +41,7 @@ func TestSideBySideMaildev221(t *testing.T) {
 	if errs := compatcheck.DocumentedLabMailDeltas(labRep); len(errs) > 0 {
 		t.Fatalf("labmail documented deltas: %s", strings.Join(errs, "; "))
 	}
+	t.Log(compatcheck.FormatTranscript(labRep))
 
 	mdSMTP, mdHTTP, stopMD, envErr := startMaildevOracle(t)
 	if envErr != "" {
@@ -66,6 +67,7 @@ func TestSideBySideMaildev221(t *testing.T) {
 	if errs := compatcheck.SharedShapeDiff(mdRep, labRep); len(errs) > 0 {
 		t.Fatalf("undesigned shared-shape diffs: %s", strings.Join(errs, "; "))
 	}
+	t.Log(compatcheck.FormatTranscript(mdRep))
 	t.Logf("plain: maildev id=%v labmail id=%v subject=%q relay_md=%d relay_lm=%d",
 		mdRep.ListItem["id"], labRep.ListItem["id"], subject, mdRep.RelayStatus, labRep.RelayStatus)
 

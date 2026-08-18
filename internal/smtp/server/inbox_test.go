@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -101,6 +102,34 @@ func TestMemoryStoresParsedMIME(t *testing.T) {
 	}
 	if got.Envelope.From != "alice@lab.test" || got.Envelope.HELO != "client.example" {
 		t.Fatalf("envelope=%+v", got.Envelope)
+	}
+}
+
+func TestInFlightReservationDoesNotConsumeStoreBytes(t *testing.T) {
+	inbox, err := store.New(store.Options{MaxMessages: 10, MaxBytes: 16 << 10, FullPolicy: model.FullPolicyReject})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(inbox.Wipe)
+	pad := []byte("Subject: pad\r\n\r\n" + strings.Repeat("z", 4000) + "\r\n")
+	if _, err := inbox.Insert(context.Background(), inbox.Epoch(), &model.Message{Raw: pad}); err != nil {
+		t.Fatal(err)
+	}
+	spec := defaultSMTPSpec(t)
+	spec.MaxMessageBytes = 1 << 20
+	srv := startServer(t, spec, inbox)
+	held := dial(t, srv)
+	mustCmd(t, held, 250, "EHLO hold")
+	mustCmd(t, held, 250, "MAIL FROM:<a@b>")
+	mustCmd(t, held, 250, "RCPT TO:<c@d>")
+	mustCmd(t, held, 354, "DATA")
+	c := dial(t, srv)
+	mustCmd(t, c, 250, "EHLO other")
+	mustCmd(t, c, 250, "MAIL FROM:<a@b>")
+	mustCmd(t, c, 250, "RCPT TO:<c@d>")
+	deliverDATA(t, c, 250, "small")
+	if inbox.Stats().MessageCount != 2 {
+		t.Fatalf("count=%d", inbox.Stats().MessageCount)
 	}
 }
 

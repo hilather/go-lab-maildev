@@ -57,7 +57,7 @@ func TestSentinelErrors(t *testing.T) {
 	if errors.Is(ErrFull, ErrStaleEpoch) {
 		t.Fatal("sentinels must differ")
 	}
-	if ErrTooLarge == nil || ErrNotFound == nil {
+	if ErrTooLarge == nil || ErrNotFound == nil || ErrSpill == nil {
 		t.Fatal("STORE-001 sentinels")
 	}
 }

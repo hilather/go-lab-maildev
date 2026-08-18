@@ -11,4 +11,6 @@ var (
 	ErrTooLarge = errors.New("message exceeds store maxBytes")
 	// ErrNotFound is a missing inbox id.
 	ErrNotFound = errors.New("message not found")
+	// ErrSpill is an unreadable or unwritable spill file.
+	ErrSpill = errors.New("store spill")
 )

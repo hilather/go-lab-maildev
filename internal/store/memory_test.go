@@ -195,23 +195,51 @@ func TestMemoryWaitDoesNotReturnDeleted(t *testing.T) {
 
 func TestMemoryMarkReadDoesNotBumpGeneration(t *testing.T) {
 	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
-	res, err := s.Insert(context.Background(), s.Epoch(), rawMsg("r", "x"))
+	a, err := s.Insert(context.Background(), s.Epoch(), rawMsg("r1", "x"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.Insert(context.Background(), s.Epoch(), rawMsg("r2", "y")); err != nil {
+		t.Fatal(err)
+	}
 	g := s.Generation()
-	if _, err := s.Get(res.ID, true); err != nil {
+	if err := s.MarkRead(a.ID); err != nil {
 		t.Fatal(err)
 	}
 	if s.Generation() != g {
-		t.Fatalf("generation %d -> %d", g, s.Generation())
+		t.Fatalf("MarkRead generation %d -> %d", g, s.Generation())
+	}
+	if s.Stats().UnreadCount != 1 {
+		t.Fatalf("unread=%d", s.Stats().UnreadCount)
 	}
 	n, err := s.MarkAllRead()
-	if err != nil || n != 0 {
+	if err != nil || n != 1 {
 		t.Fatalf("n=%d err=%v", n, err)
 	}
 	if s.Generation() != g {
-		t.Fatal("mark-all bumped generation")
+		t.Fatal("MarkAllRead bumped generation")
+	}
+	if s.Stats().UnreadCount != 0 {
+		t.Fatalf("unread after all=%d", s.Stats().UnreadCount)
+	}
+}
+
+func TestMemoryDeleteAllDoesNotBumpEpoch(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	ep := s.Epoch()
+	if _, err := s.Insert(context.Background(), ep, rawMsg("x", "y")); err != nil {
+		t.Fatal(err)
+	}
+	g := s.Generation()
+	n, err := s.DeleteAll()
+	if err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if s.Epoch() != ep {
+		t.Fatalf("epoch %d -> %d", ep, s.Epoch())
+	}
+	if s.Generation() <= g {
+		t.Fatalf("generation did not move: %d -> %d", g, s.Generation())
 	}
 }
 
@@ -308,6 +336,152 @@ func TestMemoryMalformedMIMEStored(t *testing.T) {
 	if !bytes.Equal(got.Raw, raw) {
 		t.Fatal("raw dropped")
 	}
+	if got.ParseWarning == "" {
+		t.Fatal("expected parseWarning")
+	}
+}
+
+func TestMemoryEvictOldestSpillFailureKeepsOld(t *testing.T) {
+	dir := t.TempDir()
+	s := newTestStore(t, Options{
+		MaxMessages:    1,
+		MaxBytes:       1 << 20,
+		FullPolicy:     model.FullPolicyEvictOldest,
+		SpillDirectory: dir,
+		SpillThreshold: 8,
+	})
+	firstRaw := []byte("Subject: keep\r\n\r\n" + strings.Repeat("a", 40) + "\r\n")
+	first, err := s.Insert(context.Background(), s.Epoch(), &model.Message{Raw: firstRaw})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	_, err = s.Insert(context.Background(), s.Epoch(), &model.Message{
+		Raw: []byte("Subject: new\r\n\r\n" + strings.Repeat("b", 40) + "\r\n"),
+	})
+	if err == nil {
+		t.Fatal("expected spill failure")
+	}
+	if !errors.Is(err, ErrSpill) {
+		t.Fatalf("err=%v", err)
+	}
+	if s.Stats().Evictions != 0 {
+		t.Fatalf("evictions=%d", s.Stats().Evictions)
+	}
+	got, err := s.Get(first.ID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Subject != "keep" {
+		t.Fatalf("subject=%q", got.Subject)
+	}
+}
+
+func TestMemoryListDeletedCursorUsesReceivedAt(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	now := time.Now().UTC()
+	newer := rawMsg("newer", "n")
+	newer.ReceivedAt = now
+	older := rawMsg("older", "o")
+	older.ReceivedAt = now.Add(-time.Hour)
+	// Newer first so its ULID is smaller than the older row's ULID.
+	a, err := s.Insert(context.Background(), s.Epoch(), newer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.Insert(context.Background(), s.Epoch(), older)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete(a.ID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.List(model.ListQuery{Cursor: a.ID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].ID != b.ID {
+		t.Fatalf("items=%v", idsOf(page))
+	}
+}
+
+func TestMemoryListAfterWipeIgnoresOldCursor(t *testing.T) {
+	s := newTestStore(t, Options{MaxMessages: 10, MaxBytes: 1 << 20, FullPolicy: model.FullPolicyReject})
+	old, err := s.Insert(context.Background(), s.Epoch(), rawMsg("old", "a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Wipe()
+	neu, err := s.Insert(context.Background(), s.Epoch(), rawMsg("new", "b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.List(model.ListQuery{Cursor: old.ID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].ID != neu.ID {
+		t.Fatalf("items=%v", idsOf(page))
+	}
+}
+
+func TestMemoryGetUnreadableSpill(t *testing.T) {
+	dir := t.TempDir()
+	s := newTestStore(t, Options{
+		MaxMessages:    10,
+		MaxBytes:       1 << 20,
+		FullPolicy:     model.FullPolicyReject,
+		SpillDirectory: dir,
+		SpillThreshold: 8,
+	})
+	raw := []byte("Subject: spill\r\n\r\n" + strings.Repeat("z", 40) + "\r\n")
+	res, err := s.Insert(context.Background(), s.Epoch(), &model.Message{Raw: raw})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ents, err := os.ReadDir(dir)
+	if err != nil || len(ents) == 0 {
+		t.Fatalf("spill files: %v %v", ents, err)
+	}
+	for _, e := range ents {
+		_ = os.Remove(filepath.Join(dir, e.Name()))
+	}
+	_, err = s.Get(res.ID, false)
+	if !errors.Is(err, ErrSpill) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestNewFailsIfSpillCannotClear(t *testing.T) {
+	dir := t.TempDir()
+	stale := filepath.Join(dir, "01HZYXWV7TSRQPJMKN76543210.raw")
+	if err := os.WriteFile(stale, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(dir, 0o700) }()
+	_, err := New(Options{
+		MaxMessages:    10,
+		MaxBytes:       1024,
+		SpillDirectory: dir,
+		SpillThreshold: 1,
+	})
+	if !errors.Is(err, ErrSpill) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func idsOf(r model.ListResult) []string {
+	out := make([]string, len(r.Items))
+	for i, m := range r.Items {
+		out[i] = m.ID
+	}
+	return out
 }
 
 func TestMemoryInsertCanceled(t *testing.T) {

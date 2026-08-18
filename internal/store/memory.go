@@ -17,7 +17,7 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/model"
 )
 
-var spillName = regexp.MustCompile(`(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}(-[0-9]+)?\.(raw|att)$`)
+var spillName = regexp.MustCompile(`(?i)^[0-7][0-9A-HJKMNP-TV-Z]{25}(-[0-9]+)?\.(raw|att)(\.tmp)?$`)
 
 // Options construct a Memory inbox.
 type Options struct {
@@ -109,7 +109,9 @@ func (m *Memory) prepareSpill() error {
 	if err := os.MkdirAll(m.spillDir, 0o700); err != nil {
 		return fmt.Errorf("store: spill directory: %w", err)
 	}
-	m.unlinkAllSpill()
+	if err := m.unlinkAllSpill(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -143,26 +145,37 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 	}
 	prepared.Size = len(prepared.Raw)
 	candidate := prepared.ResidentBytes()
+	if candidate > m.maxBytes {
+		return model.InsertResult{}, ErrTooLarge
+	}
+
+	// Spill to temp names before taking the index lock so a write failure
+	// cannot evict existing mail. Rename + evict + index happen atomically.
+	job, err := m.writeSpillTemps(prepared)
+	if err != nil {
+		return model.InsertResult{}, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			unlinkSpillJob(job)
+		}
+	}()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if epoch != m.epoch {
 		return model.InsertResult{}, ErrStaleEpoch
 	}
-	if candidate > m.maxBytes {
-		return model.InsertResult{}, ErrTooLarge
+	if err := m.canAcceptLocked(candidate); err != nil {
+		return model.InsertResult{}, err
 	}
-	if !m.fitsLocked(candidate) {
-		if m.fullPolicy != model.FullPolicyEvictOldest {
-			return model.InsertResult{}, ErrFull
-		}
-		if err := m.evictUntilFitsLocked(candidate); err != nil {
-			return model.InsertResult{}, err
-		}
-	}
-
 	rec := &record{msg: prepared, resident: candidate}
-	if err := m.spillLocked(rec); err != nil {
+	if err := commitSpill(rec, job); err != nil {
+		return model.InsertResult{}, err
+	}
+	if err := m.evictUntilFitsLocked(candidate); err != nil {
+		unlinkRecord(rec)
 		return model.InsertResult{}, err
 	}
 	m.byID[id] = rec
@@ -170,11 +183,41 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 	m.bytes += candidate
 	m.generation++
 	m.cond.Broadcast()
+	committed = true
 	return model.InsertResult{ID: id, Generation: m.generation}, nil
 }
 
 func (m *Memory) fitsLocked(candidate int64) bool {
 	return len(m.byID) < m.maxMessages && m.bytes+candidate <= m.maxBytes
+}
+
+func (m *Memory) canAcceptLocked(candidate int64) error {
+	if m.fitsLocked(candidate) {
+		return nil
+	}
+	if m.fullPolicy != model.FullPolicyEvictOldest {
+		return ErrFull
+	}
+	bytes := m.bytes
+	count := len(m.byID)
+	for _, id := range m.order {
+		if count < m.maxMessages && bytes+candidate <= m.maxBytes {
+			return nil
+		}
+		rec := m.byID[id]
+		if rec == nil {
+			continue
+		}
+		bytes -= rec.resident
+		if bytes < 0 {
+			bytes = 0
+		}
+		count--
+	}
+	if count < m.maxMessages && bytes+candidate <= m.maxBytes {
+		return nil
+	}
+	return ErrFull
 }
 
 func (m *Memory) evictUntilFitsLocked(candidate int64) error {
@@ -208,21 +251,33 @@ func (m *Memory) insertOrderLocked(id string, at time.Time) {
 // Get returns a clone. markRead flips the stored bit without bumping generation.
 func (m *Memory) Get(id string, markRead bool) (*model.Message, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	rec, ok := m.byID[id]
 	if !ok {
+		m.mu.Unlock()
 		return nil, ErrNotFound
 	}
 	if markRead {
 		rec.msg.Read = true
 	}
-	return m.materializeLocked(rec), nil
+	snap := snapshotRecord(rec)
+	m.mu.Unlock()
+	if err := loadSpill(snap); err != nil {
+		if os.IsNotExist(err) {
+			m.mu.Lock()
+			_, still := m.byID[id]
+			m.mu.Unlock()
+			if !still {
+				return nil, ErrNotFound
+			}
+		}
+		return nil, fmt.Errorf("%w: %v", ErrSpill, err)
+	}
+	return snap.msg, nil
 }
 
 // List returns newest-first pages. Cursor is the last id from the previous page.
 func (m *Memory) List(q model.ListQuery) (model.ListResult, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	limit := q.Limit
 	if limit <= 0 {
 		limit = DefaultListLimit
@@ -230,34 +285,91 @@ func (m *Memory) List(q model.ListQuery) (model.ListResult, error) {
 	if limit > MaxListLimit {
 		limit = MaxListLimit
 	}
-	var items []*model.Message
-	passed := q.Cursor == ""
+	cur, fresh := m.resolveCursorLocked(q.Cursor)
+	passed := q.Cursor == "" || fresh
+	var snaps []recSnap
 	var lastID string
+	var next string
 	for i := len(m.order) - 1; i >= 0; i-- {
 		id := m.order[i]
+		rec := m.byID[id]
+		if rec == nil {
+			continue
+		}
 		if !passed {
-			if id == q.Cursor {
+			if cur.found && id == cur.id {
 				passed = true
 				continue
 			}
-			// Cursor id was deleted: ULIDs sort by time, newest first.
-			if id < q.Cursor {
+			if !cur.found && !newerThanCursor(rec.msg, cur) {
 				passed = true
 			} else {
 				continue
 			}
 		}
-		rec := m.byID[id]
-		if rec == nil || !matchFilter(rec.msg, q.Filter) {
+		if !matchFilter(rec.msg, q.Filter) {
 			continue
 		}
-		if len(items) == limit {
-			return model.ListResult{Items: items, NextCursor: lastID, Generation: m.generation}, nil
+		if len(snaps) == limit {
+			next = lastID
+			break
 		}
-		items = append(items, m.materializeLocked(rec))
+		snaps = append(snaps, snapshotRecord(rec))
 		lastID = id
 	}
-	return model.ListResult{Items: items, Generation: m.generation}, nil
+	gen := m.generation
+	m.mu.Unlock()
+
+	items := make([]*model.Message, 0, len(snaps))
+	for _, snap := range snaps {
+		if err := loadSpill(snap); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return model.ListResult{}, fmt.Errorf("%w: %v", ErrSpill, err)
+		}
+		items = append(items, snap.msg)
+	}
+	return model.ListResult{Items: items, NextCursor: next, Generation: gen}, nil
+}
+
+type cursorPos struct {
+	id    string
+	at    time.Time
+	found bool
+}
+
+func (m *Memory) resolveCursorLocked(id string) (cursorPos, bool) {
+	if id == "" {
+		return cursorPos{}, true
+	}
+	if rec, ok := m.byID[id]; ok {
+		return cursorPos{id: id, at: rec.msg.ReceivedAt, found: true}, false
+	}
+	u, err := ulid.Parse(id)
+	if err != nil {
+		return cursorPos{id: id}, true
+	}
+	at := ulid.Time(u.Time())
+	if len(m.order) == 0 {
+		return cursorPos{id: id, at: at}, true
+	}
+	oldest := m.byID[m.order[0]]
+	if oldest != nil && oldest.msg.ReceivedAt.After(at) {
+		// Cursor predates every remaining row (wipe / DeleteAll + new mail).
+		return cursorPos{id: id, at: at}, true
+	}
+	return cursorPos{id: id, at: at}, false
+}
+
+func newerThanCursor(msg *model.Message, cur cursorPos) bool {
+	if msg.ReceivedAt.After(cur.at) {
+		return true
+	}
+	if msg.ReceivedAt.Equal(cur.at) && msg.ID > cur.id {
+		return true
+	}
+	return false
 }
 
 // Delete removes one message.
@@ -335,12 +447,21 @@ func (m *Memory) Wait(ctx context.Context, filter model.MessageFilter) (*model.M
 	}()
 
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	for {
 		if rec := m.newestMatchLocked(filter); rec != nil {
-			return m.materializeLocked(rec), nil
+			snap := snapshotRecord(rec)
+			m.mu.Unlock()
+			if err := loadSpill(snap); err != nil {
+				if os.IsNotExist(err) {
+					m.mu.Lock()
+					continue
+				}
+				return nil, fmt.Errorf("%w: %v", ErrSpill, err)
+			}
+			return snap.msg, nil
 		}
 		if err := ctx.Err(); err != nil {
+			m.mu.Unlock()
 			return nil, err
 		}
 		m.cond.Wait()
@@ -406,7 +527,7 @@ func (m *Memory) Wipe() {
 	m.byID = make(map[string]*record)
 	m.order = nil
 	m.bytes = 0
-	m.unlinkAllSpill()
+	_ = m.unlinkAllSpill()
 	m.cond.Broadcast()
 }
 
@@ -434,73 +555,153 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 	m.cond.Broadcast()
 }
 
-func (m *Memory) materializeLocked(rec *record) *model.Message {
-	out := cloneMessage(rec.msg)
-	if rec.rawSpill != "" && len(out.Raw) == 0 {
-		if b, err := os.ReadFile(rec.rawSpill); err == nil {
-			out.Raw = b
-		}
-	}
-	for i := range out.Attachments {
-		if len(out.Attachments[i].Data) > 0 {
-			continue
-		}
-		if i < len(rec.attSpill) && rec.attSpill[i] != "" {
-			if b, err := os.ReadFile(rec.attSpill[i]); err == nil {
-				out.Attachments[i].Data = b
-			}
-		}
-	}
-	return out
+type recSnap struct {
+	msg      *model.Message
+	rawSpill string
+	attSpill []string
 }
 
-func (m *Memory) spillLocked(rec *record) error {
-	if m.spillDir == "" || m.spillThreshold <= 0 {
-		return nil
+func snapshotRecord(rec *record) recSnap {
+	return recSnap{
+		msg:      cloneMessage(rec.msg),
+		rawSpill: rec.rawSpill,
+		attSpill: append([]string(nil), rec.attSpill...),
 	}
-	msg := rec.msg
-	if int64(len(msg.Raw)) >= m.spillThreshold {
-		path := filepath.Join(m.spillDir, msg.ID+".raw")
-		if err := os.WriteFile(path, msg.Raw, 0o600); err != nil {
-			return fmt.Errorf("store: spill raw: %w", err)
+}
+
+func loadSpill(s recSnap) error {
+	if s.rawSpill != "" && len(s.msg.Raw) == 0 {
+		b, err := os.ReadFile(s.rawSpill)
+		if err != nil {
+			return err
 		}
-		rec.rawSpill = path
-		msg.Raw = nil
+		s.msg.Raw = b
+	}
+	for i := range s.msg.Attachments {
+		if len(s.msg.Attachments[i].Data) > 0 {
+			continue
+		}
+		if i < len(s.attSpill) && s.attSpill[i] != "" {
+			b, err := os.ReadFile(s.attSpill[i])
+			if err != nil {
+				return err
+			}
+			s.msg.Attachments[i].Data = b
+		}
+	}
+	return nil
+}
+
+type spillJob struct {
+	rawTmp   string
+	rawFinal string
+	attTmp   []string
+	attFinal []string
+}
+
+func (m *Memory) writeSpillTemps(msg *model.Message) (*spillJob, error) {
+	if m.spillDir == "" || m.spillThreshold <= 0 {
+		return nil, nil
+	}
+	job := &spillJob{}
+	if int64(len(msg.Raw)) >= m.spillThreshold {
+		tmp := filepath.Join(m.spillDir, msg.ID+".raw.tmp")
+		if err := os.WriteFile(tmp, msg.Raw, 0o600); err != nil {
+			return nil, fmt.Errorf("%w: raw: %v", ErrSpill, err)
+		}
+		job.rawTmp = tmp
+		job.rawFinal = filepath.Join(m.spillDir, msg.ID+".raw")
 	}
 	if len(msg.Attachments) == 0 {
-		return nil
+		return job, nil
 	}
-	rec.attSpill = make([]string, len(msg.Attachments))
+	job.attTmp = make([]string, len(msg.Attachments))
+	job.attFinal = make([]string, len(msg.Attachments))
 	for i := range msg.Attachments {
 		a := &msg.Attachments[i]
 		if int64(len(a.Data)) < m.spillThreshold {
 			continue
 		}
-		path := filepath.Join(m.spillDir, fmt.Sprintf("%s-%d.att", msg.ID, i))
-		if err := os.WriteFile(path, a.Data, 0o600); err != nil {
-			unlinkRecord(rec)
-			return fmt.Errorf("store: spill attachment: %w", err)
+		tmp := filepath.Join(m.spillDir, fmt.Sprintf("%s-%d.att.tmp", msg.ID, i))
+		if err := os.WriteFile(tmp, a.Data, 0o600); err != nil {
+			unlinkSpillJob(job)
+			return nil, fmt.Errorf("%w: attachment: %v", ErrSpill, err)
 		}
-		rec.attSpill[i] = path
-		a.Data = nil
+		job.attTmp[i] = tmp
+		job.attFinal[i] = filepath.Join(m.spillDir, fmt.Sprintf("%s-%d.att", msg.ID, i))
+	}
+	return job, nil
+}
+
+func commitSpill(rec *record, job *spillJob) error {
+	if job == nil {
+		return nil
+	}
+	if job.rawTmp != "" {
+		if err := os.Rename(job.rawTmp, job.rawFinal); err != nil {
+			return fmt.Errorf("%w: rename raw: %v", ErrSpill, err)
+		}
+		job.rawTmp = ""
+		rec.rawSpill = job.rawFinal
+		rec.msg.Raw = nil
+	}
+	if len(job.attTmp) == 0 {
+		return nil
+	}
+	rec.attSpill = make([]string, len(job.attTmp))
+	for i, tmp := range job.attTmp {
+		if tmp == "" {
+			continue
+		}
+		if err := os.Rename(tmp, job.attFinal[i]); err != nil {
+			unlinkRecord(rec)
+			return fmt.Errorf("%w: rename attachment: %v", ErrSpill, err)
+		}
+		job.attTmp[i] = ""
+		rec.attSpill[i] = job.attFinal[i]
+		rec.msg.Attachments[i].Data = nil
 	}
 	return nil
 }
 
-func (m *Memory) unlinkAllSpill() {
-	if m.spillDir == "" {
+func unlinkSpillJob(job *spillJob) {
+	if job == nil {
 		return
+	}
+	if job.rawTmp != "" {
+		_ = os.Remove(job.rawTmp)
+		job.rawTmp = ""
+	}
+	for i, p := range job.attTmp {
+		if p != "" {
+			_ = os.Remove(p)
+			job.attTmp[i] = ""
+		}
+	}
+}
+
+func (m *Memory) unlinkAllSpill() error {
+	if m.spillDir == "" {
+		return nil
 	}
 	ents, err := os.ReadDir(m.spillDir)
 	if err != nil {
-		return
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("%w: read dir: %v", ErrSpill, err)
 	}
+	var first error
 	for _, e := range ents {
 		if e.IsDir() || !spillName.MatchString(e.Name()) {
 			continue
 		}
-		_ = os.Remove(filepath.Join(m.spillDir, e.Name()))
+		path := filepath.Join(m.spillDir, e.Name())
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) && first == nil {
+			first = fmt.Errorf("%w: unlink %s: %v", ErrSpill, e.Name(), err)
+		}
 	}
+	return first
 }
 
 func unlinkRecord(rec *record) {

@@ -137,8 +137,19 @@ func TestParseMalformedStillStored(t *testing.T) {
 	if msg.Size != len(raw) {
 		t.Fatalf("size=%d", msg.Size)
 	}
-	if msg.Subject == "" && msg.ParseWarning == "" {
-		t.Fatal("expected subject or warning")
+	if msg.ParseWarning == "" {
+		t.Fatal("expected parseWarning for malformed MIME")
+	}
+}
+
+func TestParseBrokenFromSetsWarning(t *testing.T) {
+	raw := []byte("From: <not-an-address\r\nSubject: only-from\r\n\r\nbody\r\n")
+	msg := Parse(raw)
+	if !bytes.Equal(msg.Raw, raw) {
+		t.Fatal("raw rewritten")
+	}
+	if msg.ParseWarning == "" {
+		t.Fatal("expected parseWarning for broken From")
 	}
 }
 

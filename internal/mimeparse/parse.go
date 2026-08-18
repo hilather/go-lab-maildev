@@ -74,11 +74,11 @@ func fillEnvelopeHeaders(msg *model.Message, h mail.Header) {
 	} else {
 		msg.Subject = subj
 	}
-	msg.From = addressList(h, "From")
-	msg.To = addressList(h, "To")
-	msg.Cc = addressList(h, "Cc")
-	msg.Bcc = addressList(h, "Bcc")
-	msg.ReplyTo = addressList(h, "Reply-To")
+	msg.From = addressList(msg, h, "From")
+	msg.To = addressList(msg, h, "To")
+	msg.Cc = addressList(msg, h, "Cc")
+	msg.Bcc = addressList(msg, h, "Bcc")
+	msg.ReplyTo = addressList(msg, h, "Reply-To")
 	if id, err := h.MessageID(); err != nil {
 		appendWarning(msg, err.Error())
 	} else {
@@ -97,9 +97,12 @@ func fillEnvelopeHeaders(msg *model.Message, h mail.Header) {
 	msg.Priority = priorityOf(h)
 }
 
-func addressList(h mail.Header, key string) []model.Address {
+func addressList(msg *model.Message, h mail.Header, key string) []model.Address {
 	list, err := h.AddressList(key)
-	if err != nil || len(list) == 0 {
+	if err != nil {
+		appendWarning(msg, key+": "+err.Error())
+	}
+	if len(list) == 0 {
 		return nil
 	}
 	out := make([]model.Address, 0, len(list))

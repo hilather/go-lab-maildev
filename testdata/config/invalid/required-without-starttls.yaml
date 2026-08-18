@@ -1,0 +1,9 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: required-off
+spec:
+  smtp:
+    tls:
+      mode: off
+      required: true

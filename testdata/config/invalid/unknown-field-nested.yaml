@@ -1,0 +1,8 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: unknown-nested
+spec:
+  smtp:
+    hostname: labmail.lab
+    zzz: 1

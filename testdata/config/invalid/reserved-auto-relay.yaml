@@ -1,0 +1,7 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: reserved-auto-relay
+spec:
+  smtp:
+    auto-relay: true

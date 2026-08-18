@@ -28,7 +28,7 @@ help:
 		'  test-docs           required documents, metadata, and links' \
 		'  security-scan       govulncheck' \
 		'  test-parity         unimplemented until MCP-001 (PR 8); fail-closed' \
-		'  test-config-compat  unimplemented until CFG-001 (PR 2); fail-closed' \
+		'  test-config-compat  positive+negative v1alpha1 config fixtures' \
 		'  test-container      unimplemented until DEP-001 (PR 11); fail-closed' \
 		'  test-changelog      unimplemented until REL/GA; fail-closed'
 
@@ -71,7 +71,7 @@ test-parity:
 	@echo 'test-parity: unimplemented until MCP-001 (PR 8)' >&2; exit 1
 
 test-config-compat:
-	@echo 'test-config-compat: unimplemented until CFG-001 (PR 2)' >&2; exit 1
+	$(GO) test ./internal/config -run TestConfigCompat -count=1
 
 test-container:
 	@echo 'test-container: unimplemented until DEP-001 (PR 11)' >&2; exit 1

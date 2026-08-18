@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (CFG-001)
 Related ADRs: 0003
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).

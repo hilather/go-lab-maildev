@@ -1,0 +1,7 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: unbounded
+spec:
+  smtp:
+    maxMessageBytes: 0B

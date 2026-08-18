@@ -11,7 +11,7 @@ If you want to run what exists today, stay on this page, then follow the [README
 3. `./bin/labmail version`
 4. `./bin/labmail help`
 
-There is **no SMTP listener** in this foundation slice. `serve`, `validate`, `canonicalize`, and `healthcheck` are planned commands and currently exit 2.
+There is **no SMTP listener** in this slice. `validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` and `healthcheck` are planned and currently exit 2.
 
 YAML field rules, revisions, and reset live in [docs/04-state-and-configuration.md](docs/04-state-and-configuration.md). SMTP accept/reject tables live in [docs/02-smtp-semantics.md](docs/02-smtp-semantics.md). REST and MCP twins are in [docs/06-rest-api.md](docs/06-rest-api.md) and [docs/07-mcp-api.md](docs/07-mcp-api.md).
 

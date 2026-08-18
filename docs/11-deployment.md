@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-17 (FND-001)
+Last reviewed: 2026-08-17 (CFG-001)
 Related ADRs: 0001, 0003
 
 Dockerfile, compose, and `scripts/test-container.sh` land in DEP-001 (PR 11). This document freezes the contract so later PRs do not invent ports or image posture.
@@ -25,7 +25,7 @@ labmail version
 
 `labmail send` is **not** shipped.
 
-FND-001 implements `version` and `help` only.
+CFG-001 implements `version`, `help`, `validate`, and `canonicalize`. `serve` and `healthcheck` remain unimplemented.
 
 ## Hardened container
 

@@ -8,7 +8,7 @@ Systems under test deliver RFC 5321 SMTP here. LabMail will capture, index, and 
 [![Go](https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go)](https://go.dev/dl/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/hilather/go-lab-maildev/blob/main/LICENSE)
 
-Status: **foundation + design pack**. The `labmail` binary prints `version` / `help` only. There is **no SMTP listener**, store, REST, MCP, auth, UI, or container image yet.
+Status: **foundation + fail-closed YAML**. The `labmail` binary implements `version`, `help`, `validate`, and `canonicalize`. There is **no SMTP listener**, store, REST, MCP, auth, UI, or container image yet.
 
 Module [`github.com/hilather/go-lab-maildev`](https://github.com/hilather/go-lab-maildev) · Binary `labmail` · Image (later) `ghcr.io/hilather/labmail` · YAML `apiVersion: labmail.dev/v1alpha1`, `kind: LabMail`
 
@@ -40,6 +40,7 @@ go version   # go1.26.x
 go build -o bin/labmail ./cmd/labmail
 ./bin/labmail version
 ./bin/labmail help
+./bin/labmail validate --config testdata/config/valid/defaults.yaml
 ```
 
 `serve` is not implemented. Do not expect a bind on `:1025` or `:1080`.
@@ -50,6 +51,7 @@ go build -o bin/labmail ./cmd/labmail
 make format
 make lint
 make test
+make test-config-compat
 make test-docs
 make build
 ```

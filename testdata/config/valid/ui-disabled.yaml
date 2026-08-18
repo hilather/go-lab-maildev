@@ -1,0 +1,13 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: headless
+spec:
+  ui:
+    enabled: false
+  listeners:
+    management:
+      compatEnabled: false
+  observability:
+    metrics:
+      listen: ""

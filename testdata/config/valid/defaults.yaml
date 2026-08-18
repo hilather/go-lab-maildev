@@ -1,0 +1,6 @@
+# Empty spec is valid: all defaults materialize.
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: lab-sink
+spec: {}

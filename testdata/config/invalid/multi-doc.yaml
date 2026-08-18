@@ -1,0 +1,11 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: first
+spec: {}
+---
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: second
+spec: {}

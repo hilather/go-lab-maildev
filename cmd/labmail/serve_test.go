@@ -78,10 +78,17 @@ func TestServeAcceptsAuthMode(t *testing.T) {
 	}
 }
 
+const serveTestToken = "0123456789abcdef0123456789abcdef"
+
 func writeServeConfig(t *testing.T, metricsListen string, publicPath bool) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "labmail.yaml")
-	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  observability:\n    metrics:\n      listen: " + strconvQuote(metricsListen) + "\n      publicPath: " + strconv.FormatBool(publicPath) + "\n"
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte(serveTestToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n  observability:\n    metrics:\n      listen: " + strconvQuote(metricsListen) + "\n      publicPath: " + strconv.FormatBool(publicPath) + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +209,12 @@ func TestServeBindsManagement(t *testing.T) {
 	if mcpResp.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("mcp GET status=%d want 405", mcpResp.StatusCode)
 	}
-	hidden := doHTTP(t, "http://"+mgmt+"/v1/metrics")
+	unauth := doHTTP(t, "http://"+mgmt+"/v1/metrics")
+	defer unauth.Body.Close()
+	if unauth.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated metrics status=%d want 401", unauth.StatusCode)
+	}
+	hidden := doHTTPAuth(t, "http://"+mgmt+"/v1/metrics", serveTestToken)
 	defer hidden.Body.Close()
 	if hidden.StatusCode != http.StatusNotFound {
 		t.Fatalf("publicPath false: metrics status=%d", hidden.StatusCode)
@@ -306,7 +318,7 @@ func TestServeMetricsListenAndPublicPath(t *testing.T) {
 	mgmt := waitPrefix(t, &stdout, "labmail management listen=")
 	metricsAddr := waitPrefix(t, &stdout, "labmail metrics listen=")
 
-	pub := waitHTTP(t, "http://"+mgmt+"/v1/metrics")
+	pub := waitHTTPAuth(t, "http://"+mgmt+"/v1/metrics", serveTestToken)
 	defer pub.Body.Close()
 	if pub.StatusCode != 200 {
 		t.Fatalf("publicPath true: status=%d", pub.StatusCode)
@@ -333,11 +345,23 @@ func TestServeMetricsListenAndPublicPath(t *testing.T) {
 
 func waitHTTP(t *testing.T, url string) *http.Response {
 	t.Helper()
+	return waitHTTPAuth(t, url, "")
+}
+
+func waitHTTPAuth(t *testing.T, url, token string) *http.Response {
+	t.Helper()
 	var resp *http.Response
 	var err error
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		resp, err = http.Get(url)
+		req, reqErr := http.NewRequest(http.MethodGet, url, nil)
+		if reqErr != nil {
+			t.Fatal(reqErr)
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err = http.DefaultClient.Do(req)
 		if err == nil {
 			return resp
 		}
@@ -353,6 +377,11 @@ func waitHTTP(t *testing.T, url string) *http.Response {
 func doHTTP(t *testing.T, url string) *http.Response {
 	t.Helper()
 	return waitHTTP(t, url)
+}
+
+func doHTTPAuth(t *testing.T, url, token string) *http.Response {
+	t.Helper()
+	return waitHTTPAuth(t, url, token)
 }
 
 func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
@@ -409,7 +438,7 @@ func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
 	if ready.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("ready after smtp stop: %d", ready.StatusCode)
 	}
-	st := waitHTTP(t, statusURL)
+	st := waitHTTPAuth(t, statusURL, serveTestToken)
 	defer st.Body.Close()
 	if st.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d", st.StatusCode)

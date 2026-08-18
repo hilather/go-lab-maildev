@@ -162,6 +162,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
+	s.svc.OnApply(s.reloadAuth)
 	s.registerTools()
 	s.registerResources()
 	s.startInboxFanout()

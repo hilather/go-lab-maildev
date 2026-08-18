@@ -62,6 +62,9 @@ func mcpStdioCmd(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		} else if verifier.Mode() == model.MgmtAuthDevLoopbackUnauth {
 			a := app.Actor{ID: "stdio", Class: auth.ClassLoopback, Role: model.RoleAdministrator, Scopes: auth.DefaultScopes(model.RoleAdministrator), Transport: "mcp"}
 			fixed = &a
+		} else {
+			_, _ = fmt.Fprintln(stderr, "labmail mcp-stdio: --token-file is required unless auth.mode is dev-loopback-unauth")
+			return 1
 		}
 	}
 	s, err := mcp.New(mcp.Config{

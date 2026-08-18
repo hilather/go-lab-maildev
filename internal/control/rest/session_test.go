@@ -95,6 +95,9 @@ func TestSessionCookieAndCSRF(t *testing.T) {
 	if gm["id"] != "admin" || gm["role"] != model.RoleAdministrator {
 		t.Fatalf("get session=%s", grec.Body.String())
 	}
+	if gm["csrf"] != csrf {
+		t.Fatalf("GET /v1/session must return csrf for cookie recovery: %s", grec.Body.String())
+	}
 
 	insertMail(t, svc, "sess", "x")
 	// Cookie mutation without CSRF is 403.
@@ -155,4 +158,81 @@ func TestHealthSkipsAuth(t *testing.T) {
 	s, _, _ := newAuthServer(t)
 	requireStatus(t, doReq(t, s.Handler(), http.MethodGet, "/v1/health/live", ""), http.StatusOK)
 	requireStatus(t, doReq(t, s.Handler(), http.MethodGet, "/v1/health/ready", ""), http.StatusOK)
+}
+
+func TestStaleCookieFallsThroughLoopbackUnauth(t *testing.T) {
+	dir := t.TempDir()
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: dev-loopback-unauth\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := app.Boot(t.Context(), app.Options{BootstrapPath: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(svc.Close)
+	v, err := auth.FromSpec(svc.Active().Canonical.Spec.Management.Auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptestReq(http.MethodGet, "/v1/messages", "")
+	req.AddCookie(&http.Cookie{Name: auth.CookieName, Value: "stale-or-expired"})
+	rec := doRaw(s.Handler(), req)
+	requireStatus(t, rec, http.StatusOK)
+}
+
+func TestReloadAuthKeepsSessionsWhenSecretsUnreadable(t *testing.T) {
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte(testBearerToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pw := filepath.Join(dir, "pass")
+	if err := os.WriteFile(pw, []byte("lab-web-pass\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n      basic:\n        username: admin\n        passwordFile: " + pw + "\n        tokenRef: admin\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := app.Boot(t.Context(), app.Options{BootstrapPath: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(svc.Close)
+	v, err := auth.FromSpec(svc.Active().Canonical.Spec.Management.Auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptestReq(http.MethodPost, "/v1/session", "")
+	req.Header.Set("Authorization", "Bearer "+testBearerToken)
+	rec := doRaw(s.Handler(), req)
+	requireStatus(t, rec, http.StatusOK)
+	var cookie string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == auth.CookieName {
+			cookie = c.Value
+		}
+	}
+	if err := os.Remove(tok); err != nil {
+		t.Fatal(err)
+	}
+	s.reloadAuth()
+	get := httptestReq(http.MethodGet, "/v1/session", "")
+	get.AddCookie(&http.Cookie{Name: auth.CookieName, Value: cookie})
+	grec := doRaw(s.Handler(), get)
+	requireStatus(t, grec, http.StatusOK)
+	if decodeJSON(t, grec)["csrf"] == "" {
+		t.Fatal("session dropped after failed secret reread")
+	}
 }

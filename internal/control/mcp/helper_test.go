@@ -43,6 +43,67 @@ func testVerifier(t *testing.T) (*auth.Verifier, string) {
 	return v, testBearerToken
 }
 
+const testViewerToken = "fedcba9876543210fedcba9876543210"
+
+func testVerifierWithViewer(t *testing.T) (*auth.Verifier, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	adminPath := filepath.Join(dir, "admin")
+	if err := os.WriteFile(adminPath, []byte(testBearerToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	viewPath := filepath.Join(dir, "viewer")
+	if err := os.WriteFile(viewPath, []byte(testViewerToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pw := filepath.Join(dir, "pass")
+	if err := os.WriteFile(pw, []byte("lab-web-pass\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v, err := auth.FromSpec(model.MgmtAuthSpec{
+		Mode: model.MgmtAuthBearerAndBasic,
+		Tokens: []model.TokenSpec{
+			{ID: "admin", SecretFile: adminPath, Role: model.RoleAdministrator},
+			{ID: "viewer", SecretFile: viewPath, Role: model.RoleViewer, Scopes: []string{model.ScopeMailRead}},
+		},
+		Basic: model.BasicSpec{Username: "admin", PasswordFile: pw, TokenRef: "admin"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v, testBearerToken, testViewerToken
+}
+
+type bearerRoundTripper struct {
+	token string
+	base  http.RoundTripper
+}
+
+func (b bearerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	clone := req.Clone(req.Context())
+	clone.Header.Set(headerAuthorization, "Bearer "+b.token)
+	base := b.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(clone)
+}
+
+func connectClientAuth(t *testing.T, ts *httptest.Server, token string) *sdk.ClientSession {
+	t.Helper()
+	client := sdk.NewClient(&sdk.Implementation{Name: "labmail-test", Version: "dev"}, nil)
+	session, err := client.Connect(t.Context(), &sdk.StreamableClientTransport{
+		Endpoint:             ts.URL + DefaultPath,
+		DisableStandaloneSSE: true,
+		HTTPClient:           &http.Client{Transport: bearerRoundTripper{token: token}},
+	}, nil)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+	return session
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()

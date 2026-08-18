@@ -177,7 +177,10 @@ func (s *Store) ValidCSRF(cookieValue, presented string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rec, ok := s.sessions[cookieValue]
-	if !ok {
+	if !ok || s.expiredLocked(rec, s.now()) {
+		if ok {
+			delete(s.sessions, cookieValue)
+		}
 		return false
 	}
 	return EqualDigest(DigestSecret([]byte(rec.csrf)), DigestSecret([]byte(presented)))

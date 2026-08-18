@@ -174,6 +174,20 @@ func TestMailAdminSatisfiesRead(t *testing.T) {
 	}
 }
 
+func TestFromSpecRejectsUnknownRole(t *testing.T) {
+	dir := t.TempDir()
+	tok := writeSecret(t, dir, "token", testToken)
+	_, err := FromSpec(model.MgmtAuthSpec{
+		Mode: model.MgmtAuthBearer,
+		Tokens: []model.TokenSpec{{
+			ID: "x", SecretFile: tok, Role: "superuser",
+		}},
+	})
+	if err == nil {
+		t.Fatal("unknown role accepted")
+	}
+}
+
 func TestWWWAuthenticate(t *testing.T) {
 	got := WWWAuthenticate(true)
 	if len(got) != 2 || !strings.Contains(got[0], "Bearer") || !strings.Contains(got[1], "Basic") {

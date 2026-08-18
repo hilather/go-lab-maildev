@@ -46,7 +46,7 @@ auto-relay-rules, relay, smarthost, smartHost, forwardTo, mx, deliver
 
 - Tokens: **≥256 bits** entropy (TacLab ADR 0010), compared as SHA-256 digests in the in-memory index. Bootstrap file is the only durable secret.
 - Basic: `username` exact match + constant-time password compare; then the principal is `tokens[basic.tokenRef]`. Failed Basic and failed Bearer both return `401` `unauthenticated` with `WWW-Authenticate: Bearer realm="labmail"` **and** (if basic enabled) `WWW-Authenticate: Basic realm="labmail"`.
-- UI session cookie name **`labmail_session`**: `HttpOnly`, `SameSite=Lax`, `Secure` iff management TLS; CSRF header `X-LabMail-CSRF` required on cookie-authenticated mutations even over HTTP (`POST /v1/session`, `DELETE /v1/session`).
+- UI session cookie name **`labmail_session`**: `HttpOnly`, `SameSite=Lax`, `Secure` iff management TLS; CSRF header `X-LabMail-CSRF` required on cookie-authenticated mutations even over HTTP (`POST /v1/session`, `DELETE /v1/session`). `GET /v1/session` returns the CSRF secret for a valid cookie (reload recovery). Token files are reread on reset and apply; the session table is cleared only when the compiled auth identity changes. A failed secret reread keeps the previous verifier and live sessions.
 - No `.well-known/oauth-protected-resource` (ADR 0005: lab static bearer).
 - `X-Forwarded-For` is not trusted.
 - No CORS headers. OPTIONS is not a success path.

@@ -36,7 +36,8 @@ func (s *Server) handleSessionGet(w http.ResponseWriter, r *http.Request, instan
 		out.Scopes = []string{}
 	}
 	if c, err := r.Cookie(auth.CookieName); err == nil && s.cfg.Sessions != nil {
-		if sess, _, ok := s.cfg.Sessions.Lookup(c.Value); ok {
+		if sess, csrf, ok := s.cfg.Sessions.Lookup(c.Value); ok {
+			out.CSRF = csrf
 			out.ExpiresAt = rfc3339(s.cfg.Sessions.ExpiresAt(sess))
 		}
 	}

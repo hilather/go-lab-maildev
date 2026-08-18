@@ -94,6 +94,7 @@ type sessionViewJSON struct {
 	ID        string   `json:"id"`
 	Role      string   `json:"role"`
 	Scopes    []string `json:"scopes"`
+	CSRF      string   `json:"csrf,omitempty"`
 	ExpiresAt string   `json:"expiresAt,omitempty"`
 }
 

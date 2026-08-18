@@ -9,19 +9,27 @@ func TestOriginAllowlist(t *testing.T) {
 	s, _ := newTestServer(t)
 	h := s.Handler()
 
+	missing := httptestReq(http.MethodGet, "/v1/health/live", "")
+	requireStatus(t, doRaw(h, missing), http.StatusOK)
+
 	req := httptestReq(http.MethodGet, "/v1/health/live", "")
-	req.Header.Set("Origin", "http://localhost:1080")
-	rec := doRaw(h, req)
-	requireStatus(t, rec, http.StatusOK)
+	req.Header.Set("Origin", "http://127.0.0.1:1080")
+	requireStatus(t, doRaw(h, req), http.StatusOK)
+
+	req = httptestReq(http.MethodGet, "/v1/health/live", "")
+	req.Header.Set("Origin", "https://evil.example")
+	requireProblem(t, doRaw(h, req), http.StatusForbidden, "forbidden")
+
+	req = httptestReq(http.MethodGet, "/v1/health/live", "")
+	req.Header.Set("Origin", "file://localhost")
+	requireProblem(t, doRaw(h, req), http.StatusForbidden, "forbidden")
 
 	req = httptestReq(http.MethodGet, "/v1/health/live", "")
 	req.Header.Set("Origin", "http://192.168.1.9:1080")
-	rec = doRaw(h, req)
-	requireProblem(t, rec, http.StatusForbidden, "forbidden")
+	requireProblem(t, doRaw(h, req), http.StatusForbidden, "forbidden")
 
 	s.cfg.AllowedOrigins = []string{"http://192.168.1.9:1080"}
 	req = httptestReq(http.MethodGet, "/v1/health/live", "")
 	req.Header.Set("Origin", "http://192.168.1.9:1080")
-	rec = doRaw(h, req)
-	requireStatus(t, rec, http.StatusOK)
+	requireStatus(t, doRaw(h, req), http.StatusOK)
 }

@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"net"
 	"net/netip"
@@ -92,6 +91,11 @@ func FromSpec(spec model.MgmtAuthSpec) (*Verifier, error) {
 			return nil, domainerr.ValidationFailed("duplicate token value",
 				domainerr.FieldViolation{Path: indexPath("spec.management.auth.tokens", i) + ".secretFile", Code: "duplicate_id", Message: "token value matches " + other})
 		}
+		if tok.Role != "" && !model.KnownRole(tok.Role) {
+			zero(raw)
+			return nil, domainerr.ValidationFailed("unknown role",
+				domainerr.FieldViolation{Path: indexPath("spec.management.auth.tokens", i) + ".role", Code: "invalid_value", Message: "role must be viewer, operator, or administrator"})
+		}
 		seenID[id] = len(tokens)
 		seenDigest[d] = id
 		role, scopes := expandScopes(tok.Role, tok.Scopes)
@@ -137,6 +141,50 @@ func (v *Verifier) Replace(next *Verifier) {
 	v.mode = next.mode
 	v.tokens = next.tokens
 	v.basic = next.basic
+}
+
+// Equivalent reports whether the compiled identity (mode, token digests, Basic) matches.
+func (v *Verifier) Equivalent(other *Verifier) bool {
+	if v == nil || other == nil {
+		return v == other
+	}
+	modeA, toksA, basicA := v.snapshot()
+	modeB, toksB, basicB := other.snapshot()
+	if modeA != modeB || len(toksA) != len(toksB) {
+		return false
+	}
+	byID := make(map[string][sha256.Size]byte, len(toksA))
+	for _, t := range toksA {
+		byID[t.id] = t.digest
+	}
+	for _, t := range toksB {
+		d, ok := byID[t.id]
+		if !ok || !EqualDigest(d, t.digest) {
+			return false
+		}
+	}
+	if (basicA == nil) != (basicB == nil) {
+		return false
+	}
+	if basicA != nil && (basicA.username != basicB.username || basicA.tokenIdx != basicB.tokenIdx || !EqualDigest(basicA.password, basicB.password)) {
+		return false
+	}
+	return true
+}
+
+func (v *Verifier) snapshot() (string, []storedToken, *basicCred) {
+	if v == nil {
+		return "", nil, nil
+	}
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	toks := append([]storedToken(nil), v.tokens...)
+	var b *basicCred
+	if v.basic != nil {
+		cp := *v.basic
+		b = &cp
+	}
+	return v.mode, toks, b
 }
 
 // Mode is the compiled auth mode.
@@ -226,7 +274,7 @@ func (v *Verifier) lookupBearerLocked(secret string) (Principal, error) {
 		}
 		mask := eq
 		idx = idx*(1-mask) + i*mask
-		found |= eq
+		found += eq
 	}
 	if found != 1 {
 		return Principal{}, domainerr.Unauthenticated("authentication required")
@@ -245,7 +293,8 @@ func (v *Verifier) lookupBasicLocked(payload string) (Principal, error) {
 		wantPass = v.basic.password
 		idx = v.basic.tokenIdx
 	}
-	userOK := subtle.ConstantTimeCompare([]byte(user), []byte(wantUser)) == 1
+	// Hash usernames so compare cost does not leak length.
+	userOK := EqualDigest(DigestSecret([]byte(user)), DigestSecret([]byte(wantUser)))
 	passOK := EqualDigest(DigestSecret([]byte(pass)), wantPass)
 	if !ok || !userOK || !passOK || idx < 0 || idx >= len(v.tokens) {
 		return Principal{}, domainerr.Unauthenticated("authentication required")

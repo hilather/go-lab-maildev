@@ -37,9 +37,5 @@ func expandScopes(role string, scopes []string) (string, []string) {
 	if role == "" {
 		role = model.RoleAdministrator
 	}
-	expanded := DefaultScopes(role)
-	if expanded == nil {
-		expanded = allScopes()
-	}
-	return role, expanded
+	return role, DefaultScopes(role)
 }

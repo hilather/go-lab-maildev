@@ -39,6 +39,9 @@ func TestSessionExpiryAndCSRF(t *testing.T) {
 		t.Fatal("csrf compare")
 	}
 	now = now.Add(61 * time.Second)
+	if s.ValidCSRF(cookie, csrf) {
+		t.Fatal("expired session csrf accepted")
+	}
 	if _, _, ok := s.Lookup(cookie); ok {
 		t.Fatal("idle expiry should invalidate")
 	}

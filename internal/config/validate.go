@@ -279,6 +279,8 @@ func validateManagement(m *model.ManagementSpec, vs *[]domainerr.FieldViolation)
 		}
 		if strings.TrimSpace(tok.SecretFile) == "" {
 			*vs = append(*vs, domainerr.FieldViolation{Path: path + ".secretFile", Code: violationRequired, Message: "token secretFile is required"})
+		} else {
+			checkTokenSecretLength(path+".secretFile", tok.SecretFile, vs)
 		}
 		if tok.Role != "" && !model.KnownRole(tok.Role) {
 			*vs = append(*vs, domainerr.FieldViolation{Path: path + ".role", Code: violationInvalidValue, Message: "role must be viewer, operator, or administrator"})
@@ -378,4 +380,32 @@ func requireExistingFile(path, file string, vs *[]domainerr.FieldViolation) {
 			Message: "file does not resolve at load",
 		})
 	}
+}
+
+// checkTokenSecretLength fails if the file exists and the first secret line
+// is shorter than 32 bytes so validate matches serve/FromSpec.
+func checkTokenSecretLength(path, file string, vs *[]domainerr.FieldViolation) {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if len(line) < 32 {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "token secret must be at least 32 bytes",
+			})
+		}
+		return
+	}
+	*vs = append(*vs, domainerr.FieldViolation{
+		Path:    path,
+		Code:    violationInvalidValue,
+		Message: "token secret must be at least 32 bytes",
+	})
 }

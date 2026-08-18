@@ -64,10 +64,10 @@ func (s *Server) authenticate(r *http.Request, skip bool) (app.Actor, error) {
 
 	if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" && s.cfg.Sessions != nil {
 		sess, _, ok := s.cfg.Sessions.Lookup(c.Value)
-		if !ok {
-			return app.Actor{}, domainerr.Unauthenticated("authentication required")
+		if ok {
+			return actorOf(auth.PrincipalFromSession(sess), "rest"), nil
 		}
-		return actorOf(auth.PrincipalFromSession(sess), "rest"), nil
+		// Stale/unknown cookie must not block dev-loopback-unauth.
 	}
 
 	p, err := s.cfg.Auth.Authenticate(auth.Request{RemoteAddr: r.RemoteAddr})

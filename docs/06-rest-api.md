@@ -130,7 +130,10 @@ POST   /v1/session     Authorization: Bearer | Basic
                        Set-Cookie: labmail_session=<opaque>; HttpOnly; SameSite=Lax; Path=/
                                    Secure iff management TLS
                        Body: { "csrf": "<32-byte hex>", "expiresAt": "…" }
-GET    /v1/session     cookie or bearer → { "id", "role", "scopes", "expiresAt" }
+GET    /v1/session     cookie or bearer → { "id", "role", "scopes", "expiresAt", "csrf"? }
+                       csrf is returned for a valid cookie so the UI can recover
+                       after reload; cookie-authenticated POST /v1/session still
+                       requires X-LabMail-CSRF.
 DELETE /v1/session     clears cookie
 ```
 

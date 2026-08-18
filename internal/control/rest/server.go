@@ -167,6 +167,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
+	s.svc.OnApply(s.reloadAuth)
 	if len(cfg.Mounts) > 0 {
 		mux := http.NewServeMux()
 		for path, h := range cfg.Mounts {
@@ -375,9 +376,6 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) reloadAuth() {
-	if s.cfg.Sessions != nil {
-		s.cfg.Sessions.Clear()
-	}
 	if s.cfg.Auth == nil {
 		return
 	}
@@ -391,9 +389,14 @@ func (s *Server) reloadAuth() {
 	}
 	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
 	if err != nil {
+		// Keep the previous verifier and live UI sessions.
 		return
 	}
+	changed := !s.cfg.Auth.Equivalent(next)
 	s.cfg.Auth.Replace(next)
+	if changed && s.cfg.Sessions != nil {
+		s.cfg.Sessions.Clear()
+	}
 }
 
 func (s *Server) dispatchMount(w http.ResponseWriter, r *http.Request, instance string) bool {

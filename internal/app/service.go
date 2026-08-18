@@ -28,6 +28,7 @@ type Service interface {
 	Extract(ctx context.Context, actor Actor, id string) (*ExtractResult, error)
 	Subscribe(ctx context.Context, actor Actor, buffer int) (<-chan InboxEvent, func())
 	OnReset(fn func())
+	OnApply(fn func())
 
 	QueryAudit(ctx context.Context, actor Actor, in AuditQuery) (*AuditList, error)
 	GetAudit(ctx context.Context, actor Actor, id string) (*AuditEvent, error)

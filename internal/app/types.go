@@ -88,8 +88,35 @@ type StateView struct {
 
 // Status is the agent-readable process DTO.
 type Status struct {
-	Ready     bool
-	Revisions model.RevisionStatus
+	Ready       bool
+	Revisions   model.RevisionStatus
+	UnreadCount int
+	Epoch       uint64
+}
+
+// DefaultWaitTimeout is the native wait default when the caller omits timeout.
+const DefaultWaitTimeout = 10 * time.Second
+
+// WaitIn is POST /v1/messages:wait. Timeout 0 means DefaultWaitTimeout;
+// both the default and an explicit timeout are capped by store.maxWait.
+type WaitIn struct {
+	Filter  model.MessageFilter
+	Timeout time.Duration
+}
+
+// Inbox event types for REST SSE / MCP notify. Adapters must not import store.
+const (
+	InboxMailReceived = "mail.received"
+	InboxMailDeleted  = "mail.deleted"
+	InboxStoreWiped   = "store.wiped"
+)
+
+// InboxEvent is one inbox membership change.
+type InboxEvent struct {
+	Type       string
+	ID         string
+	Subject    string
+	Generation uint64
 }
 
 // Warning is a bounded, stable-coded note.
@@ -123,3 +150,16 @@ type AuditList struct {
 
 // AuditEvent is one mutation or security record.
 type AuditEvent = audit.Event
+
+// ExtractResult is POST /v1/messages/{id}:extract.
+type ExtractResult struct {
+	URLs   []string         `json:"urls"`
+	Tokens []ExtractedToken `json:"tokens"`
+}
+
+// ExtractedToken is one OTP-like match.
+type ExtractedToken struct {
+	Kind    string `json:"kind"`
+	Value   string `json:"value"`
+	Context string `json:"context"`
+}

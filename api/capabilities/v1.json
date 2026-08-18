@@ -1,0 +1,787 @@
+{
+  "apiVersion": "labmail.dev/capabilities/v1",
+  "generatedBy": "scripts/generate; DO NOT EDIT.",
+  "capabilities": [
+    {
+      "id": "health.live",
+      "title": "Health live",
+      "version": "v1",
+      "description": "Process liveness. Not an MCP tool.",
+      "mutating": false,
+      "idempotent": true,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/health/live"
+        }
+      ],
+      "mcp": null
+    },
+    {
+      "id": "health.ready",
+      "title": "Health ready",
+      "version": "v1",
+      "description": "Readiness (valid snapshot, listeners bound). Not an MCP tool.",
+      "mutating": false,
+      "idempotent": true,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/health/ready"
+        }
+      ],
+      "mcp": null
+    },
+    {
+      "id": "version.get",
+      "title": "Version",
+      "version": "v1",
+      "description": "Build and protocol versions.",
+      "outputSchema": {
+        "name": "Version"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/version"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_version_get"
+        ]
+      },
+      "serviceMethods": [
+        "Version"
+      ]
+    },
+    {
+      "id": "capabilities.get",
+      "title": "Capabilities",
+      "version": "v1",
+      "description": "Capability list and protocol metadata.",
+      "outputSchema": {
+        "name": "CapabilityView"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/capabilities"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_capabilities_get"
+        ],
+        "resources": [
+          "labmail://capabilities"
+        ]
+      },
+      "serviceMethods": [
+        "Capabilities"
+      ]
+    },
+    {
+      "id": "status.get",
+      "title": "Agent status",
+      "version": "v1",
+      "description": "Listeners, store stats, and revisions.",
+      "outputSchema": {
+        "name": "Status"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/status"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_status_get"
+        ],
+        "resources": [
+          "labmail://status"
+        ]
+      },
+      "serviceMethods": [
+        "Status"
+      ]
+    },
+    {
+      "id": "schema.get",
+      "title": "Config schema",
+      "version": "v1",
+      "description": "Published v1alpha1 config JSON Schema.",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/schema/config"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_schema_get"
+        ],
+        "resources": [
+          "labmail://schema/config"
+        ]
+      },
+      "serviceMethods": [
+        "ConfigSchema"
+      ]
+    },
+    {
+      "id": "state.get",
+      "title": "Get state",
+      "version": "v1",
+      "description": "Redacted spec plus revision metadata.",
+      "outputSchema": {
+        "name": "StateView"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/state"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_state_get"
+        ],
+        "resources": [
+          "labmail://state"
+        ]
+      },
+      "serviceMethods": [
+        "GetState"
+      ]
+    },
+    {
+      "id": "state.validate",
+      "title": "Validate",
+      "version": "v1",
+      "description": "Validate a candidate document and/or operations without writing.",
+      "inputSchema": {
+        "name": "ValidateIn"
+      },
+      "outputSchema": {
+        "name": "Plan"
+      },
+      "requiredScopes": [
+        "mail.admin"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/state:validate"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_state_validate"
+        ]
+      },
+      "serviceMethods": [
+        "Validate"
+      ]
+    },
+    {
+      "id": "state.export",
+      "title": "Export",
+      "version": "v1",
+      "description": "Canonical desired-state export plus drift material.",
+      "outputSchema": {
+        "name": "Export"
+      },
+      "requiredScopes": [
+        "mail.admin"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/state:export"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_state_export"
+        ]
+      },
+      "serviceMethods": [
+        "Export"
+      ]
+    },
+    {
+      "id": "state.reset",
+      "title": "Reset",
+      "version": "v1",
+      "description": "Reread the bootstrap mount, wipe the inbox, and swap. Never writes the file.",
+      "inputSchema": {
+        "name": "ResetIn"
+      },
+      "outputSchema": {
+        "name": "ApplyResult"
+      },
+      "requiredScopes": [
+        "mail.admin"
+      ],
+      "mutating": true,
+      "idempotent": false,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/state:reset"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_state_reset"
+        ]
+      },
+      "serviceMethods": [
+        "Reset"
+      ]
+    },
+    {
+      "id": "changes.plan",
+      "title": "Plan",
+      "version": "v1",
+      "description": "Dry-run operations against the active snapshot.",
+      "inputSchema": {
+        "name": "ChangeIn"
+      },
+      "outputSchema": {
+        "name": "Plan"
+      },
+      "requiredScopes": [
+        "mail.admin"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/changes:plan"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_change_plan"
+        ]
+      },
+      "serviceMethods": [
+        "Plan"
+      ]
+    },
+    {
+      "id": "changes.apply",
+      "title": "Apply",
+      "version": "v1",
+      "description": "Apply operations. expectedRevision is required.",
+      "inputSchema": {
+        "name": "ChangeIn"
+      },
+      "outputSchema": {
+        "name": "ApplyResult"
+      },
+      "requiredScopes": [
+        "mail.admin"
+      ],
+      "mutating": true,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/changes:apply"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_change_apply"
+        ]
+      },
+      "serviceMethods": [
+        "Apply"
+      ]
+    },
+    {
+      "id": "session.create",
+      "title": "Create session",
+      "version": "v1",
+      "description": "Cookie + CSRF session for the inbox UI. Implemented in SEC-001.",
+      "mutating": true,
+      "idempotent": false,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/session"
+        }
+      ],
+      "mcp": null
+    },
+    {
+      "id": "session.delete",
+      "title": "Delete session",
+      "version": "v1",
+      "description": "Clear the inbox UI session cookie. Implemented in SEC-001.",
+      "mutating": true,
+      "idempotent": true,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/v1/session"
+        }
+      ],
+      "mcp": null
+    },
+    {
+      "id": "session.get",
+      "title": "Get session",
+      "version": "v1",
+      "description": "Current session principal. Implemented in SEC-001.",
+      "mutating": false,
+      "idempotent": true,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/session"
+        }
+      ],
+      "mcp": null
+    },
+    {
+      "id": "events.stream",
+      "title": "Events stream",
+      "version": "v1",
+      "description": "REST SSE inbox events. MCP uses subscriptions/listen URI-only notify.",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "differentBinding": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/events/stream"
+        }
+      ],
+      "mcp": {
+        "resources": [
+          "labmail://messages"
+        ]
+      },
+      "serviceMethods": [
+        "Subscribe"
+      ]
+    },
+    {
+      "id": "messages.list",
+      "title": "List messages",
+      "version": "v1",
+      "description": "Cursor-paginated inbox list. HMAC cursors bind storeGeneration.",
+      "outputSchema": {
+        "name": "MessageList"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/messages"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_messages_list"
+        ],
+        "resources": [
+          "labmail://messages"
+        ]
+      },
+      "serviceMethods": [
+        "ListMessages"
+      ]
+    },
+    {
+      "id": "messages.get",
+      "title": "Get message",
+      "version": "v1",
+      "description": "Full message. markRead defaults to false on the native path.",
+      "outputSchema": {
+        "name": "Message"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/messages/{id}"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_message_get"
+        ],
+        "resources": [
+          "labmail://messages/{id}"
+        ]
+      },
+      "serviceMethods": [
+        "GetMessage"
+      ]
+    },
+    {
+      "id": "messages.raw",
+      "title": "Raw message",
+      "version": "v1",
+      "description": "RFC 822 source (message/rfc822).",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/messages/{id}/raw"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_message_raw_get"
+        ]
+      },
+      "serviceMethods": [
+        "GetMessage"
+      ]
+    },
+    {
+      "id": "messages.html",
+      "title": "HTML body",
+      "version": "v1",
+      "description": "Raw HTML body with no CSP. Not the sandboxed preview.",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/messages/{id}/html"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_message_html_get"
+        ]
+      },
+      "serviceMethods": [
+        "GetMessage"
+      ]
+    },
+    {
+      "id": "messages.preview",
+      "title": "HTML preview",
+      "version": "v1",
+      "description": "CSP document for the sandboxed iframe. cid: rewritten to data: URLs.",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/messages/{id}/preview"
+        }
+      ],
+      "mcp": null,
+      "serviceMethods": [
+        "GetMessage"
+      ]
+    },
+    {
+      "id": "messages.delete",
+      "title": "Delete message",
+      "version": "v1",
+      "description": "Delete one message by id.",
+      "requiredScopes": [
+        "mail.write"
+      ],
+      "mutating": true,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/v1/messages/{id}"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_message_delete"
+        ]
+      },
+      "serviceMethods": [
+        "DeleteMessage"
+      ]
+    },
+    {
+      "id": "messages.clear",
+      "title": "Clear inbox",
+      "version": "v1",
+      "description": "Delete every message. Does not bump epoch.",
+      "requiredScopes": [
+        "mail.write"
+      ],
+      "mutating": true,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "DELETE",
+          "path": "/v1/messages"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_messages_clear"
+        ]
+      },
+      "serviceMethods": [
+        "ClearMessages"
+      ]
+    },
+    {
+      "id": "messages.read_all",
+      "title": "Mark all read",
+      "version": "v1",
+      "description": "Set every read bit. Does not bump storeGeneration.",
+      "requiredScopes": [
+        "mail.write"
+      ],
+      "mutating": true,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/messages:read-all"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_messages_read_all"
+        ]
+      },
+      "serviceMethods": [
+        "MarkAllRead"
+      ]
+    },
+    {
+      "id": "messages.wait",
+      "title": "Wait for message",
+      "version": "v1",
+      "description": "Block until a matching message arrives or the timeout fires.",
+      "inputSchema": {
+        "name": "WaitIn"
+      },
+      "outputSchema": {
+        "name": "Message"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/messages:wait"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_messages_wait"
+        ]
+      },
+      "serviceMethods": [
+        "Wait"
+      ]
+    },
+    {
+      "id": "messages.extract",
+      "title": "Extract tokens",
+      "version": "v1",
+      "description": "Extract URLs and OTP-like tokens using the frozen RE2 set.",
+      "outputSchema": {
+        "name": "ExtractResult"
+      },
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/messages/{id}:extract"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_message_extract"
+        ]
+      },
+      "serviceMethods": [
+        "Extract"
+      ]
+    },
+    {
+      "id": "attachments.get",
+      "title": "Get attachment",
+      "version": "v1",
+      "description": "Download one attachment. Content-Disposition: attachment.",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/messages/{id}/attachments/{attId}"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_attachment_get"
+        ]
+      },
+      "serviceMethods": [
+        "GetMessage"
+      ]
+    },
+    {
+      "id": "audit.list",
+      "title": "Audit list",
+      "version": "v1",
+      "description": "Query recent in-memory audit events.",
+      "inputSchema": {
+        "name": "AuditQuery"
+      },
+      "outputSchema": {
+        "name": "AuditList"
+      },
+      "requiredScopes": [
+        "mail.audit.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/audit"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_audit_query"
+        ],
+        "resources": [
+          "labmail://audit/recent"
+        ]
+      },
+      "serviceMethods": [
+        "QueryAudit"
+      ]
+    },
+    {
+      "id": "audit.get",
+      "title": "Audit get",
+      "version": "v1",
+      "description": "Get one audit event by ID.",
+      "outputSchema": {
+        "name": "AuditEvent"
+      },
+      "requiredScopes": [
+        "mail.audit.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/audit/{eventId}"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_audit_get"
+        ]
+      },
+      "serviceMethods": [
+        "GetAudit"
+      ]
+    },
+    {
+      "id": "metrics.get",
+      "title": "Metrics",
+      "version": "v1",
+      "description": "OpenMetrics text. Served only when observability.metrics.publicPath is true.",
+      "requiredScopes": [
+        "mail.read"
+      ],
+      "mutating": false,
+      "idempotent": true,
+      "restOnly": true,
+      "rest": [
+        {
+          "method": "GET",
+          "path": "/v1/metrics"
+        }
+      ],
+      "mcp": null
+    }
+  ]
+}

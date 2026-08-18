@@ -20,8 +20,8 @@ help:
 		'  vet                 go vet ./...' \
 		'  lint                go vet + golangci-lint $(GOLANGCI_LINT_VERSION)' \
 		'  build               go build -o bin/labmail ./cmd/labmail' \
-		'  generate            unimplemented until API-001 (PR 6); fail-closed' \
-		'  verify-generated    unimplemented until API-001 (PR 6); fail-closed' \
+		'  generate            write api/capabilities/v1.json and api/openapi/v1.json' \
+		'  verify-generated    fail if generate would change those files' \
 		'  test                go test ./...' \
 		'  test-race           go test -race ./...' \
 		'  test-fuzz-smoke     buildinfo + config + SMTP codec + MIME parse fuzz corpora (5s each)' \
@@ -47,10 +47,10 @@ build:
 	$(GO) build -o bin/labmail ./cmd/labmail
 
 generate:
-	@echo 'generate: unimplemented until API-001 (PR 6)' >&2; exit 1
+	$(GO) run ./scripts/generate
 
 verify-generated:
-	@echo 'verify-generated: unimplemented until API-001 (PR 6)' >&2; exit 1
+	$(GO) run ./scripts/generate -check
 
 test:
 	$(GO) test ./...

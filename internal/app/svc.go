@@ -40,6 +40,7 @@ type App struct {
 	bootstrapPath string
 	idemp         *idempCache
 	audit         *audit.Fanout
+	resetHooks    []func()
 }
 
 var _ Service = (*App)(nil)

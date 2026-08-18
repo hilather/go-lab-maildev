@@ -1,7 +1,7 @@
 # Program Board
 
-Status: in-progress (API-001 next)
-Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001)
+Status: in-progress (COMPAT-001 / MCP-001 next)
+Last reviewed: 2026-08-17 (SMTP-001b + STORE-001 + STA-001 + API-001)
 
 Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs/` is the source of truth.
 
@@ -15,7 +15,7 @@ Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs
 | 3b | SMTP AUTH and STARTTLS | SMTP-001b | SMTP-001a | AUTH PLAIN/LOGIN transcript, STARTTLS; `implicit` stays reject | done |
 | 4 | MIME parse and bounded store | STORE-001 | SMTP-001a | MIME adapter, ULID inbox, caps, wait, wipe, epoch | done |
 | 5 | Application service, snapshot, reset | STA-001 | CFG-001, STORE-001 | `app.Service`, config snapshot, reset wipes inbox | done |
-| 6 | REST `/v1` and OpenAPI | API-001 | STA-001 | Native REST except UI/session; problem+json; wait/extract | not-started |
+| 6 | REST `/v1` and OpenAPI | API-001 | STA-001 | Native REST except UI/session; problem+json; wait/extract | done |
 | 7 | maildev 2.2.1 compat adapter | COMPAT-001 | API-001 | `/email`, `/healthz`, `/config`; relay is 403 | not-started |
 | 8 | MCP Streamable HTTP and parity | MCP-001 | API-001 | `mail_*` tools, `labmail://` resources, `make test-parity` | not-started |
 | 9 | Auth, Basic compat, audit | SEC-001 | API-001, COMPAT-001, MCP-001 | Bearer + Basic, CSRF session, `TestMaildevScenarioCompat` | not-started |

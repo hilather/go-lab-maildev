@@ -128,4 +128,4 @@ make test-changelog
 
 If a target does not yet exist, the task that first needs it must add it rather than silently omitting the check. Placeholders must fail closed, not succeed as no-ops.
 
-FND-001 required CI jobs: `format`, `lint`, `unit`, `documentation`.
+FND-001 required CI jobs: `format`, `lint`, `unit`, `documentation`. API-001 adds `generated-file`.

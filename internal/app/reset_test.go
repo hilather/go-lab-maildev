@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
@@ -167,6 +168,29 @@ func TestResetBadSpillLeavesInboxAndSnapshot(t *testing.T) {
 	}
 	if _, err := svc.Inbox().Get(id, false); err != nil {
 		t.Fatalf("message gone after failed reset: %v", err)
+	}
+}
+
+func TestResetHooksRunWithoutAppLock(t *testing.T) {
+	svc, _ := mustBoot(t)
+	done := make(chan struct{})
+	svc.OnReset(func() {
+		svc.OnReset(func() {})
+		if _, err := svc.Plan(context.Background(), actor(), ChangeIn{
+			ExpectedRevision: svc.Active().Revision,
+			Operations:       []model.Operation{hideSIZE()},
+		}); err != nil {
+			t.Errorf("plan from reset hook: %v", err)
+		}
+		close(done)
+	})
+	if _, err := svc.Reset(context.Background(), actor(), ResetIn{Reason: "hook-unlock"}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("reset hook deadlocked on App.mu")
 	}
 }
 

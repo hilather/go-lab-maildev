@@ -60,6 +60,7 @@ type Memory struct {
 	bytes      int64
 	byID       map[string]*record
 	order      []string
+	subs       []*subscriber
 }
 
 type record struct {
@@ -213,6 +214,7 @@ func (m *Memory) Insert(ctx context.Context, epoch uint64, msg *model.Message) (
 	m.bytes += candidate
 	m.generation++
 	m.cond.Broadcast()
+	m.emitLocked(Event{Type: EventMailReceived, ID: id, Subject: prepared.Subject, Generation: m.generation})
 	committed = true
 	return model.InsertResult{ID: id, Generation: m.generation}, nil
 }
@@ -650,6 +652,7 @@ func (m *Memory) ResetTo(opts Options) error {
 	m.spillDir = opts.SpillDirectory
 	m.spillThreshold = opts.SpillThreshold
 	m.cond.Broadcast()
+	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
 	return nil
 }
 
@@ -667,6 +670,7 @@ func (m *Memory) Wipe() {
 	m.bytes = 0
 	_ = m.unlinkAllSpill()
 	m.cond.Broadcast()
+	m.emitLocked(Event{Type: EventStoreWiped, Generation: m.generation})
 }
 
 func (m *Memory) removeLocked(id string, eviction bool) {
@@ -691,6 +695,11 @@ func (m *Memory) removeLocked(id string, eviction bool) {
 		m.evictions++
 	}
 	m.cond.Broadcast()
+	subj := ""
+	if rec.msg != nil {
+		subj = rec.msg.Subject
+	}
+	m.emitLocked(Event{Type: EventMailDeleted, ID: id, Subject: subj, Generation: m.generation})
 }
 
 type recSnap struct {

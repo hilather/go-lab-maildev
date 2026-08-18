@@ -2,12 +2,12 @@
 
 Status: Proposed normative behavior
 Owners: Application, REST, MCP
-Last reviewed: 2026-08-17 (STA-001)
+Last reviewed: 2026-08-17 (API-001)
 Related ADRs: 0004, 0005, 0006, 0007
 
 REST and MCP are two protocol adapters over one capability model. Adapters never call each other and never contain store/SMTP business logic. See [docs/adr/0004-shared-capability-registry.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0004-shared-capability-registry.md).
 
-STA-001 implements `internal/app.Service` (HTTP-less), `internal/snapshot`, and `internal/audit`. SMTP insert stays on the data plane. REST/MCP adapters are later PRs.
+STA-001 implements `internal/app.Service` (HTTP-less), `internal/snapshot`, and `internal/audit`. API-001 implements `internal/capabilities` and `internal/control/rest` (`/v1`, problem+json, HMAC cursors, wait/extract, preview CSP, plan/apply). Session cookie/CSRF is SEC-001. Compat `/email` is COMPAT-001. MCP is MCP-001. SMTP insert stays on the data plane.
 
 ## Package layout
 

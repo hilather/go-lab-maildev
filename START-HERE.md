@@ -10,9 +10,9 @@ If you want to run what exists today, stay on this page, then follow the [README
 2. `go build -o bin/labmail ./cmd/labmail`
 3. `./bin/labmail version`
 4. `./bin/labmail help`
-5. `./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025`
+5. `./bin/labmail serve --config testdata/config/valid/defaults.yaml --smtp-listen 127.0.0.1:1025 --management-listen 127.0.0.1:1080`
 
-`validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` binds SMTP and stores accepted mail in the process inbox. `healthcheck` and management HTTP are not implemented.
+`validate` and `canonicalize` load a fail-closed `labmail.dev/v1alpha1` document. `serve` binds SMTP and native `/v1` REST. `healthcheck` probes `GET /v1/health/ready`. Session, `/email` compat, and MCP are later PRs.
 
 YAML field rules, revisions, and reset live in [docs/04-state-and-configuration.md](docs/04-state-and-configuration.md). SMTP accept/reject tables live in [docs/02-smtp-semantics.md](docs/02-smtp-semantics.md). REST and MCP twins are in [docs/06-rest-api.md](docs/06-rest-api.md) and [docs/07-mcp-api.md](docs/07-mcp-api.md).
 

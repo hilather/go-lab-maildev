@@ -1,0 +1,13 @@
+# AUTH PLAIN one-step. Credentials: lab / secret
+S: 220 labmail.lab LabMail ready
+C: EHLO client.example
+S: 250-labmail.lab
+S: 250-SIZE 10485760
+S: 250-8BITMIME
+S: 250-SMTPUTF8
+S: 250-ENHANCEDSTATUSCODES
+S: 250 AUTH PLAIN LOGIN
+C: AUTH PLAIN AGxhYgBzZWNyZXQ=
+S: 235 2.7.0 Authentication successful
+C: QUIT
+S: 221 2.0.0 Bye

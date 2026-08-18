@@ -35,6 +35,8 @@ type session struct {
 	rcpt         []string
 	declaredSize int64
 	sizeSet      bool
+	tls          bool
+	authed       bool
 }
 
 func (s *session) run() {
@@ -85,9 +87,9 @@ func (s *session) dispatch(verb, arg string) bool {
 	case "EXPN":
 		_ = s.reply(502, "5.5.1 EXPN not implemented")
 	case "AUTH":
-		_ = s.reply(502, "5.5.1 AUTH not implemented")
+		return s.cmdAuth(arg)
 	case "STARTTLS":
-		_ = s.reply(502, "5.5.1 STARTTLS not implemented")
+		return s.cmdStartTLS()
 	case "BDAT":
 		_ = s.reply(502, "5.5.1 BDAT not implemented")
 	case "ETRN", "ATRN", "TURN":
@@ -132,6 +134,12 @@ func (s *session) ehloLines() []string {
 	if !hidden["ENHANCEDSTATUSCODES"] {
 		lines = append(lines, "ENHANCEDSTATUSCODES")
 	}
+	if spec.TLS.Mode == model.TLSModeStartTLS && !s.tls && !hidden["STARTTLS"] {
+		lines = append(lines, "STARTTLS")
+	}
+	if spec.Auth.Mode == model.SMTPAuthPlainLogin && !s.authed && !hidden["AUTH"] && !s.tlsRequiredCleartext() {
+		lines = append(lines, "AUTH PLAIN LOGIN")
+	}
 	return lines
 }
 
@@ -143,6 +151,9 @@ func (s *session) cmdMail(arg string) {
 	}
 	if s.state != stateHelloed {
 		_ = s.reply(503, "5.5.1 Nested MAIL")
+		return
+	}
+	if !s.policyOK() {
 		return
 	}
 	path, params, err := parsePathArg(arg, "FROM:")
@@ -173,6 +184,9 @@ func (s *session) cmdRcpt(arg string) {
 		_ = s.reply(503, "5.5.1 Need MAIL")
 		return
 	}
+	if !s.policyOK() {
+		return
+	}
 	path, _, err := parsePathArg(arg, "TO:")
 	if err != nil {
 		_ = s.reply(501, "5.5.4 Syntax error in parameters")
@@ -190,6 +204,9 @@ func (s *session) cmdRcpt(arg string) {
 func (s *session) cmdData() bool {
 	if s.state != stateRcpt || len(s.rcpt) == 0 {
 		_ = s.reply(503, "5.5.1 Need RCPT")
+		return true
+	}
+	if !s.policyOK() {
 		return true
 	}
 	spec := s.spec()
@@ -326,6 +343,34 @@ func (s *session) resetToHelloed() {
 	} else {
 		s.state = stateGreeting
 	}
+}
+
+func (s *session) resetAfterTLS() {
+	s.resetTxn()
+	s.helo = ""
+	s.authed = false
+	s.tls = true
+	s.state = stateGreeting
+}
+
+func (s *session) policyOK() bool {
+	spec := s.spec()
+	if s.tlsRequiredCleartext() {
+		_ = s.reply(530, "5.7.0 Must issue a STARTTLS command first")
+		return false
+	}
+	if spec.Auth.Mode == model.SMTPAuthPlainLogin && !s.authed {
+		_ = s.reply(530, "5.7.0 Authentication required")
+		return false
+	}
+	return true
+}
+
+// tlsRequiredCleartext is true when STARTTLS is mandatory and this session
+// has not completed the handshake. AUTH must not be advertised or accepted.
+func (s *session) tlsRequiredCleartext() bool {
+	spec := s.spec()
+	return spec.TLS.Mode == model.TLSModeStartTLS && spec.TLS.Required && !s.tls
 }
 
 func (s *session) spec() model.SMTPSpec {

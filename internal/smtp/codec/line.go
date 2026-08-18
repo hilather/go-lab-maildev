@@ -41,6 +41,14 @@ func (r *Reader) ReadDataLine() (string, error) {
 	return ReadLine(r.br, MaxDataLine)
 }
 
+// Read implements io.Reader so STARTTLS can wrap leftover buffered bytes.
+func (r *Reader) Read(p []byte) (int, error) {
+	if r == nil || r.br == nil {
+		return 0, errors.New("smtp: nil reader")
+	}
+	return r.br.Read(p)
+}
+
 // ReadLine reads until LF, strips a preceding CR, and enforces maxInclCRLF.
 func ReadLine(r *bufio.Reader, maxInclCRLF int) (string, error) {
 	if r == nil {

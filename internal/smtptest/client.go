@@ -2,6 +2,7 @@ package smtptest
 
 import (
 	"bufio"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"strconv"
@@ -95,6 +96,23 @@ func (c *Client) Cmd(line string) (code int, lines []string, err error) {
 		return 0, nil, err
 	}
 	return c.ReadReply()
+}
+
+// StartTLS upgrades the connection after a 220 STARTTLS reply.
+func (c *Client) StartTLS(cfg *tls.Config) error {
+	if c == nil || c.conn == nil {
+		return fmt.Errorf("smtptest: nil conn")
+	}
+	if cfg == nil {
+		cfg = &tls.Config{InsecureSkipVerify: true} // test helper; production smtp never dials
+	}
+	tc := tls.Client(c.conn, cfg)
+	if err := tc.Handshake(); err != nil {
+		return err
+	}
+	c.conn = tc
+	c.br = bufio.NewReader(tc)
+	return nil
 }
 
 // ReplyText joins reply lines without the status code prefix.

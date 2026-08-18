@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: SMTP, Architecture
-Last reviewed: 2026-08-17 (SMTP-001a)
+Last reviewed: 2026-08-17 (SMTP-001b)
 Related ADRs: 0002
 
 Implementation lives in `internal/smtp/codec` (line IO, reply formatting) and `internal/smtp/server` (session, limits, TLS). No third-party SMTP server library. See [docs/adr/0002-in-tree-smtp-receive-only.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0002-in-tree-smtp-receive-only.md).
@@ -47,7 +47,7 @@ SIZE <maxMessageBytes>
 SMTPUTF8
 ENHANCEDSTATUSCODES
 STARTTLS          # only when tls.mode=starttls
-AUTH PLAIN LOGIN  # only when auth.mode=plain_login
+AUTH PLAIN LOGIN  # only when auth.mode=plain_login (and not withheld for required STARTTLS)
 ```
 
 `PIPELINING` is **not** advertised in 1.0 (`spec.smtp.hideExtensions` may also hide any of the above). `spec.smtp.hideExtensions` is the maildev `--hide-extensions` equivalent.
@@ -93,7 +93,7 @@ state: greeting -> helloed -> mail -> rcpt+ -> data -> helloed
 | Mode | Behavior |
 |---|---|
 | `none` (default) | `AUTH` → `502`. Matches current lab profile. |
-| `plain_login` | Advertise `AUTH PLAIN LOGIN`. Unauthenticated `MAIL` → `530 5.7.0 Authentication required`. |
+| `plain_login` | Advertise `AUTH PLAIN LOGIN`. Unauthenticated `MAIL` → `530 5.7.0 Authentication required`. When `tls.required` is also true, withhold AUTH on the cleartext session (see TLS). |
 
 Credentials: `username` + `passwordFile` (required). Compare with constant-time `subtle.ConstantTimeCompare` after length check. No cram-md5. Successful AUTH is session-scoped. The password is never logged.
 
@@ -134,7 +134,7 @@ Single schema. `spec.smtp.tls.mode` is the enum; `required` is a bool that appli
 |---|---|---|
 | `off` (default) | must be `false` | No `STARTTLS`. Plain SMTP. Lab contract. |
 | `starttls` | `false` | Advertise `STARTTLS`. Cleartext MAIL allowed. |
-| `starttls` | `true` | Advertise `STARTTLS`. Cleartext MAIL → `530 5.7.0 Must issue a STARTTLS command first`. |
+| `starttls` | `true` | Advertise `STARTTLS`. Cleartext MAIL → `530 5.7.0 Must issue a STARTTLS command first`. Do not advertise AUTH on the cleartext session; cleartext `AUTH` → the same `530` (password is never accepted in the clear). After STARTTLS, advertise AUTH if `auth.mode=plain_login`. |
 | `implicit` | — | **Rejected at 1.0 validate** (`smtp.tls.mode: implicit is not supported until 1.1; use starttls or a future listeners.smtpImplicit bind`). Must not share `:1025`. |
 
 Validate rules (fail closed):

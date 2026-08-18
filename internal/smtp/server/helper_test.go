@@ -2,6 +2,14 @@ package server
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,4 +93,69 @@ func mustCmd(t *testing.T, c *smtptest.Client, want int, line string) []string {
 		t.Fatalf("%s: code %d want %d (%v)", line, code, want, lines)
 	}
 	return lines
+}
+
+func authSpec(t *testing.T, user, pass string) model.SMTPSpec {
+	t.Helper()
+	spec := defaultSMTPSpec(t)
+	spec.Auth.Mode = model.SMTPAuthPlainLogin
+	spec.Auth.Username = user
+	spec.Auth.PasswordFile = writeSecretFile(t, pass)
+	return spec
+}
+
+func writeSecretFile(t *testing.T, pass string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "smtp.pass")
+	if err := os.WriteFile(p, []byte(pass+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func starttlsSpec(t *testing.T, required bool) model.SMTPSpec {
+	t.Helper()
+	spec := defaultSMTPSpec(t)
+	cert, key := writeTestCert(t)
+	spec.TLS.Mode = model.TLSModeStartTLS
+	spec.TLS.Required = required
+	spec.TLS.CertFile = cert
+	spec.TLS.KeyFile = key
+	return spec
+}
+
+func writeTestCert(t *testing.T) (certFile, keyFile string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "labmail.lab"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"localhost", "labmail.lab"},
+		IPAddresses:  []net.IP{net.IPv4(127, 0, 0, 1)},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	certFile = filepath.Join(dir, "smtp.crt")
+	keyFile = filepath.Join(dir, "smtp.key")
+	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return certFile, keyFile
 }

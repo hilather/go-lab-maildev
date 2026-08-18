@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hilather/go-lab-maildev/internal/smtptest"
@@ -18,6 +19,10 @@ func TestTranscripts(t *testing.T) {
 	addr := srv.Addr().String()
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".txt" {
+			continue
+		}
+		// AUTH/STARTTLS fixtures need a matching spec; see auth_test/starttls_test.
+		if strings.HasPrefix(e.Name(), "auth-") || strings.HasPrefix(e.Name(), "starttls-") {
 			continue
 		}
 		name := e.Name()

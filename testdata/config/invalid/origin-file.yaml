@@ -1,0 +1,8 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: origin-file
+spec:
+  management:
+    originAllowlist:
+      - "file://localhost"

@@ -6,11 +6,12 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Added
 
-- None.
+- `spec.management.originAllowlist` sentinels `"*"` (any http(s) Origin) and `"private"` (Go `net.IP.IsPrivate()` host: RFC 1918 and RFC 4193 ULA). Adapters live-read the active snapshot. Operator cookbook in `docs/11-deployment.md`. Example: `examples/labmail.origin-dev.yaml`.
 
 ### Changed
 
 - README and START-HERE rewritten as an operator-facing front door: header art, a YAML bootstrap walkthrough, and curl/MCP examples for the state loading APIs (`GET /v1/state`, `POST /v1/state:validate`, `GET /v1/state:export`, `POST /v1/state:reset`, `POST /v1/changes:plan`, `POST /v1/changes:apply`). Architecture pack, ADRs, and the program board stay linked from the documentation map.
+- `"*"` in `originAllowlist` is now the any-http(s) sentinel (it was a no-op exact miss). Invalid `originAllowlist` entries that previously loaded are `validation_failed`. Migration: replace non-http(s) / glob / empty entries with exact `http(s)://host[:port]`, `"*"`, or `"private"`.
 
 ### Fixed
 
@@ -21,6 +22,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 - Plan/apply idempotency fingerprints include `expectedRevision` and `force`, so a reused key with a different concurrency token is `idempotency_conflict`.
 - `spec.listeners.management.tls.enabled` terminates TLS on the management listener (TLS 1.2+). Enabling it no longer set `Secure` cookies on a cleartext bind.
 - Inbox UI ignores stale overlapping list responses and keeps a 15s list watchdog while SSE is open so dropped fan-out events cannot leave the page silent.
+- Documented originAllowlist hatch for remote-dev / LAN SPA JS (`"*"` / `"private"` / exact). Default empty list still 403s non-loopback hashed JS until hatched. CORS stays disabled.
 
 ### Removed or deprecated
 

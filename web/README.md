@@ -17,3 +17,5 @@ npm --prefix web run build
 ```
 
 Dev server proxies `/v1`, `/mcp`, `/email`, and `/healthz` to `http://127.0.0.1:1080`.
+
+Loopback Origins (`http://localhost:5173`) are already allowed. Remote Vite needs that origin on `spec.management.originAllowlist` (or `"*"`) **and** the proxy; there is no CORS success path in 1.0. Cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).

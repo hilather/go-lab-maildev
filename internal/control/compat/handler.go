@@ -36,8 +36,11 @@ type Config struct {
 	Principal Principal
 	// Auth is the shared verifier. Nil keeps goldens stub-open.
 	Auth *auth.Verifier
-	// AllowedOrigins are extra Origins accepted besides loopback.
+	// AllowedOrigins is the test-only fallback when OriginAllowlist is nil.
+	// Extra Origins plus sentinels "*" / "private". Empty denies non-loopback.
 	AllowedOrigins []string
+	// OriginAllowlist, when set, is the SoT (production: live snapshot).
+	OriginAllowlist func() []string
 	// Ready overrides readiness for GET /healthz. Nil is app.Status.Ready.
 	Ready func() bool
 }
@@ -75,7 +78,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(headerRequestID, reqID)
 	instance := requestURNPrefix + reqID
 
-	if err := checkOrigin(r.Header.Get("Origin"), h.cfg.AllowedOrigins); err != nil {
+	if err := checkOrigin(r.Header.Get("Origin"), h.originAllowlist()); err != nil {
 		h.writeProblem(w, r, instance, err)
 		return
 	}

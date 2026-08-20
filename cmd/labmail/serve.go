@@ -207,9 +207,17 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 		return nil, err
 	}
 	sessions := auth.NewStore(auth.DefaultSessionConfig())
+	originAllowlist := func() []string {
+		snap := svc.Active()
+		if snap == nil || snap.Canonical == nil {
+			return spec.Management.OriginAllowlist
+		}
+		return snap.Canonical.Spec.Management.OriginAllowlist
+	}
 	mcpSrv, err := mcp.New(mcp.Config{
 		Service:            svc,
 		AllowedOrigins:     spec.Management.OriginAllowlist,
+		OriginAllowlist:    originAllowlist,
 		AllowLegacyClients: spec.Management.MCP.AllowLegacyClients,
 		MaxBodyBytes:       spec.Management.BodyLimit,
 		MaxConcurrent:      spec.Management.MaxConcurrent,
@@ -221,7 +229,7 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 		_ = ln.Close()
 		return nil, err
 	}
-	mounts, err := compatMounts(svc, spec, ready, verifier)
+	mounts, err := compatMounts(svc, spec, ready, verifier, originAllowlist)
 	if err != nil {
 		_ = ln.Close()
 		return nil, err
@@ -231,22 +239,23 @@ func startManagement(svc *app.App, addr string, spec model.Spec, reg *observabil
 	}
 	mounts[mcpPath] = mcpSrv.Handler()
 	hs, err := rest.New(rest.Config{
-		Addr:           addr,
-		Service:        svc,
-		AllowedOrigins: spec.Management.OriginAllowlist,
-		MaxBodyBytes:   spec.Management.BodyLimit,
-		MaxConcurrent:  spec.Management.MaxConcurrent,
-		RatePerSec:     float64(spec.Management.RequestsPerSecond),
-		RateBurst:      float64(spec.Management.Burst),
-		PublicMetrics:  spec.Observability.Metrics.PublicPath,
-		Metrics:        reg,
-		Logger:         log,
-		Mounts:         mounts,
-		Ready:          ready,
-		Auth:           verifier,
-		Sessions:       sessions,
-		CookieSecure:   spec.Listeners.Management.TLS.Enabled,
-		UI:             web.NewHandler(nil),
+		Addr:            addr,
+		Service:         svc,
+		AllowedOrigins:  spec.Management.OriginAllowlist,
+		OriginAllowlist: originAllowlist,
+		MaxBodyBytes:    spec.Management.BodyLimit,
+		MaxConcurrent:   spec.Management.MaxConcurrent,
+		RatePerSec:      float64(spec.Management.RequestsPerSecond),
+		RateBurst:       float64(spec.Management.Burst),
+		PublicMetrics:   spec.Observability.Metrics.PublicPath,
+		Metrics:         reg,
+		Logger:          log,
+		Mounts:          mounts,
+		Ready:           ready,
+		Auth:            verifier,
+		Sessions:        sessions,
+		CookieSecure:    spec.Listeners.Management.TLS.Enabled,
+		UI:              web.NewHandler(nil),
 		UIEnabled: func() bool {
 			snap := svc.Active()
 			if snap == nil || snap.Canonical == nil {
@@ -275,15 +284,16 @@ func wrapManagementTLS(ln net.Listener, spec model.ListenerTLS) (net.Listener, e
 	}), nil
 }
 
-func compatMounts(svc *app.App, spec model.Spec, ready func() bool, verifier *auth.Verifier) (map[string]http.Handler, error) {
+func compatMounts(svc *app.App, spec model.Spec, ready func() bool, verifier *auth.Verifier, originAllowlist func() []string) (map[string]http.Handler, error) {
 	if !spec.Listeners.Management.CompatEnabled {
 		return nil, nil
 	}
 	h, err := compat.New(compat.Config{
-		Service:        svc,
-		AllowedOrigins: spec.Management.OriginAllowlist,
-		Ready:          ready,
-		Auth:           verifier,
+		Service:         svc,
+		AllowedOrigins:  spec.Management.OriginAllowlist,
+		OriginAllowlist: originAllowlist,
+		Ready:           ready,
+		Auth:            verifier,
 	})
 	if err != nil {
 		return nil, err

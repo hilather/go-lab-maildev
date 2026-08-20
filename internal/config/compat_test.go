@@ -35,6 +35,11 @@ var expectedInvalid = map[string]string{
 	"multi-doc.yaml":                 violationInvalidValue,
 	"yaml-alias.yaml":                violationInvalidValue,
 	"duplicate-key.yaml":             violationDuplicateKey,
+	"origin-empty-entry.yaml":        violationInvalidValue,
+	"origin-file.yaml":               violationInvalidValue,
+	"origin-wildcard-host.yaml":      violationInvalidValue,
+	"origin-path.yaml":               violationInvalidValue,
+	"origin-became-sentinel.yaml":    violationInvalidValue,
 }
 
 // TestConfigCompat is the positive+negative fixture matrix for make test-config-compat.

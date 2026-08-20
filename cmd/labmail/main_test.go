@@ -270,11 +270,21 @@ func TestExampleAndContainerYAML(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"examples/labmail.yaml",
+		"examples/labmail.origin-dev.yaml",
 		"testdata/container/config.yaml",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
-		if _, err := config.LoadFile(path); err != nil {
+		st, err := config.LoadFile(path)
+		if err != nil {
 			t.Fatalf("load %s: %v", rel, err)
+		}
+		if rel == "testdata/container/config.yaml" {
+			if len(st.Spec.Management.OriginAllowlist) != 0 {
+				t.Fatalf("container smoke originAllowlist=%q", st.Spec.Management.OriginAllowlist)
+			}
+			if st.Spec.UI.Enabled {
+				t.Fatal("container smoke ui.enabled must stay false")
+			}
 		}
 	}
 }

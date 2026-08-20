@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-18 (SMTP-001b + STORE-001 + STA-001 + API-001 + MCP-001 + OBS-001 + SEC-001 + DEP-001 + UI-001 + SWAP-001 + GA-001 + bugfix regressions)
-Related ADRs: 0002, 0004
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0002, 0004, 0008
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
 
@@ -28,6 +28,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Changelog | user-visible paths require `CHANGELOG.md` | `make test-changelog` |
 | Tag gate | notes headings + green required CI on the tag SHA | `.github/workflows/release.yml` |
 | Inbox UI | SPA fallback, `ui.enabled: false` 404, CSRF header, empty preview sandbox, no Relay/innerHTML | `internal/web`, `internal/control/rest/spa_test.go`, `make web-test` |
+| Origin hatches | `"*"` / `"private"` / exact / loopback / `file://` / `Origin: null` / CGNAT deny; OPTIONS 403 with `"*"` (no ACAO); three-surface reset live-read (`/v1/health/live`, `/healthz`, `POST /mcp`); SPA hashed-JS asserting tests | `internal/auth/origin_test.go`, `internal/control/{rest,mcp,compat}/origin_test.go`, `spa_asset_origin_hatch_test.go`; `testdata/config/valid/origin-*.yaml` + `invalid/origin-*.yaml` |
 
 ## Required Make targets
 

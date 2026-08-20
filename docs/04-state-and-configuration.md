@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-18 (STA-001 + smtp.behavior + operator quick start + apply idempotency)
-Related ADRs: 0003
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0003, 0008
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
 
@@ -120,7 +120,7 @@ spec:
         tokenRef: admin            # same principal as tokens[id=admin]
     mcp:
       allowLegacyClients: false    # lab overlay: true (D17 / TacLab knob)
-    originAllowlist: []            # present non-loopback Origin default-deny
+    originAllowlist: []            # present non-loopback Origin default-deny; see table below
     bodyLimit: 1MiB
     requestsPerSecond: 32
     burst: 64
@@ -134,6 +134,17 @@ spec:
     audit:
       ring: 128
 ```
+
+`spec.management.originAllowlist` entries (fail-closed validate; stored strings are not rewritten). Quote `"*"` in YAML. Cap 64. [ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md). Operator cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).
+
+| Entry | Meaning |
+|---|---|
+| (omitted / `[]`) | Default deny for a present non-loopback Origin |
+| `http://devbox:1080` | Exact Origin (scheme + host + port as the browser sends it) |
+| `*` | Any http(s) Origin. Does not allow `file://` or `Origin: null` |
+| `private` | http(s) Origin whose host is a Go `net.IP.IsPrivate()` address (RFC 1918 IPv4 and RFC 4193 ULA). Hostnames do not match. RFC 6598 CGNAT / Tailscale `100.x` does **not** match |
+
+YAML edit + **reset or restart**. There is no `replaceOriginAllowlist` apply op.
 
 ## Reserved / rejected keys
 
@@ -245,4 +256,4 @@ A normal startup does not bind listeners when bootstrap validation or compile fa
 
 ## Compatibility promise
 
-`labmail.dev/v1alpha1` is fail-closed; additive fields only after schema bump or explicit defaulting ADR.
+`labmail.dev/v1alpha1` is fail-closed; additive fields only after schema bump or explicit defaulting ADR. [ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md) is that ADR for the existing field `originAllowlist`: sentinel semantics on `"*"` / `"private"`, and fail-closed validate of junk that previously loaded.

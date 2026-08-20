@@ -1,0 +1,9 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: origin-mixed
+spec:
+  management:
+    originAllowlist:
+      - "*"
+      - "http://devbox:1080"

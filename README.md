@@ -137,7 +137,10 @@ spec:
 ```
 
 Lab and container defaults stay `bearer_and_basic` with tokens pointed at
-`secretFile` paths. Full field map, reserved-key list, and revision rules:
+`secretFile` paths. If the inbox HTML loads but hashed JS is `403`
+`origin is not allowed`, the browser Origin is not loopback and not on
+`originAllowlist` — [origin cookbook](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).
+Full field map, reserved-key list, and revision rules:
 [docs/04-state-and-configuration.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/04-state-and-configuration.md).
 JSON Schema:
 [api/jsonschema/labmail.dev.v1alpha1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/jsonschema/labmail.dev.v1alpha1.json).
@@ -430,6 +433,7 @@ summaries do not override it.
 | [0005](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0005-lab-static-bearer-and-basic-compat.md) | Lab static bearer + Basic compat |
 | [0006](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md) | Pin MCP protocol versions |
 | [0007](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0007-compat-email-surface.md) | Compat `/email` surface |
+| [0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md) | Origin-policy escape hatches |
 
 ### Task lists
 

@@ -8,9 +8,16 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
 
+const (
+	originAllowAny     = "*"
+	originAllowPrivate = "private"
+)
+
 // CheckOrigin implements the LabDNS wording: a present non-loopback Origin
 // is rejected unless it is on originAllowlist. Missing Origin is allowed.
 // Only http/https Origins are accepted (file:// is denied even on loopback).
+// Allowlist sentinels: "*" (any remaining http(s) Origin) and "private"
+// (Go net.IP.IsPrivate host — RFC 1918 and RFC 4193 ULA, not CGNAT).
 func CheckOrigin(origin string, allowlist []string) error {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -29,11 +36,22 @@ func CheckOrigin(origin string, allowlist []string) error {
 		return nil
 	}
 	for _, allowed := range allowlist {
-		if originMatches(origin, allowed) {
+		raw := strings.TrimSpace(allowed)
+		switch {
+		case raw == originAllowAny:
+			return nil
+		case strings.EqualFold(raw, originAllowPrivate) && isPrivateOriginHost(host):
+			return nil
+		case originMatches(origin, allowed):
 			return nil
 		}
 	}
 	return domainerr.Forbidden("origin is not allowed")
+}
+
+func isPrivateOriginHost(host string) bool {
+	ip := net.ParseIP(strings.TrimSpace(host))
+	return ip != nil && ip.IsPrivate()
 }
 
 func originMatches(got, want string) bool {

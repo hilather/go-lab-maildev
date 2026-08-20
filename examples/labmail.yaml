@@ -72,7 +72,7 @@ spec:
         tokenRef: admin
     mcp:
       allowLegacyClients: true
-    originAllowlist: []
+    originAllowlist: []            # default deny; do not ship "*"
     bodyLimit: 1MiB
     requestsPerSecond: 32
     burst: 64

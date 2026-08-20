@@ -58,9 +58,11 @@ const (
 type Config struct {
 	// Service is required. Handlers call it and do not mutate snapshots.
 	Service app.Service
-	// AllowedOrigins are extra Origins accepted besides loopback. Empty denies
-	// every non-loopback Origin (DNS-rebinding default-deny).
+	// AllowedOrigins is the test-only fallback when OriginAllowlist is nil.
+	// Extra Origins plus sentinels "*" / "private". Empty denies non-loopback.
 	AllowedOrigins []string
+	// OriginAllowlist, when set, is the SoT (production: live snapshot).
+	OriginAllowlist func() []string
 	// AllowLegacyClients relaxes the HTTP-level protocol pin so MCPJungle can
 	// negotiate during initialize (D17). subscriptions/listen stays 2026-07-28.
 	AllowLegacyClients bool
@@ -237,7 +239,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := checkOrigin(r.Header.Get(headerOrigin), s.cfg.AllowedOrigins); err != nil {
+	if err := checkOrigin(r.Header.Get(headerOrigin), s.originAllowlist()); err != nil {
 		writeRPC(w, http.StatusForbidden, err)
 		return
 	}

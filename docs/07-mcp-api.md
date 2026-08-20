@@ -2,8 +2,8 @@
 
 Status: Implemented (MCP-001)
 Owners: MCP, Application
-Last reviewed: 2026-08-18 (SEC-001 + smtp.behavior)
-Related ADRs: 0004, 0006
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0004, 0006, 0008
 
 Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are frozen in [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Protocol pin: [docs/adr/0006-pin-mcp-protocol-versions.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md).
 
@@ -15,7 +15,9 @@ Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are 
 - Optional: `labmail mcp-stdio --config … --token-file …` (stdout = protocol, stderr = logs)
 - `Stateless: true`
 - Auth: bearer only (Basic is not an MCP client convention)
-- Origin check: same as REST (**missing Origin allowed**; D17)
+- Origin check: same `auth.CheckOrigin` as REST (**missing Origin allowed**; D17 / D18). Same `originAllowlist` sentinels `"*"` / `"private"` / exact. Live-read from the snapshot. `file://` and `Origin: null` stay denied.
+- MCP Streamable HTTP keeps `DisableLocalhostProtection: true`. LabMail `CheckOrigin` is the only MCP origin gate. Do not flip that SDK flag (ADR 0008 D18l).
+- Direct MCP handler is POST-only (`405` after origin passes). `OPTIONS /mcp` on the management listener is REST `403` `CORS is disabled` and never reaches MCP. No CORS headers.
 - Pin recorded in `internal/buildinfo` and `/v1/version`
 - `spec.management.mcp.allowLegacyClients` default **false** (D17). TacLab equivalent: `api.mcp.allow_legacy_clients`. LabDNS has **no** knob (hard pin); the lab patches LabDNS. LabMail ships the TacLab knob so MCPJungle (`mark3labs/mcp-go v0.48`) can register without a LabMail patch. Integration-lab bootstrap sets `true`.
 - `subscriptions/listen` stays 2026-07-28 even when the pin is relaxed.

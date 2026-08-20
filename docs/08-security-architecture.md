@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Security, SMTP, Control Plane
-Last reviewed: 2026-08-18 (SEC-001 + DEP-001 + UI-001 + relay segment + management TLS)
-Related ADRs: 0002, 0003, 0005, 0007
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0002, 0003, 0005, 0007, 0008
 
 LabMail is a lab sink, not a public MX. The critical invariant is receive-only: outbound SMTP must be unrepresentable.
 
@@ -18,7 +18,7 @@ LabMail is a lab sink, not a public MX. The critical invariant is receive-only: 
 | SMTP AUTH / management secret leakage | High | File refs only; redaction in logs/export/audit/MCP; never log DATA by default (`logMailContents` is not offered — maildev’s `--log-mail-contents` is a footgun) |
 | Store memory DoS | Medium | Caps + reject-full + DATA size + session caps |
 | SMTP command injection / smuggling | Medium | Line limits; no PIPELINING; strict CRLF DATA end; fuzz codec |
-| DNS rebinding on management | Medium | Present non-loopback Origin default-deny; missing Origin allowed |
+| DNS rebinding on management | Medium | Present non-loopback Origin default-deny; missing Origin allowed. `"*"` **disables** this control for all http(s) Origins. `"private"` does not (Origin host is still a public name). Exact list is the published-LAN default. [ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md) |
 | Confused deputy via Basic vs Bearer | Low | Both map to one `tokenRef` principal and one scope set |
 | Supply chain | Medium | Pin modules and Actions SHAs; govulncheck; SBOM on release |
 
@@ -49,8 +49,15 @@ auto-relay-rules, relay, smarthost, smartHost, forwardTo, mx, deliver
 - UI session cookie name **`labmail_session`**: `HttpOnly`, `SameSite=Lax`, `Secure` iff management TLS; CSRF header `X-LabMail-CSRF` required on cookie-authenticated mutations even over HTTP (`POST /v1/session`, `DELETE /v1/session`). `GET /v1/session` returns the CSRF secret for a valid cookie (reload recovery). Session JSON (and other REST JSON) is `Cache-Control: no-store`. Native `GET /v1/messages/{id}` defaults `markRead=false`; the SPA does not pass `markRead=true` (compat `GET /email/:id` still marks read). Token files are reread on reset and apply; the session table is cleared only when the compiled auth identity changes. A failed secret reread keeps the previous verifier and live sessions.
 - No `.well-known/oauth-protected-resource` (ADR 0005: lab static bearer).
 - `X-Forwarded-For` is not trusted.
-- No CORS headers. OPTIONS is not a success path.
-- Default container YAML is `bearer_and_basic`. `dev-loopback-unauth` is not the image default.
+- No CORS headers. OPTIONS is not a success path (`403` `CORS is disabled` even when `"*"` or `"private"` is set).
+- Default container YAML is `bearer_and_basic`. `dev-loopback-unauth` is not the image default. It skips **auth** on loopback `RemoteAddr` only — it is **not** an origin hatch for remote-dev.
+- `originAllowlist: []` is default-deny for a present non-loopback Origin. Operator-opt-in sentinels: `"*"` (any http(s) Origin; turns off rebinding origin defense) and `"private"` (Go `net.IP.IsPrivate()` host: RFC 1918 + ULA; **not** RFC 6598 CGNAT / Tailscale `100.x`). Do not ship `"*"` in `examples/labmail.yaml` or the image default. Cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).
+
+### Residual of `"*"` and `"private"`
+
+`"*"` means any browser that can send an http(s) `Origin` passes the rebinding gate. Combined with a stolen bearer/basic token that is a full management compromise. Default auth still applies. Do not present `"*"` as safe for a production published `:1080`.
+
+`"private"` is narrower (`https://evil.example` still denied) but allows **any** RFC 1918 / ULA Origin host and port, not only the management bind. A page at `http://192.168.1.5:9999` against LabMail at `192.168.1.9:1080` passes origin check. Without CORS, foreign JS still cannot read responses. Link-local (`169.254/16`, `fe80::/10`) and CGNAT (`100.64/10`) are not `IsPrivate()`; list them exactly or use `"*"`.
 
 Scopes and roles: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md).
 

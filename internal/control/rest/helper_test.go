@@ -117,6 +117,13 @@ func requireStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	}
 }
 
+func requireNoACAO(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if v := rec.Header().Get("Access-Control-Allow-Origin"); v != "" {
+		t.Fatalf("Access-Control-Allow-Origin=%q", v)
+	}
+}
+
 func requireProblem(t *testing.T, rec *httptest.ResponseRecorder, status int, code string) map[string]any {
 	t.Helper()
 	requireStatus(t, rec, status)

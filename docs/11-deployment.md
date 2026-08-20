@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-18 (DEP-001 + UI-001 + SWAP-001 + GA-001 + management TLS)
-Related ADRs: 0001, 0003
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0001, 0003, 0008
 
 DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here. A `v*` tag is refused unless [`.github/workflows/release.yml`](https://github.com/hilather/go-lab-maildev/blob/main/.github/workflows/release.yml) `tag-gate` sees required CI green on that SHA. Current notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
 
@@ -120,6 +120,27 @@ Service name stays `maildev` (D15). Healthcheck plane change: today’s maildev 
 ```
 
 Full swap bill of materials: [docs/13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md).
+
+## Origin allowlist cookbook
+
+Hashed SPA JS/CSS send `Origin`. Empty `originAllowlist` 403s any non-loopback Origin (`forbidden` / `origin is not allowed`). Loopback Origins are already allowed. There is no CORS success path in 1.0 (`OPTIONS` stays `403` `CORS is disabled`). YAML edit + reset or restart (reset wipes the inbox). [ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md). Worked remote-dev file: [examples/labmail.origin-dev.yaml](https://github.com/hilather/go-lab-maildev/blob/main/examples/labmail.origin-dev.yaml).
+
+| Scenario | Browser Origin | What to do | Auth |
+|---|---|---|---|
+| Local `labmail serve` + browser `http://127.0.0.1:1080` | loopback | Nothing. | default `bearer_and_basic` |
+| In-tree Vite `npm --prefix web run dev` (proxy in `web/vite.config.ts`) | `http://localhost:5173` | Nothing. Loopback. Browser talks to Vite; Vite proxies `/v1` to LabMail. | same |
+| SSH tunnel / `kubectl port-forward` so the tab is `http://127.0.0.1:1080` | loopback | Nothing. | same |
+| Known stable hostname | `http://devbox:1080` | Exact: `originAllowlist: ["http://devbox:1080"]` | same |
+| Published LAN IP, stable | `http://192.168.x.x:1080` | **Prefer exact** `http://192.168.x.x:1080` | same |
+| Published LAN IP, DHCP | `http://192.168.x.x:1080` | `originAllowlist: ["private"]` **or** exact IP:port. See footnote. | same |
+| Codespaces / preview URL / remote VM public DNS | `https://….app.github.dev` etc. | `originAllowlist: ["*"]` (or the exact Origin if stable) | **Keep bearer_and_basic.** Do not switch to `dev-loopback-unauth`. |
+| Remote Vite **with** proxy to LabMail | Vite origin (possibly non-loopback) | List that Vite origin exactly, or `"*"`. Still no CORS (same-origin to Vite). | same |
+| Remote Vite **without** proxy (Vite `:5173` calling LabMail `:1080` in the browser) | Vite origin, cross-origin | **Not supported in 1.0.** Use the proxy, a tunnel, or serve the embedded UI from LabMail. Do not enable CORS as a workaround. | — |
+| Production / lab overlay `examples/labmail.yaml` | n/a | Leave `originAllowlist: []`. | `bearer_and_basic` |
+
+Footnote — `"private"` is **every** Origin whose host is Go `net.IP.IsPrivate()` (RFC 1918 IPv4 and RFC 4193 ULA only), not “this host’s bind address.” Any such host and port passes the rebinding gate. RFC 6598 CGNAT (`100.64.0.0/10`, including Tailscale `100.x`) is **not** `IsPrivate()`; list those Origins exactly or use `"*"`. `"private"` does **not** allow `devbox.local` or public DNS names. Prefer an exact Origin when the LAN IP is stable.
+
+Do not list default ports unless the browser sends them (`http://host` ≠ `http://host:80`). Quote `"*"` in YAML. Do not pair `"*"` with `dev-loopback-unauth` on a non-loopback bind. Do not ship `"*"` in the image default or `examples/labmail.yaml`.
 
 ## Compatibility promise
 

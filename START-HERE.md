@@ -26,7 +26,10 @@ inbox UI. It never opens an outbound SMTP session and never relays.
 `serve` binds SMTP, native `/v1` REST, the inbox SPA at `/`, `POST /mcp`,
 and maildev `/email` compat (when `compatEnabled`). Default lab auth is
 `bearer_and_basic`. For a local browser session without tokens, set
-`spec.management.auth.mode: dev-loopback-unauth`.
+`spec.management.auth.mode: dev-loopback-unauth`. If hashed SPA JS returns
+`403` `origin is not allowed` from a LAN or Codespaces Origin, hatch
+`spec.management.originAllowlist` (`"*"`, `"private"`, or exact) —
+[origin cookbook](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).
 
 Read the loaded snapshot with `GET /v1/state`. Validate a candidate with
 `POST /v1/state:validate`. Dry-run and commit mutations with

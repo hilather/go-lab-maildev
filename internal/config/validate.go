@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 
@@ -376,6 +377,104 @@ func validateManagement(m *model.ManagementSpec, vs *[]domainerr.FieldViolation)
 	}
 	if m.MaxConcurrent <= 0 {
 		*vs = append(*vs, domainerr.FieldViolation{Path: "spec.management.maxConcurrent", Code: violationInvalidValue, Message: "maxConcurrent must be > 0"})
+	}
+	validateOriginAllowlist(m.OriginAllowlist, vs)
+}
+
+const originAllowlistCap = 64
+
+func validateOriginAllowlist(list []string, vs *[]domainerr.FieldViolation) {
+	if len(list) > originAllowlistCap {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    "spec.management.originAllowlist",
+			Code:    violationInvalidValue,
+			Message: "originAllowlist cap 64",
+		})
+	}
+	for i, entry := range list {
+		path := indexPath("spec.management.originAllowlist", i)
+		raw := strings.TrimSpace(entry)
+		if raw == "" {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "empty originAllowlist entry",
+			})
+			continue
+		}
+		if raw == "*" {
+			continue
+		}
+		if strings.EqualFold(raw, "private") {
+			continue
+		}
+		stripped := strings.TrimRight(raw, "/")
+		if stripped == "*" || strings.EqualFold(stripped, "private") {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist sentinel must be exactly * or private",
+			})
+			continue
+		}
+		if strings.Contains(raw, "*") {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "wildcards other than the sentinel * are not supported",
+			})
+			continue
+		}
+		u, err := url.Parse(raw)
+		if err != nil {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist entry is not a valid URL",
+			})
+			continue
+		}
+		scheme := strings.ToLower(u.Scheme)
+		if scheme != "http" && scheme != "https" {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist entry must be an http(s) Origin, *, or private",
+			})
+			continue
+		}
+		if u.Hostname() == "" {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist entry host is required",
+			})
+			continue
+		}
+		if u.User != nil {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist entry must not include userinfo",
+			})
+			continue
+		}
+		if u.RawQuery != "" || u.Fragment != "" {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist entry must not include query or fragment",
+			})
+			continue
+		}
+		if u.Path != "" && u.Path != "/" {
+			*vs = append(*vs, domainerr.FieldViolation{
+				Path:    path,
+				Code:    violationInvalidValue,
+				Message: "originAllowlist entry path must be empty or /",
+			})
+			continue
+		}
 	}
 }
 

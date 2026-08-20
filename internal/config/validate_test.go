@@ -88,6 +88,71 @@ func TestValidateNil(t *testing.T) {
 	_ = requireValidation(t, Validate(nil), violationRequired)
 }
 
+func TestValidateOriginAllowlistCap(t *testing.T) {
+	st, err := Load([]byte(mustLoad(t, "valid", "defaults.yaml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.Spec.Management.OriginAllowlist = make([]string, originAllowlistCap+1)
+	for i := range st.Spec.Management.OriginAllowlist {
+		st.Spec.Management.OriginAllowlist[i] = "*"
+	}
+	de := requireValidation(t, Validate(st), violationInvalidValue)
+	found := false
+	for _, v := range de.FieldViolations {
+		if v.Path == "spec.management.originAllowlist" && v.Message == "originAllowlist cap 64" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("want cap violation in %+v", de.FieldViolations)
+	}
+}
+
+func TestValidateOriginAllowlistExactOK(t *testing.T) {
+	st, err := Load([]byte(mustLoad(t, "valid", "origin-exact.yaml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Validate(st); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNormalizeDoesNotRewriteOriginAllowlist(t *testing.T) {
+	doc := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    originAllowlist: [\"PRIVATE\", \"http://devbox:1080/\"]\n"
+	st, err := Load([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := st.Spec.Management.OriginAllowlist
+	if len(got) != 2 || got[0] != "PRIVATE" || got[1] != "http://devbox:1080/" {
+		t.Fatalf("rewrote originAllowlist: %q", got)
+	}
+}
+
+func TestOriginAllowlistRevisionStarDiffers(t *testing.T) {
+	empty, err := Load([]byte(mustLoad(t, "valid", "defaults.yaml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	star, err := Load([]byte(mustLoad(t, "valid", "origin-star.yaml")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	revEmpty, err := Revision(empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	revStar, err := Revision(star)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if revEmpty == revStar {
+		t.Fatal("empty and [\"*\"] must have different revisions")
+	}
+}
+
 func TestValidateShortTokenSecret(t *testing.T) {
 	dir := t.TempDir()
 	tok := filepath.Join(dir, "token")

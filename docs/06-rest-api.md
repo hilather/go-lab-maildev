@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-18 (COMPAT-001 + OBS-001 + SEC-001 + UI-001 + apply idempotency)
-Related ADRs: 0004, 0005, 0007
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0004, 0005, 0007, 0008
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
 
@@ -60,7 +60,18 @@ Auth: `Authorization: Bearer <token>` or (when `bearer_and_basic`) `Authorizatio
 
 Ready becomes unready as soon as SMTP `Shutdown` begins (`Accepting()` is false), even while management is still draining. The process scrape listener (`spec.observability.metrics.listen`) is separate and unauthenticated; empty listen disables it.
 
-**Origin (LabDNS wording, copied):** a **present** non-loopback `Origin` is rejected unless it is on `originAllowlist` (DNS-rebinding default-deny). **Missing Origin is allowed** for official SDK, curl, and MCPJungle (the gateway typically sends no Origin). Loopback Origins are those whose host is `localhost`, `127.0.0.1`, `::1`, or any RFC 6890 loopback; `http://localhost:1080` and `http://127.0.0.1:1080` are both loopback. Published LAN UI (`http://192.168.x.x:1080`) **must** list that origin in `originAllowlist` or the browser will 403.
+**Origin (LabDNS wording + ADR 0008):** a **present** non-loopback `Origin` is rejected unless it is on `spec.management.originAllowlist` (DNS-rebinding default-deny). **Missing Origin is allowed** for official SDK, curl, and MCPJungle. Loopback Origins are those whose host is byte-for-byte `localhost`, or `net.ParseIP(host).IsLoopback()` (`127.0.0.1`, `::1`, IPv4-mapped loopback). `http://LocalHost:1080` is **not** loopback. `file://` and the literal `Origin: null` are denied even with `"*"`.
+
+| Allowlist | Effect |
+|---|---|
+| `[]` (default) | Non-loopback Origin → `403` `forbidden` / `origin is not allowed`. Hashed SPA JS from a LAN or Codespaces Origin 403s until hatched. |
+| Exact `http(s)://host[:port]` | That Origin only (EqualFold, trailing `/` stripped at match time) |
+| `"private"` | Host is a Go `net.IP.IsPrivate()` address (RFC 1918 + RFC 4193 ULA). Not CGNAT/`100.64/10`. Not hostnames. |
+| `"*"` | Any remaining http(s) Origin. Residual: rebinding origin defense is off. Keep `bearer_and_basic`. |
+
+`OPTIONS` is still `403` `forbidden` / `CORS is disabled` even with `"*"` or `"private"`. No `Access-Control-Allow-*`. Same-origin hashed JS does not need CORS once Origin is allowed.
+
+Operator how-to (loopback/tunnel/Vite vs exact vs `"private"` vs `"*"`): [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook). YAML edit + reset or restart; there is no apply op.
 
 Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Plan/apply identity is `expectedRevision` + `force` + `reason` + operations. Idempotency LRU default 256; reset clears it.
 

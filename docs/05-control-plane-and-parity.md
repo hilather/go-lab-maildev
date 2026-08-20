@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Application, REST, MCP
-Last reviewed: 2026-08-18 (COMPAT-001 + MCP-001 + SEC-001 + UI-001)
-Related ADRs: 0004, 0005, 0006, 0007
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0004, 0005, 0006, 0007, 0008
 
 REST and MCP are two protocol adapters over one capability model. Adapters never call each other and never contain store/SMTP business logic. See [docs/adr/0004-shared-capability-registry.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0004-shared-capability-registry.md).
 
@@ -90,6 +90,10 @@ Roles (token `role` is documentation + default scope set):
 `make generate` writes `api/capabilities/v1.json`, `api/openapi/v1.json`, `api/mcp/v1.json`. CI `verify-generated` fails on drift.
 
 Renaming a tool, resource, or REST path requires an ADR plus a coordinated catalog + manifest + design-table change. MCP tool names `mail_*` are frozen.
+
+## Origin gate (not a capability)
+
+HTTP origin is middleware, not a registry row. `auth.CheckOrigin` is the single matcher. REST runs it **before** `dispatchMount` (outer gate). MCP and compat check again (inner gates). All three live-read `spec.management.originAllowlist` from the active snapshot. Sentinels `"*"` and `"private"` are operator-opt-in on that field ([ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md)). `OPTIONS` on the management listener is REST `403` `forbidden` / `CORS is disabled` even with hatches on; it never reaches MCP’s POST-only `405`. Direct MCP handler tests still see `405` after origin passes.
 
 ## Parity rules
 

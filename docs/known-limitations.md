@@ -2,7 +2,7 @@
 
 Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.2** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that is **not** claimed here.
 
-Last reviewed: 2026-08-18 (smtp.behavior + rc.2)
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
 
 This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
 
@@ -52,6 +52,14 @@ Design PRs 1–14, the side-by-side probe, and `spec.smtp.behavior` are in this 
 - `POST /email/:id/relay` never works (intentional `403` `receive_only`).
 - `mail-directory` and `base-pathname` are rejected (no passthrough).
 - `ui.enabled: false` hides the SPA only; REST/MCP stay up (not maildev `--disable-web`).
+
+## Origin policy / inbox UI
+
+- Empty `originAllowlist` still **403s non-loopback SPA JS** (`forbidden` / `origin is not allowed`) until the operator lists an exact Origin, `"private"`, or `"*"`. `GET /` HTML is often 200 (no Origin); hashed module scripts send Origin.
+- `"*"` turns off DNS-rebinding origin defense for all http(s) Origins. Keep `bearer_and_basic`. Do not ship `"*"` in the image default.
+- `"private"` follows Go `net.IP.IsPrivate()` (RFC 1918 + RFC 4193 ULA). RFC 6598 CGNAT / Tailscale `100.x` is **not** private; use exact or `"*"`.
+- No CORS headers. `OPTIONS` stays `403` `CORS is disabled` even with hatches on. Remote Vite without a proxy is not 1.0.
+- Cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).
 
 ## Control plane
 

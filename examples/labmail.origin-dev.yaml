@@ -1,0 +1,12 @@
+# Remote-dev / Codespaces hatch. Not the container or lab overlay default.
+# Quote "*". Keep bearer_and_basic. Reset or restart after editing (reset wipes mail).
+# Cookbook: https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: lab-sink-dev
+spec:
+  management:
+    auth:
+      mode: bearer_and_basic
+    originAllowlist: ["*"]

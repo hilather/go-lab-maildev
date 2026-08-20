@@ -68,6 +68,74 @@ func TestOriginAllowlist(t *testing.T) {
 	requireRPCError(t, bad, http.StatusForbidden, "forbidden")
 }
 
+func TestOriginStar(t *testing.T) {
+	_, svc := newTestServer(t)
+	s, err := New(Config{Service: svc, RatePerSec: -1, AllowedOrigins: []string{"*"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	ok := doRaw(t, s.Handler(), rpcCall(1, "ping", nil), map[string]string{
+		"Content-Type":        "application/json",
+		"Accept":              "application/json, text/event-stream",
+		headerProtocolVersion: ProtocolVersion,
+		headerOrigin:          "https://evil.example",
+	}, "127.0.0.1:1")
+	if ok.Code == http.StatusForbidden {
+		t.Fatalf("star Origin rejected: %s", ok.Body.String())
+	}
+	file := doRaw(t, s.Handler(), rpcCall(1, "ping", nil), map[string]string{
+		"Content-Type":        "application/json",
+		"Accept":              "application/json, text/event-stream",
+		headerProtocolVersion: ProtocolVersion,
+		headerOrigin:          "file://localhost",
+	}, "127.0.0.1:1")
+	requireRPCError(t, file, http.StatusForbidden, "forbidden")
+}
+
+func TestOriginPrivate(t *testing.T) {
+	_, svc := newTestServer(t)
+	s, err := New(Config{Service: svc, RatePerSec: -1, AllowedOrigins: []string{"private"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	ok := doRaw(t, s.Handler(), rpcCall(1, "ping", nil), map[string]string{
+		"Content-Type":        "application/json",
+		"Accept":              "application/json, text/event-stream",
+		headerProtocolVersion: ProtocolVersion,
+		headerOrigin:          "http://192.168.1.9:1080",
+	}, "127.0.0.1:1")
+	if ok.Code == http.StatusForbidden {
+		t.Fatalf("private LAN Origin rejected: %s", ok.Body.String())
+	}
+	bad := doRaw(t, s.Handler(), rpcCall(1, "ping", nil), map[string]string{
+		"Content-Type":        "application/json",
+		"Accept":              "application/json, text/event-stream",
+		headerProtocolVersion: ProtocolVersion,
+		headerOrigin:          "https://evil.example",
+	}, "127.0.0.1:1")
+	requireRPCError(t, bad, http.StatusForbidden, "forbidden")
+}
+
+func TestOriginOPTIONSAfterAllowedIs405(t *testing.T) {
+	_, svc := newTestServer(t)
+	s, err := New(Config{Service: svc, RatePerSec: -1, AllowedOrigins: []string{"*"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Close)
+	rec := doRawMethod(t, s.Handler(), http.MethodOptions, DefaultPath, "", map[string]string{
+		"Accept":              "application/json, text/event-stream",
+		headerProtocolVersion: ProtocolVersion,
+		headerOrigin:          "https://evil.example",
+	}, "127.0.0.1:1")
+	requireRPCError(t, rec, http.StatusMethodNotAllowed, "method_not_allowed")
+	if v := rec.Header().Get("Access-Control-Allow-Origin"); v != "" {
+		t.Fatalf("Access-Control-Allow-Origin=%q", v)
+	}
+}
+
 func TestOriginAllowedHelper(t *testing.T) {
 	if originAllowed("https://evil.example", nil) {
 		t.Fatal("evil origin allowed")

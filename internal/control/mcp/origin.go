@@ -10,3 +10,10 @@ func checkOrigin(origin string, allowlist []string) error {
 func originAllowed(origin string, extra []string) bool {
 	return checkOrigin(origin, extra) == nil
 }
+
+func (s *Server) originAllowlist() []string {
+	if s.cfg.OriginAllowlist != nil {
+		return s.cfg.OriginAllowlist()
+	}
+	return s.cfg.AllowedOrigins
+}

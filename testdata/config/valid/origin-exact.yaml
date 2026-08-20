@@ -1,0 +1,9 @@
+apiVersion: labmail.dev/v1alpha1
+kind: LabMail
+metadata:
+  name: origin-exact
+spec:
+  management:
+    originAllowlist:
+      - "http://devbox:1080"
+      - "https://ui.lab.test"

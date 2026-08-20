@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-18 (UI-001 + SWAP-001 + GA-001 + management TLS)
-Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007
+Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008
 
 ## Problem statement
 
@@ -87,6 +87,7 @@ These are closed. Implementers do not re-litigate them without an ADR.
 | **D15** | **Compat catalog id stays `maildev` during the swap release.** Product name in docs/UI is LabMail. labinfo `name` becomes `Mail sink (LabMail, receive-only)`. | Avoids breaking agent prompts and `services.yaml` id references. A later lab release may rename the id. |
 | **D16** | **No chaos engine in 1.0.** | A mail sink’s job is reliable capture. Deterministic, default-off `spec.smtp.behavior` (explicit reply/delay/close scripting) is not a LabDNS-style random chaos engine. |
 | **D17** | **MCP `spec.management.mcp.allowLegacyClients` default false; integration-lab overlay sets true.** `subscriptions/listen` stays pinned to 2026-07-28. | TacLab knob so MCPJungle (`mark3labs/mcp-go v0.48`) can register without a LabMail patch. |
+| **D18** | **Origin hatches live only on `spec.management.originAllowlist`.** Sentinels `"*"` (any http(s) Origin) and `"private"` (Go `net.IP.IsPrivate`: RFC 1918 + RFC 4193 ULA, not CGNAT). Default `[]`. No CORS. Live-read the snapshot. ADR 0008. | Remote-dev / DHCP LAN without a new field or CORS success path. |
 
 ## Process architecture
 
@@ -334,6 +335,7 @@ Operator-facing copy of this list: [docs/known-limitations.md](https://github.co
 - HTML preview blocks remote `https:` images (no tracking pixels).
 - No LabDNS-style random SMTP chaos engine (D16). Optional `spec.smtp.behavior` is deterministic and default-off.
 - Catalog service id remains `maildev` during the swap release.
+- Empty `originAllowlist` still 403s non-loopback SPA JS until the operator lists an exact Origin, `"private"`, or `"*"`. `"*"` turns off DNS-rebinding origin defense for all http(s) Origins. No CORS headers; `OPTIONS` stays `403` `CORS is disabled`. RFC 6598 / Tailscale `100.x` is not `"private"`. Cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook).
 
 ## Related documents
 
@@ -342,3 +344,4 @@ Operator-facing copy of this list: [docs/known-limitations.md](https://github.co
 - YAML: [docs/04-state-and-configuration.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/04-state-and-configuration.md)
 - Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md)
 - Preview CSP / iframe sandbox: [docs/06-rest-api.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/06-rest-api.md), [docs/08-security-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/08-security-architecture.md)
+- Origin allowlist cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook), [ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md)

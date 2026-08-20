@@ -58,9 +58,11 @@ type Config struct {
 	Addr string
 	// Service is required. Handlers call it and do not mutate snapshots.
 	Service app.Service
-	// AllowedOrigins are extra Origins accepted besides loopback. Empty denies
-	// every non-loopback Origin (CORS/DNS-rebinding default-deny).
+	// AllowedOrigins is the test-only fallback when OriginAllowlist is nil.
+	// Extra Origins plus sentinels "*" / "private". Empty denies non-loopback.
 	AllowedOrigins []string
+	// OriginAllowlist, when set, is the SoT (production: live snapshot).
+	OriginAllowlist func() []string
 	// Live overrides liveness. Nil is always live while the process serves.
 	Live func() bool
 	// Ready overrides readiness. Nil is app.Status.Ready.
@@ -304,7 +306,7 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		s.observeHTTP(capID, sw.status(), start)
 	}()
 
-	if err := checkOrigin(r.Header.Get("Origin"), s.cfg.AllowedOrigins); err != nil {
+	if err := checkOrigin(r.Header.Get("Origin"), s.originAllowlist()); err != nil {
 		s.writeProblem(w, r, instance, err)
 		return
 	}

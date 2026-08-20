@@ -186,7 +186,12 @@
       "properties": {
         "auth": { "$ref": "#/$defs/mgmtAuth" },
         "mcp": { "$ref": "#/$defs/mcp" },
-        "originAllowlist": { "type": "array", "items": { "type": "string" } },
+        "originAllowlist": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string" },
+          "description": "Default []. Each entry is an exact http(s) Origin (scheme://host[:port]), the sentinel \"*\" (any http(s) Origin; quote in YAML), or the sentinel \"private\" (Go net.IP.IsPrivate host: RFC 1918 and RFC 4193 ULA, not CGNAT). Quote \"*\" in YAML. Go Validate is SoT."
+        },
         "bodyLimit": { "$ref": "#/$defs/byteSize", "description": "default 1MiB" },
         "requestsPerSecond": { "type": "integer", "minimum": 1, "description": "default 32" },
         "burst": { "type": "integer", "minimum": 1, "description": "default 64" },

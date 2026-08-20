@@ -43,6 +43,9 @@ func TestLabOverlayExample(t *testing.T) {
 	if !st.Spec.UI.Enabled {
 		t.Fatal("ui.enabled must stay true (Q2: inbox UI required for GA)")
 	}
+	if len(st.Spec.Management.OriginAllowlist) != 0 {
+		t.Fatalf("lab overlay must keep originAllowlist empty, got %q", st.Spec.Management.OriginAllowlist)
+	}
 	if st.Spec.Listeners.SMTP.Address != ":1025" || st.Spec.Listeners.Management.Address != ":1080" {
 		t.Fatalf("listeners smtp=%q mgmt=%q", st.Spec.Listeners.SMTP.Address, st.Spec.Listeners.Management.Address)
 	}

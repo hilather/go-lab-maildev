@@ -20,7 +20,7 @@ func TestValidateNotesRepoFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"v1.0.0-rc.1.md", "v1.0.0-rc.2.md"} {
+	for _, name := range []string{"v1.0.0-rc.1.md", "v1.0.0-rc.2.md", "v1.0.0-rc.3.md"} {
 		body, err := os.ReadFile(filepath.Join(root, "docs", "releases", name))
 		if err != nil {
 			t.Fatal(err)

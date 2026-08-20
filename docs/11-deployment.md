@@ -5,7 +5,7 @@ Owners: Platform, Operations
 Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
 Related ADRs: 0001, 0003, 0008
 
-DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here. A `v*` tag is refused unless [`.github/workflows/release.yml`](https://github.com/hilather/go-lab-maildev/blob/main/.github/workflows/release.yml) `tag-gate` sees required CI green on that SHA. Current notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
+DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here. A `v*` tag is refused unless [`.github/workflows/release.yml`](https://github.com/hilather/go-lab-maildev/blob/main/.github/workflows/release.yml) `tag-gate` sees required CI green on that SHA. Current notes: [docs/releases/v1.0.0-rc.3.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.3.md).
 
 ## CLI
 

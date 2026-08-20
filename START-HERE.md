@@ -122,4 +122,4 @@ A task is not done until:
 `maildev`. LabMail is a lab sink, not a public MTA. Residuals:
 [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md).
 Current notes:
-[docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
+[docs/releases/v1.0.0-rc.3.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.3.md).

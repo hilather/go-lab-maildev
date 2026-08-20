@@ -1,6 +1,6 @@
 # Program Board
 
-Status: in-progress (rc.1 tag-gate)
+Status: in-progress (rc.3 tag-gate)
 Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
 
 Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs/` is the source of truth.
@@ -24,7 +24,7 @@ Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs
 | 12 | Embedded inbox UI | UI-001 | API-001, SEC-001 | Sandboxed inbox SPA; **required for GA / 1.0** | done |
 | 13 | Integration-lab swap contract | SWAP-001 | COMPAT-001, MCP-001, SEC-001, DEP-001 | Docs + examples for mcp-integration-lab | done |
 | 14 | GA hardening | GA-001 | PRs 1–13 (3b for AUTH/STARTTLS claims) | Fuzz, soak, release notes, known limitations | done |
-| — | Origin-policy escape hatches | SEC-002 | SEC-001, UI-001 | `originAllowlist` sentinels `*` / `private`; live snapshot read; cookbook | post-rc.2 / pre-next-tag |
+| — | Origin-policy escape hatches | SEC-002 | SEC-001, UI-001 | `originAllowlist` sentinels `*` / `private`; live snapshot read; cookbook | done |
 
 SEC-002 does **not** reopen GA-001. Exact allowlist entries already satisfied the published-LAN docs sentence; the sentinels are operator UX for ephemeral hosts and DHCP IPs.
 

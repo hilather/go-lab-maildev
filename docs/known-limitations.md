@@ -1,16 +1,16 @@
-# Known limitations (1.0 / v1.0.0-rc.2)
+# Known limitations (1.0 / v1.0.0-rc.3)
 
-Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.2** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that is **not** claimed here.
+Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.3** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that is **not** claimed here.
 
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Last reviewed: 2026-08-20 (v1.0.0-rc.3)
 
-This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
+This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.3.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.3.md).
 
 LabMail is a **lab sink**. It is **not** a public MTA and does **not** claim RFC 5321/5322 completeness.
 
 ## This tree versus what is not tagged
 
-Design PRs 1–14, the side-by-side probe, and `spec.smtp.behavior` are in this tree. What is **not** this candidate:
+Design PRs 1–14, the side-by-side probe, `spec.smtp.behavior`, and originAllowlist sentinels are in this tree. What is **not** this candidate:
 
 | In this tree | Not this tag |
 |---|---|
@@ -72,7 +72,7 @@ Design PRs 1–14, the side-by-side probe, and `spec.smtp.behavior` are in this 
 
 - Healthcheck plane is HTTP `/v1/health/ready` (not SMTP/`node`). Ready still requires SMTP bound.
 - Dockerfile and `make test-container` are in-tree. This candidate does not publish a `ghcr.io/hilather/labmail` digest, SBOM, or provenance.
-- Application binaries built without ldflags report version `dev`. The notes version `1.0.0-rc.2` is the candidate identity for the tag, not the default `dev` string.
+- Application binaries built without ldflags report version `dev`. The notes version `1.0.0-rc.3` is the candidate identity for the tag, not the default `dev` string.
 - Required GitHub Actions green-on-tag is enforced by Release `tag-gate`.
 
 ## Explicit non-goals (unchanged)

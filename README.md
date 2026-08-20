@@ -14,7 +14,7 @@
   <a href="https://github.com/hilather/go-lab-maildev/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/hilather/go-lab-maildev/ci.yml?branch=main&label=CI&style=flat-square" alt="CI"></a>
   <a href="https://go.dev/dl/"><img src="https://img.shields.io/github/go-mod/go-version/hilather/go-lab-maildev?label=Go&style=flat-square" alt="Go"></a>
   <a href="https://github.com/hilather/go-lab-maildev/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-1f6feb?style=flat-square" alt="Apache-2.0"></a>
-  <img src="https://img.shields.io/badge/status-v1.0.0--rc.2-d4a04a?style=flat-square" alt="v1.0.0-rc.2">
+  <img src="https://img.shields.io/badge/status-v1.0.0--rc.3-d4a04a?style=flat-square" alt="v1.0.0-rc.3">
   <img src="https://img.shields.io/badge/posture-receive--only-0d9488?style=flat-square" alt="receive-only">
 </p>
 
@@ -33,7 +33,7 @@ empty store.
 It is a lab sink, not a public MTA. Known limits:
 [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md).
 Release notes:
-[docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md).
+[docs/releases/v1.0.0-rc.3.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.3.md).
 
 New here? Start with [START-HERE.md](https://github.com/hilather/go-lab-maildev/blob/main/START-HERE.md).
 Architecture, ADRs, and the program board are in [Documentation](#documentation).
@@ -419,7 +419,8 @@ summaries do not override it.
 | [docs/12-maildev-compat.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/12-maildev-compat.md) | `/email` mapping |
 | [docs/13-integration-lab-swap.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/13-integration-lab-swap.md) | mcp-integration-lab swap |
 | [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md) | 1.0 residuals (not a public MTA) |
-| [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md) | Current candidate notes |
+| [docs/releases/v1.0.0-rc.3.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.3.md) | Current candidate notes |
+| [docs/releases/v1.0.0-rc.2.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.2.md) | rc.2 notes |
 | [docs/releases/v1.0.0-rc.1.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.1.md) | First candidate notes |
 
 ### Architecture decisions

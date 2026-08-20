@@ -6,6 +6,26 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+### Removed or deprecated
+
+- None.
+
+## 1.0.0-rc.3
+
+Third candidate. Tag only on a green CI SHA via the Release `tag-gate`. Notes: [docs/releases/v1.0.0-rc.3.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.3.md). Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md).
+
+### Added
+
 - `spec.management.originAllowlist` sentinels `"*"` (any http(s) Origin) and `"private"` (Go `net.IP.IsPrivate()` host: RFC 1918 and RFC 4193 ULA). Adapters live-read the active snapshot. Operator cookbook in `docs/11-deployment.md`. Example: `examples/labmail.origin-dev.yaml`.
 
 ### Changed

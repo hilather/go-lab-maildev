@@ -30,7 +30,7 @@ A list entry whose **trimmed** value is exactly `*` allows any **http/https** Or
 
 ### D18c — Sentinel `"private"`
 
-A list entry whose trimmed value EqualFolds `private` allows Origins whose host parses as an IP and `ip.IsPrivate()` (Go `net.IP.IsPrivate`: RFC 1918, RFC 4193 ULA, RFC 6598 CGNAT). Hostnames (`devbox.local`) do **not** match. Loopback remains independently allowed. Link-local (`169.254/16`, `fe80::/10`) does **not** match. IPv4-mapped `::ffff:192.168.0.0/112` **does** match because Go `IP.IsPrivate` uses `To4()`. Classifier is stdlib, not a hand-rolled table. `"private"` is every such Origin host (any port), not “this process’s bind address.”
+A list entry whose trimmed value EqualFolds `private` allows Origins whose host parses as an IP and `ip.IsPrivate()` (Go `net.IP.IsPrivate`: RFC 1918 IPv4 and RFC 4193 ULA only). Hostnames (`devbox.local`) do **not** match. Loopback remains independently allowed. Link-local (`169.254/16`, `fe80::/10`) does **not** match. RFC 6598 CGNAT (`100.64.0.0/10`, including Tailscale) does **not** match; those Origins need an exact `http(s)://host[:port]` entry or `"*"`. IPv4-mapped RFC 1918 (e.g. `::ffff:192.168.1.9`) **does** match because Go `IP.IsPrivate` uses `To4()`. Classifier is stdlib, not a hand-rolled table — do not add a CGNAT prefix list. `"private"` is every such Origin host (any port), not “this process’s bind address.”
 
 ### D18d — `"*"` is the only wildcard
 
@@ -106,12 +106,12 @@ Normative procedure (do not invent a second table):
 1. **Cap 64** — if `len(originAllowlist) > 64` → one violation `spec.management.originAllowlist` / `invalid_value` / `originAllowlist cap 64`. Then for each index `i`:
 2. **Trim** — `raw := strings.TrimSpace(entry)`.
 3. **Empty reject** — if `raw == ""` → `spec.management.originAllowlist[i]` / `invalid_value` / `empty originAllowlist entry`.
-4. **Exact `"*"`** — if `raw == "*"` → OK (sentinel).
-5. **EqualFold `private`** — if `strings.EqualFold(raw, "private")` → OK (sentinel).
-6. **Became-sentinel reject** — `stripped := strings.TrimRight(raw, "/")`. If `stripped == "*"` **or** `strings.EqualFold(stripped, "private")` → `invalid_value` / `originAllowlist sentinel must be exactly * or private` (so `"*/"` and `"private/"` cannot fail-open into a hatch).
+4. **Exact `"*"`** — if `raw == "*"` → OK (sentinel); **stop** per-entry checks (`continue` to the next index).
+5. **EqualFold `private`** — if `strings.EqualFold(raw, "private")` → OK (sentinel); **stop** per-entry checks (`continue` to the next index).
+6. **Became-sentinel reject** — applies only to slash-suffixed forms that survived 4–5. `stripped := strings.TrimRight(raw, "/")`. If `stripped == "*"` **or** `strings.EqualFold(stripped, "private")` → `invalid_value` / `originAllowlist sentinel must be exactly * or private` (so `"*/"` and `"private/"` cannot fail-open into a hatch).
 7. **Other wildcards** — if `strings.Contains(raw, "*")` → `invalid_value` / `wildcards other than the sentinel * are not supported`. ASCII `*` only; do not scan fullwidth `＊` (it fails the URL-shape check).
 8. **`url.Parse`** — `u, err := url.Parse(raw)`. On error → `invalid_value`.
-9. **http(s) shape** — scheme must be `http` or `https` (lowercase compare). Host (`u.Hostname()` or `u.Host`) non-empty. `u.User == nil`. `u.RawQuery == ""`. `u.Fragment == ""`. Path empty or `/` only.
+9. **http(s) shape** — scheme must be `http` or `https` (lowercase compare). `u.Hostname()` non-empty (port may live in `u.Host`; do not treat `u.Host == ":1080"` as a host). `u.User == nil`. `u.RawQuery == ""`. `u.Fragment == ""`. Path empty or `/` only.
 10. **No rebuild** — otherwise OK (exact Origin). Do **not** rebuild with `u.String()`.
 
 Do **not** require that `"*"` be the sole entry. Go Validate remains SoT. JSON Schema may describe `maxItems: 64` and the string items; it must not become an enum (that would reject exact Origins).
@@ -122,7 +122,7 @@ Migration (implementation CHANGELOG **Changed**, one line): replace non-http(s) 
 
 - Remote-dev / Codespaces can set `originAllowlist: ["*"]` (quoted) and keep `bearer_and_basic`. LAN DHCP can set `["private"]` or an exact Origin. Published LAN with a stable Origin should prefer exact.
 - Default empty allowlist still 403s non-loopback SPA JS until the operator hatches. That residual belongs in `docs/known-limitations.md` **in the same change as the matcher**, not in this ADR-only change.
-- `"*"` disables DNS-rebinding origin defense for all http(s) Origins. Do not present it as safe for a production published `:1080`. `"private"` is narrower (`https://evil.example` still denied) but allows any RFC1918 / ULA / CGNAT Origin host, including Tailscale `100.x`, not only the bind address.
+- `"*"` disables DNS-rebinding origin defense for all http(s) Origins. Do not present it as safe for a production published `:1080`. `"private"` is narrower (`https://evil.example` still denied) but allows any RFC 1918 / ULA Origin host, not only the bind address. RFC 6598 CGNAT / Tailscale `100.x` Origins are not `IsPrivate()`; list them exactly or use `"*"`.
 - OPTIONS stays 403 with hatches on. Tests in the implementation PR must assert that so CORS is not “fixed” in to load the SPA.
 - Adapters share one live-read closure; a REST-only getter would leave `GET /email` and `POST /mcp` on the bind-time list.
 - Previously loaded junk YAML fails bootstrap after the validate change. That is accepted.

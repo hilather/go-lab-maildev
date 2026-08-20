@@ -43,6 +43,7 @@ var RequiredRootDocs = []string{
 	"docs/adr/0005-lab-static-bearer-and-basic-compat.md",
 	"docs/adr/0006-pin-mcp-protocol-versions.md",
 	"docs/adr/0007-compat-email-surface.md",
+	"docs/adr/0008-origin-policy-escape-hatches.md",
 	"tasks/00-program-board.md",
 	".github/workflows/ci.yml",
 	".github/workflows/release.yml",

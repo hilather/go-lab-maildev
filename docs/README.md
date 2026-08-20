@@ -67,6 +67,7 @@ Operator curl walkthrough:
 | [0005](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0005-lab-static-bearer-and-basic-compat.md) | Lab static bearer + Basic compat (D6) |
 | [0006](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md) | Pin MCP protocol versions (D14 + D17) |
 | [0007](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0007-compat-email-surface.md) | Compat `/email` surface (D5) |
+| [0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md) | Origin-policy escape hatches (D18) |
 
 ## Task lists
 

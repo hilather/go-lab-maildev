@@ -28,7 +28,7 @@ No other page files exist under `web/src/pages/`.
 
 ### What is already dark
 
-`:root` in `web/src/styles.css` already has the approved tokens (`--bg #0b0c0e`, `--elevated #121317`, `--panel #181a1f`, `--fg #ecece8`, `--muted #9a9b97`, `--accent #4aa384`, `--danger #c45c5c`). IBM Plex is loaded in `web/index.html`. `--font-sans` lists `"Segoe UI"` only as a **fallback** after IBM Plex (air-gap residual from the inbox plan). There is **no** leftover `#1f4b3a` / paper / navy theme in `web/src/styles.css`.
+`:root` in `web/src/styles.css` already has the approved tokens (`--bg #0b0c0e`, `--elevated #121317`, `--panel #181a1f`, `--fg #ecece8`, `--muted #9a9b97`, `--accent #4aa384`, `--danger #c45c5c`). IBM Plex is loaded in `web/index.html`. `--font-sans` must **not** list Segoe (request: no leftover Segoe interiors). Fallback is `system-ui, sans-serif` when Google Fonts is blocked. There is **no** leftover `#1f4b3a` / paper / navy theme in `web/src/styles.css`.
 
 Remaining pages inherit those tokens but their **interiors are unstyled generic HTML**, not money-view panels:
 
@@ -123,7 +123,7 @@ No `make generate`. No ADR. No capability change.
 | Audit table headers + empty state | new `AuditPage.test.tsx`; mock `/v1/audit` empty and one-row |
 | Reset still disabled until `RESET` + checkbox | existing `ResetPage.test.tsx` (keep) |
 | Reset submit is danger outline class, not `.primary` | extend Reset test |
-| CSS has `--accent: #4aa384` and no `#1f4b3a` | `chrome.test.tsx` reads `web/src/styles.css` |
+| CSS has `--accent: #4aa384` and no `#1f4b3a` / `Segoe` | `chrome.test.tsx` reads `web/src/styles.css` |
 | GET still no `markRead=true`; empty sandbox | existing Inbox/Message/security tests (unchanged) |
 
 Chrome tests assert **observable classes and copy**, not computed colors (jsdom).
@@ -143,7 +143,7 @@ Chrome tests assert **observable classes and copy**, not computed colors (jsdom)
 
 - **Submit cascade:** missing the `button[type="submit"]` change leaves Reset green. Step 1 is mandatory.
 - **Login tests** render `LoginPage` without `AppShell` — do not require masthead in those tests; add a shell-wrapped case only if asserting header on `/login`.
-- **Google Fonts:** air-gapped operators still see system fallback. Keep Segoe as fallback after IBM Plex (same as inbox plan); do not set Segoe as the designed face.
+- **Google Fonts:** air-gapped operators see `system-ui` (no Segoe). Do not self-host woff2 this round.
 - **Double padding** on login (`stage--solo` + `.page`) is acceptable; do not invent a second layout language.
 
 ## 6. Done when

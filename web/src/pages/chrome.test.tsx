@@ -21,8 +21,17 @@ describe("remaining-page chrome", () => {
     expect(css).toMatch(/--bg:\s*#0b0c0e/);
     expect(css).toMatch(/--panel:\s*#181a1f/);
     expect(css).not.toMatch(/#1f4b3a/);
+    expect(css).not.toMatch(/Segoe/i);
     expect(css).not.toMatch(/button\[type="submit"\]/);
     expect(css).toMatch(/"IBM Plex Sans"/);
+  });
+
+  it("restyles leftover page bodies, not only the shell", () => {
+    for (const file of ["LoginPage.tsx", "StatusPage.tsx", "AuditPage.tsx", "ResetPage.tsx"]) {
+      const src = readFileSync(join(srcRoot, "pages", file), "utf8");
+      expect(src, file).toMatch(/page-title/);
+      expect(src, file).toMatch(/panel|empty-state/);
+    }
   });
 
   it("styles login as a panel with primary Sign in and no compose", async () => {

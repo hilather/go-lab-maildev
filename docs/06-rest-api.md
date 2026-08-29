@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
-Related ADRs: 0004, 0005, 0007, 0008
+Last reviewed: 2026-08-29 (SSE subscribe-before-flush)
+Related ADRs: 0004, 0005, 0007, 0008, 0009
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
 
@@ -92,7 +92,7 @@ Default `limit=50`, max `200`. Sort: `receivedAt` descending, then id desc.
 
 **Cursor:** opaque `base64url(id || uint64 storeGeneration || HMAC-SHA256)`. MAC key is **32 random bytes generated at process start**, never persisted, never logged, never a metric label. Reset/restart issues a new key (all cursors die — clients restart the list). If the generation embedded in the cursor ≠ current `storeGeneration`, return `400` with `code: cursor_stale` (not `validation_failed`); client must list from scratch. Mark-read does **not** invalidate cursors.
 
-`MessageListItem` omits `raw`, `text`, `html` (only a `hasHTML` bool), and attachment bytes. Full `GET /v1/messages/{id}?markRead=false` (default) includes `text`, `html`, headers, envelope, attachment metadata. `markRead=true` is a write of the read bit only.
+`MessageListItem` omits `raw`, `text`, `html` (only a `hasHTML` bool), and attachment bytes. Full `GET /v1/messages/{id}?markRead=false` (default) includes `text`, `html`, headers, envelope, attachment metadata. `markRead=true` is a write of the read bit only (programmatic). The inbox SPA display GET never sets `markRead`. Select uses `POST /v1/messages/{id}:read` (`messages.read`, `mail.write`, CSRF on cookie sessions, `204`, does not bump `storeGeneration`).
 
 ## Wait
 
@@ -167,7 +167,7 @@ event: store.wiped
 data: {"storeGeneration":21}
 ```
 
-Heartbeat comment every 15s. MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
+Heartbeat comment every 15s. The handler registers the store subscriber **before** writing and flushing the 200 so a client that observes an open stream cannot miss a later insert (events are not replayed). MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
 
 ## Preview
 

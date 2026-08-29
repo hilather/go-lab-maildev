@@ -70,6 +70,8 @@ func (s *Server) dispatch(w http.ResponseWriter, r *http.Request, instance strin
 		s.handleClear(w, r, instance, ctx, actor)
 	case capabilities.MessagesReadAll:
 		s.handleReadAll(w, r, instance, ctx, actor)
+	case capabilities.MessagesRead:
+		s.handleMarkRead(w, r, instance, ctx, actor, params["id"])
 	case capabilities.MessagesWait:
 		s.handleWait(w, r, instance, ctx, actor)
 	case capabilities.MessagesExtract:

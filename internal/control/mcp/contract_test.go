@@ -261,6 +261,21 @@ func TestMarkReadDefaultFalse(t *testing.T) {
 	}
 }
 
+func TestMailMessageRead(t *testing.T) {
+	s, svc := newTestServer(t)
+	ts := startHTTP(t, s)
+	cs := connectClient(t, ts)
+	id := insertMail(t, svc, "unread-tool", "body")
+	out := structuredMap(t, callTool(t, cs, "mail_message_read", map[string]any{"id": id}))
+	if out["ok"] != true {
+		t.Fatalf("read tool=%v", out)
+	}
+	got := structuredMap(t, callTool(t, cs, "mail_message_get", map[string]any{"id": id}))
+	if got["read"] != true {
+		t.Fatal("mail_message_read must set the read bit")
+	}
+}
+
 func TestHealthNotRegisteredAsTools(t *testing.T) {
 	s, _ := newTestServer(t)
 	ts := startHTTP(t, s)

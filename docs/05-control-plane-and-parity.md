@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Application, REST, MCP
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
-Related ADRs: 0004, 0005, 0006, 0007, 0008
+Last reviewed: 2026-08-29 (D19 messages.read)
+Related ADRs: 0004, 0005, 0006, 0007, 0008, 0009
 
 REST and MCP are two protocol adapters over one capability model. Adapters never call each other and never contain store/SMTP business logic. See [docs/adr/0004-shared-capability-registry.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0004-shared-capability-registry.md).
 
@@ -27,7 +27,7 @@ Every public capability is one `capabilities.Capability` with REST and MCP bindi
 
 | Disposition | Examples |
 |---|---|
-| `PARITY_REQUIRED` | messages list/get/delete/clear/wait/extract, state get/validate/export/reset, status, schema, audit, changes plan/apply |
+| `PARITY_REQUIRED` | messages list/get/delete/clear/read/read_all/wait/extract, state get/validate/export/reset, status, schema, audit, changes plan/apply |
 | `REST_ONLY_PROTOCOL` | live/ready, OpenAPI, UI assets, session/CSRF, `/v1/metrics`, `/email` compat, `/healthz`, `/config`, `GET /v1/messages/{id}/preview` |
 | `MCP_ONLY_PROTOCOL` | `tools/list`, `resources/list`, protocol negotiate |
 | `PARITY_DIFFERENT_BINDING` | `events.stream`: REST SSE bodies vs MCP `subscriptions/listen` URI-only notify + `mail_messages_list`. Native `messages.get` default `markRead=false`; compat `GET /email/:id` marks read (maildev). |
@@ -80,6 +80,7 @@ Roles (token `role` is documentation + default scope set):
 | `messages.delete` | `DELETE /v1/messages/{id}` | `mail_message_delete` | `mail.write` | |
 | `messages.clear` | `DELETE /v1/messages` | `mail_messages_clear` | `mail.write` | |
 | `messages.read_all` | `POST /v1/messages:read-all` | `mail_messages_read_all` | `mail.write` | does **not** bump `storeGeneration` |
+| `messages.read` | `POST /v1/messages/{id}:read` | `mail_message_read` | `mail.write` | one message; does **not** bump `storeGeneration` |
 | `messages.wait` | `POST /v1/messages:wait` | `mail_messages_wait` | `mail.read` | filter + timeout |
 | `messages.extract` | `POST /v1/messages/{id}:extract` | `mail_message_extract` | `mail.read` | URLs + OTP-like tokens |
 | `attachments.get` | `GET /v1/messages/{id}/attachments/{attId}` | `mail_attachment_get` | `mail.read` | |

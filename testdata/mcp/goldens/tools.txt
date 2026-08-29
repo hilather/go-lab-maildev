@@ -15,6 +15,7 @@ mail_message_html_get
 mail_message_delete
 mail_messages_clear
 mail_messages_read_all
+mail_message_read
 mail_messages_wait
 mail_message_extract
 mail_attachment_get

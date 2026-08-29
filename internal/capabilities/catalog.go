@@ -201,6 +201,14 @@ func catalog() []Capability {
 			ServiceMethods: []string{"MarkAllRead"},
 		},
 		{
+			ID: MessagesRead, Title: "Mark message read", Version: VersionTag,
+			Description:    "Set one message read bit. Does not bump storeGeneration.",
+			RequiredScopes: []string{ScopeMailWrite}, Mutating: true, Idempotent: true,
+			REST:           []RESTBinding{{Method: "POST", Path: "/v1/messages/{id}:read"}},
+			MCP:            &MCPBinding{Tools: []string{"mail_message_read"}},
+			ServiceMethods: []string{"MarkRead"},
+		},
+		{
 			ID: MessagesWait, Title: "Wait for message", Version: VersionTag,
 			Description:    "Block until a matching message arrives or the timeout fires.",
 			RequiredScopes: []string{ScopeMailRead}, Idempotent: true,

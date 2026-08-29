@@ -29,6 +29,7 @@ const (
 	MessagesDelete  ID = "messages.delete"
 	MessagesClear   ID = "messages.clear"
 	MessagesReadAll ID = "messages.read_all"
+	MessagesRead    ID = "messages.read"
 	MessagesWait    ID = "messages.wait"
 	MessagesExtract ID = "messages.extract"
 	AttachmentsGet  ID = "attachments.get"

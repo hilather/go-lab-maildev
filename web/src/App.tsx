@@ -1,11 +1,11 @@
 import { type ReactNode } from "react";
-import { BrowserRouter, NavLink, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { SCOPE_ADMIN, SCOPE_AUDIT } from "./auth/scopes";
+import { LiveProvider, useLive } from "./hooks/LiveProvider";
 import { AuditPage } from "./pages/AuditPage";
 import { InboxPage } from "./pages/InboxPage";
 import { LoginPage } from "./pages/LoginPage";
-import { MessagePage } from "./pages/MessagePage";
 import { ResetPage } from "./pages/ResetPage";
 import { StatusPage } from "./pages/StatusPage";
 import { navItems } from "./ui/forbidden";
@@ -18,41 +18,87 @@ function SkipLink() {
   );
 }
 
-function NavItem({ to, children }: { to: string; children: ReactNode }) {
+function NavItem({ to, children, badge }: { to: string; children: ReactNode; badge?: number | undefined }) {
   return (
-    <NavLink to={to} className={({ isActive }) => (isActive ? "nav-active" : undefined)} end={to === "/"}>
-      {children}
+    <NavLink to={to} className={({ isActive }) => (isActive ? "rail__link rail__link--active" : "rail__link")} end={to === "/"}>
+      <span>{children}</span>
+      {badge !== undefined && badge > 0 ? <span className="rail__badge">{badge}</span> : null}
     </NavLink>
   );
 }
 
-function Shell() {
-  const { state, hasScope, logout } = useAuth();
+function Masthead({ signedIn, onSignOut }: { signedIn: boolean; onSignOut: () => void }) {
+  return (
+    <header className="masthead">
+      <NavLink className="brand" to="/">
+        {signedIn ? <span className="brand__dot" aria-hidden="true" /> : null}
+        LabMail
+      </NavLink>
+      {signedIn ? (
+        <div className="masthead__meta">
+          <LiveChips />
+          <span className="chip">receive-only</span>
+          <button type="button" className="btn-signout" onClick={onSignOut}>
+            Sign out
+          </button>
+        </div>
+      ) : null}
+    </header>
+  );
+}
+
+function LiveChips() {
+  const { mode } = useLive();
+  if (mode === "sse") {
+    return <span className="chip chip--live">live</span>;
+  }
+  if (mode === "poll") {
+    return <span className="chip chip--live">poll</span>;
+  }
+  return <span className="chip">connecting</span>;
+}
+
+function Rail() {
+  const { hasScope } = useAuth();
+  const { unreadCount } = useLive();
+  const items = navItems(hasScope(SCOPE_AUDIT), hasScope(SCOPE_ADMIN));
+  return (
+    <nav className="rail" aria-label="Primary">
+      {items.map((item) => (
+        <NavItem key={item.to} to={item.to} badge={item.to === "/" ? unreadCount : undefined}>
+          {item.label}
+        </NavItem>
+      ))}
+    </nav>
+  );
+}
+
+export function AppShell() {
+  const { state, logout } = useAuth();
   const signedIn = state.status === "signed_in";
-  const items = signedIn ? navItems(hasScope(SCOPE_AUDIT), hasScope(SCOPE_ADMIN)) : [];
   return (
     <div className="app">
       <SkipLink />
-      <header className="topbar">
-        <NavLink className="brand" to="/">
-          LabMail
-        </NavLink>
-        <nav aria-label="Primary">
-          {items.map((item) => (
-            <NavItem key={item.to} to={item.to}>
-              {item.label}
-            </NavItem>
-          ))}
-          {signedIn ? (
-            <button type="button" className="linkish" onClick={() => void logout()}>
-              Sign out
-            </button>
-          ) : null}
-        </nav>
-      </header>
-      <div id="app-main">
-        <Outlet />
-      </div>
+      <LiveProvider enabled={signedIn}>
+        {signedIn ? (
+          <>
+            <Masthead signedIn onSignOut={() => void logout()} />
+            <div className="workspace">
+              <Rail />
+              <div id="app-main" className="stage">
+                <Outlet />
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <Masthead signedIn={false} onSignOut={() => undefined} />
+            <div id="app-main" className="stage stage--solo">
+              <Outlet />
+            </div>
+          </>
+        )}
+      </LiveProvider>
     </div>
   );
 }
@@ -62,7 +108,9 @@ function RequireSession() {
   if (state.status === "loading") {
     return (
       <main className="page">
-        <p role="status">Checking session…</p>
+        <p className="empty-state" role="status">
+          Checking session…
+        </p>
       </main>
     );
   }
@@ -77,7 +125,9 @@ function RedirectIfSignedIn() {
   if (state.status === "loading") {
     return (
       <main className="page">
-        <p role="status">Checking session…</p>
+        <p className="empty-state" role="status">
+          Checking session…
+        </p>
       </main>
     );
   }
@@ -87,18 +137,27 @@ function RedirectIfSignedIn() {
   return <Outlet />;
 }
 
+function MessageRedirect() {
+  const { id = "" } = useParams();
+  const qs = new URLSearchParams();
+  if (id !== "") {
+    qs.set("id", id);
+  }
+  return <Navigate to={id === "" ? "/" : `/?${qs.toString()}`} replace />;
+}
+
 export function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route element={<Shell />}>
+          <Route element={<AppShell />}>
             <Route element={<RedirectIfSignedIn />}>
               <Route path="/login" element={<LoginPage />} />
             </Route>
             <Route element={<RequireSession />}>
               <Route path="/" element={<InboxPage />} />
-              <Route path="/messages/:id" element={<MessagePage />} />
+              <Route path="/messages/:id" element={<MessageRedirect />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/audit" element={<AuditPage />} />
               <Route path="/reset" element={<ResetPage />} />

@@ -3,3 +3,4 @@ mail_change_apply
 mail_message_delete
 mail_messages_clear
 mail_messages_read_all
+mail_message_read

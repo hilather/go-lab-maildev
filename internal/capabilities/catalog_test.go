@@ -43,7 +43,7 @@ func TestFrozenIDsStable(t *testing.T) {
 		StateGet, StateValidate, StateExport, StateReset, ChangesPlan, ChangesApply,
 		SessionCreate, SessionDelete, SessionGet, EventsStream,
 		MessagesList, MessagesGet, MessagesRaw, MessagesHTML, MessagesPreview,
-		MessagesDelete, MessagesClear, MessagesReadAll, MessagesWait, MessagesExtract,
+		MessagesDelete, MessagesClear, MessagesReadAll, MessagesRead, MessagesWait, MessagesExtract,
 		AttachmentsGet, AuditList, AuditGet, MetricsGet,
 	}
 	got := All()

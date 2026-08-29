@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
-Related ADRs: 0002, 0004, 0008
+Last reviewed: 2026-08-29 (remaining SPA page chrome)
+Related ADRs: 0002, 0004, 0008, 0009
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
 
@@ -14,7 +14,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Unit | config decode/unknown fields/reserved names/byte sizes; store caps/wipe/wait/race; auth scopes; domainerr mapping; extract regex; OpenMetrics labels/health | `internal/*` |
 | SMTP protocol | 3a: greeting–DATA, SIZE, limits, 452/451 epoch; 3b: AUTH LOGIN/PLAIN transcripts, STARTTLS optional/required + handshake | `internal/smtp/server` with `internal/smtptest`; transcripts in `testdata/smtp` |
 | MIME | multipart/alternative, attachments, base64, quoted-printable, broken MIME still stored | `internal/mimeparse` + `testdata/mime` |
-| REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json | `internal/control/rest` |
+| REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json. `TestEventsStream` inserts as soon as SSE headers return (subscribe-before-flush; events are not replayed) | `internal/control/rest` |
 | Compat | Array + relay 403 + `/healthz` + `testdata/compat` goldens. `TestMaildevScenarioCompat` (401 + Basic + subject + SendMail). `TestSideBySideMaildev221` (`cmd/labmail`) sends the same `net/smtp.SendMail` + `/email` + `/healthz` probe to LabMail `serve` and, when Docker works, `maildev/maildev:2.2.1` | `internal/control/compat`, `internal/compatcheck`, `cmd/labmail` |
 | MCP | 2026-07-28 initialize, tools/list, tool call, origin, bearer | `internal/control/mcp` |
 | Parity | every `PARITY_REQUIRED` capability: same input types, scopes, errors, side effects | `internal/capabilities` + rest/mcp tests (`make test-parity`) |
@@ -27,7 +27,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Config compat | `testdata/config/valid` + `invalid` | `make test-config-compat` |
 | Changelog | user-visible paths require `CHANGELOG.md` | `make test-changelog` |
 | Tag gate | notes headings + green required CI on the tag SHA | `.github/workflows/release.yml` |
-| Inbox UI | SPA fallback, `ui.enabled: false` 404, CSRF header, empty preview sandbox, no Relay/innerHTML | `internal/web`, `internal/control/rest/spa_test.go`, `make web-test` |
+| Inbox UI | SPA fallback, `ui.enabled: false` 404, CSRF header, empty preview sandbox, no Relay/innerHTML, shell chips / unread badge, select marks read via `POST …:read`, relative timestamps, login/status/audit/reset interiors share inbox chrome (panel / primary / danger / empty-state) | `internal/web`, `internal/control/rest/spa_test.go`, `make web-test` |
 | Origin hatches | `"*"` / `"private"` / exact / loopback / `file://` / `Origin: null` / CGNAT deny; OPTIONS 403 with `"*"` (no ACAO); three-surface reset live-read (`/v1/health/live`, `/healthz`, `POST /mcp`); SPA hashed-JS asserting tests | `internal/auth/origin_test.go`, `internal/control/{rest,mcp,compat}/origin_test.go`, `spa_asset_origin_hatch_test.go`; `testdata/config/valid/origin-*.yaml` + `invalid/origin-*.yaml` |
 
 ## Required Make targets

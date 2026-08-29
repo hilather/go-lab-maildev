@@ -16,6 +16,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 		s.writeProblem(w, r, instance, asDomain(errStreaming))
 		return
 	}
+	// Register fan-out before the client observes 200. Events are not
+	// replayed; TestEventsStream inserts as soon as Do returns.
+	ch, cancel := s.svc.Subscribe(r.Context(), actor, 32)
+	defer cancel()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -24,8 +28,6 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 
 	idle := make(chan app.InboxEvent)
 	events := (<-chan app.InboxEvent)(idle)
-	ch, cancel := s.svc.Subscribe(r.Context(), actor, 32)
-	defer cancel()
 	if ch != nil {
 		events = ch
 	}

@@ -28,5 +28,8 @@ describe("ResetPage", () => {
     expect(submit).toBeDisabled();
     await user.click(screen.getByLabelText(/Wipe the inbox/i));
     expect(submit).toBeEnabled();
+    expect(submit).toHaveClass("btn-danger");
+    expect(submit).not.toHaveClass("primary");
+    expect(document.querySelector("form")?.className.split(/\s+/)).toContain("panel");
   });
 });

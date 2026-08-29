@@ -2,8 +2,8 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
-Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008
+Last reviewed: 2026-08-29 (remaining SPA interiors share inbox chrome)
+Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0009
 
 ## Problem statement
 
@@ -149,9 +149,10 @@ Required for GA / 1.0 (D12, PR 12). The UI talks REST only. XSS/CSP/`cid:` rewri
 | Stack | React + TypeScript + Vite (Node 22.14.0), TacLab/LabLDAP pattern |
 | Embed | `internal/web` `go:embed` of `web/dist` (copy step; `web/` has its own `go.mod` if needed like TacLab) |
 | Auth | Login page: paste bearer **or** basic username/password. `POST /v1/session`. Cookie `labmail_session` + `X-LabMail-CSRF`. Cookie is REST-only. |
-| Pages | Inbox list, message view (text / HTML preview / headers / raw / attachments), status (revisions, store stats), audit (if scoped), gated reset |
+| Pages | Split inbox on `/` (captured list + inspector: HTML / text / raw / headers), status (revisions, store stats), audit (if scoped), gated reset, login (bearer or Basic). Dark lab chrome: 56px header (live / receive-only chips), left rail with unread badge. Status / audit / reset / login interiors use the same dark panel language (accent `#4aa384`, IBM Plex) as the inbox. |
 | Live update | `EventSource` `GET /v1/events/stream` (SSE) plus a 15s list watchdog while the stream is open. Exclusive fallback: 3s poll of `GET /v1/messages`. **No** maildev WebSocket. |
-| HTML preview | `<iframe src="/v1/messages/{id}/preview" sandbox>` — **no** `allow-scripts`, **no** `allow-same-origin`, **no** `allow-popups-to-escape-sandbox`. Not `srcdoc`. Never parent `innerHTML`. |
+| HTML preview | `<iframe src="/v1/messages/{id}/preview" sandbox>` — **no** `allow-scripts`, **no** `allow-same-origin`, **no** `allow-popups-to-escape-sandbox`. Not `srcdoc`. Never parent `innerHTML`. One-line sandbox note under the preview card. |
+| Mark-read | Display `GET /v1/messages/{id}` never sets `markRead`. Select issues `POST /v1/messages/{id}:read` with CSRF (`messages.read`, `mail.write`). |
 | Missing on purpose | Relay button, “send”, outgoing settings, compose-new-mail |
 
 `spec.ui.enabled: false` serves 404 for `/` but keeps REST/MCP (`--disable-web` is **not** “disable management”).
@@ -345,3 +346,4 @@ Operator-facing copy of this list: [docs/known-limitations.md](https://github.co
 - Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md)
 - Preview CSP / iframe sandbox: [docs/06-rest-api.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/06-rest-api.md), [docs/08-security-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/08-security-architecture.md)
 - Origin allowlist cookbook: [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook), [ADR 0008](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0008-origin-policy-escape-hatches.md)
+- Single-message mark-read: [ADR 0009](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0009-single-message-mark-read.md)

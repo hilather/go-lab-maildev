@@ -6,15 +6,16 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Added
 
-- None.
+- `POST /v1/messages/{id}:read` / MCP `mail_message_read` (`messages.read`, `mail.write`) marks one message read without bumping `storeGeneration`. ADR 0009 / D19.
 
 ### Changed
 
-- None.
+- Embedded inbox SPA is a dark split-pane operator chrome (header chips, left rail with unread badge, captured list + HTML inspector). Select marks read via the new POST, not `GET ?markRead=true`. Clear/delete use in-page confirms. Relative list timestamps.
+- Login, status, audit, and reset interiors use the same dark panel language as the inbox (accent `#4aa384`, IBM Plex). Reset is a danger-outline submit; Sign in stays the filled primary.
 
 ### Fixed
 
-- None.
+- `GET /v1/events/stream` registers the inbox subscriber before flushing HTTP 200 so `mail.received` cannot be lost between header receipt and subscribe (events are not replayed).
 
 ### Removed or deprecated
 

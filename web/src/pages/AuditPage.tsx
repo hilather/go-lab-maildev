@@ -20,6 +20,7 @@ export function AuditPage() {
   if (error !== "") {
     return (
       <main className="page">
+        <h1 className="page-title">Audit</h1>
         <p className="banner-error" role="alert">
           {error}
         </p>
@@ -29,45 +30,50 @@ export function AuditPage() {
   if (events === null) {
     return (
       <main className="page">
-        <p role="status">Loading audit…</p>
+        <h1 className="page-title">Audit</h1>
+        <p className="empty-state" role="status">
+          Loading audit…
+        </p>
       </main>
     );
   }
 
   return (
     <main className="page">
-      <h1>Audit</h1>
+      <h1 className="page-title">Audit</h1>
       <p className="muted">Scoped to mail.audit.read. Bodies and secrets are not recorded.</p>
       {events.length === 0 ? (
-        <p>No audit events.</p>
+        <p className="empty-state">No audit events.</p>
       ) : (
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Capability</th>
-              <th>Actor</th>
-              <th>Result</th>
-              <th>Message</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((ev) => (
-              <tr key={ev.id}>
-                <td>{ev.time}</td>
-                <td>{ev.capability ?? "—"}</td>
-                <td>
-                  {ev.actorId ?? "—"}
-                  {ev.transport ? ` (${ev.transport})` : ""}
-                </td>
-                <td>{ev.result ?? "—"}</td>
-                <td>
-                  <code>{ev.messageId ?? ev.id}</code>
-                </td>
+        <div className="panel">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Capability</th>
+                <th>Actor</th>
+                <th>Result</th>
+                <th>Message</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {events.map((ev) => (
+                <tr key={ev.id}>
+                  <td>{ev.time}</td>
+                  <td>{ev.capability ?? "—"}</td>
+                  <td>
+                    {ev.actorId ?? "—"}
+                    {ev.transport ? ` (${ev.transport})` : ""}
+                  </td>
+                  <td>{ev.result ?? "—"}</td>
+                  <td>
+                    <code>{ev.messageId ?? ev.id}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   );

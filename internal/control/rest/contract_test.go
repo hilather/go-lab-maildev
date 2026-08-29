@@ -238,6 +238,21 @@ func TestMarkReadDefaultFalse(t *testing.T) {
 	}
 }
 
+func TestMarkReadPOST(t *testing.T) {
+	s, svc := newTestServer(t)
+	id := insertMail(t, svc, "unread-post", "body")
+	got := doReq(t, s.Handler(), http.MethodPost, "/v1/messages/"+id+":read", "")
+	requireStatus(t, got, http.StatusNoContent)
+	msg, err := svc.GetMessage(context.Background(), app.Actor{ID: "t"}, id, false)
+	if err != nil || !msg.Read {
+		t.Fatalf("store read=%v err=%v", msg, err)
+	}
+	again := doReq(t, s.Handler(), http.MethodPost, "/v1/messages/"+id+":read", "")
+	requireStatus(t, again, http.StatusNoContent)
+	missing := doReq(t, s.Handler(), http.MethodPost, "/v1/messages/01AAAAAAAAAAAAAAAAAAAAAAAA:read", "")
+	requireProblem(t, missing, http.StatusNotFound, "not_found")
+}
+
 func TestDeleteIfMatchStoreGeneration(t *testing.T) {
 	s, svc := newTestServer(t)
 	id := insertMail(t, svc, "if-match", "b")

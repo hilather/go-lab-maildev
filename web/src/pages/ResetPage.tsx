@@ -37,21 +37,23 @@ export function ResetPage() {
 
   return (
     <main className="page page--narrow">
-      <h1>Reset</h1>
-      <p>
+      <h1 className="page-title">Reset</h1>
+      <p className="muted">
         Reset rereads the mounted bootstrap YAML and wipes the inbox. It does not send mail. Type{" "}
         <code>{RESET_PHRASE}</code> to enable the control.
       </p>
-      {!allowed ? <p>Requires scope mail.admin.</p> : null}
+      {!allowed ? <p className="empty-state">Requires scope mail.admin.</p> : null}
       {error !== "" ? (
         <p className="banner-error" role="alert">
           {error}
         </p>
       ) : null}
       {notice !== "" ? (
-        <p role="status">{notice}</p>
+        <p className="empty-state" role="status">
+          {notice}
+        </p>
       ) : null}
-      <form className="stack" onSubmit={(e) => void onSubmit(e)}>
+      <form className="panel stack" onSubmit={(e) => void onSubmit(e)}>
         <div className="field">
           <label htmlFor="reset-phrase">Confirmation phrase</label>
           <input
@@ -70,7 +72,7 @@ export function ResetPage() {
           <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> Wipe
           the inbox and reload bootstrap
         </label>
-        <button type="submit" disabled={!ok || busy}>
+        <button type="submit" className="btn-danger" disabled={!ok || busy}>
           {busy ? "Resetting…" : "Reset LabMail"}
         </button>
       </form>

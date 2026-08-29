@@ -1,7 +1,7 @@
 # Program Board
 
-Status: in-progress (rc.3 tag-gate)
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Status: in-progress (rc.4 tag-gate)
+Last reviewed: 2026-08-29 (v1.0.0-rc.4 notes)
 
 Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs/` is the source of truth.
 
@@ -25,8 +25,10 @@ Work packages match LabMail 1.0 design PRs 1–14. The numbered pack under `docs
 | 13 | Integration-lab swap contract | SWAP-001 | COMPAT-001, MCP-001, SEC-001, DEP-001 | Docs + examples for mcp-integration-lab | done |
 | 14 | GA hardening | GA-001 | PRs 1–13 (3b for AUTH/STARTTLS claims) | Fuzz, soak, release notes, known limitations | done |
 | — | Origin-policy escape hatches | SEC-002 | SEC-001, UI-001 | `originAllowlist` sentinels `*` / `private`; live snapshot read; cookbook | done |
+| — | Dark inbox chrome + mark-read | D19 | UI-001, SEC-001 | Split-pane inbox, remaining-page chrome, `POST /v1/messages/{id}:read` | done |
 
 SEC-002 does **not** reopen GA-001. Exact allowlist entries already satisfied the published-LAN docs sentence; the sentinels are operator UX for ephemeral hosts and DHCP IPs.
+D19 does **not** reopen GA-001. `messages.read` is an additive capability on existing `app.MarkRead`.
 
 ## Parallelization
 

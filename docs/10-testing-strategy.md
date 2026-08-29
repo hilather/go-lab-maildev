@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-29 (SSE subscribe-before-flush)
+Last reviewed: 2026-08-29 (remaining SPA page chrome)
 Related ADRs: 0002, 0004, 0008, 0009
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -27,7 +27,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Config compat | `testdata/config/valid` + `invalid` | `make test-config-compat` |
 | Changelog | user-visible paths require `CHANGELOG.md` | `make test-changelog` |
 | Tag gate | notes headings + green required CI on the tag SHA | `.github/workflows/release.yml` |
-| Inbox UI | SPA fallback, `ui.enabled: false` 404, CSRF header, empty preview sandbox, no Relay/innerHTML, shell chips / unread badge, select marks read via `POST …:read`, relative timestamps | `internal/web`, `internal/control/rest/spa_test.go`, `make web-test` |
+| Inbox UI | SPA fallback, `ui.enabled: false` 404, CSRF header, empty preview sandbox, no Relay/innerHTML, shell chips / unread badge, select marks read via `POST …:read`, relative timestamps, login/status/audit/reset interiors share inbox chrome (panel / primary / danger / empty-state) | `internal/web`, `internal/control/rest/spa_test.go`, `make web-test` |
 | Origin hatches | `"*"` / `"private"` / exact / loopback / `file://` / `Origin: null` / CGNAT deny; OPTIONS 403 with `"*"` (no ACAO); three-surface reset live-read (`/v1/health/live`, `/healthz`, `POST /mcp`); SPA hashed-JS asserting tests | `internal/auth/origin_test.go`, `internal/control/{rest,mcp,compat}/origin_test.go`, `spa_asset_origin_hatch_test.go`; `testdata/config/valid/origin-*.yaml` + `invalid/origin-*.yaml` |
 
 ## Required Make targets

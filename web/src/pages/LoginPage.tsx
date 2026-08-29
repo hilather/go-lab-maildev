@@ -54,8 +54,8 @@ export function LoginPage() {
 
   return (
     <main className="page page--narrow">
-      <h1>Sign in to LabMail</h1>
-      <p>
+      <h1 className="page-title">Sign in to LabMail</h1>
+      <p className="muted">
         Exchange a scoped API token or Basic password for an HttpOnly session cookie. Credentials
         are not written to web storage.
       </p>
@@ -64,9 +64,9 @@ export function LoginPage() {
           {error}
         </p>
       ) : null}
-      <form className="stack" onSubmit={(e) => void onSubmit(e)} noValidate>
+      <form className="panel stack" onSubmit={(e) => void onSubmit(e)} noValidate>
         <fieldset className="stack">
-          <legend>Sign in with</legend>
+          <legend className="section-label">Sign in with</legend>
           <label>
             <input
               type="radio"
@@ -113,7 +113,7 @@ export function LoginPage() {
             </div>
           </>
         )}
-        <button type="submit" disabled={busy}>
+        <button type="submit" className="primary" disabled={busy}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>

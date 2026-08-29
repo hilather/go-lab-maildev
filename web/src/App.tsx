@@ -108,7 +108,9 @@ function RequireSession() {
   if (state.status === "loading") {
     return (
       <main className="page">
-        <p role="status">Checking session…</p>
+        <p className="empty-state" role="status">
+          Checking session…
+        </p>
       </main>
     );
   }
@@ -123,7 +125,9 @@ function RedirectIfSignedIn() {
   if (state.status === "loading") {
     return (
       <main className="page">
-        <p role="status">Checking session…</p>
+        <p className="empty-state" role="status">
+          Checking session…
+        </p>
       </main>
     );
   }

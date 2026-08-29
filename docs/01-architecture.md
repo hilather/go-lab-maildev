@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-29 (inbox SPA dark split-pane + D19)
+Last reviewed: 2026-08-29 (remaining SPA interiors share inbox chrome)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0009
 
 ## Problem statement
@@ -149,7 +149,7 @@ Required for GA / 1.0 (D12, PR 12). The UI talks REST only. XSS/CSP/`cid:` rewri
 | Stack | React + TypeScript + Vite (Node 22.14.0), TacLab/LabLDAP pattern |
 | Embed | `internal/web` `go:embed` of `web/dist` (copy step; `web/` has its own `go.mod` if needed like TacLab) |
 | Auth | Login page: paste bearer **or** basic username/password. `POST /v1/session`. Cookie `labmail_session` + `X-LabMail-CSRF`. Cookie is REST-only. |
-| Pages | Split inbox on `/` (captured list + inspector: HTML / text / raw / headers), status (revisions, store stats), audit (if scoped), gated reset. Dark lab chrome: 56px header (live / receive-only chips), left rail with unread badge. |
+| Pages | Split inbox on `/` (captured list + inspector: HTML / text / raw / headers), status (revisions, store stats), audit (if scoped), gated reset, login (bearer or Basic). Dark lab chrome: 56px header (live / receive-only chips), left rail with unread badge. Status / audit / reset / login interiors use the same dark panel language (accent `#4aa384`, IBM Plex) as the inbox. |
 | Live update | `EventSource` `GET /v1/events/stream` (SSE) plus a 15s list watchdog while the stream is open. Exclusive fallback: 3s poll of `GET /v1/messages`. **No** maildev WebSocket. |
 | HTML preview | `<iframe src="/v1/messages/{id}/preview" sandbox>` — **no** `allow-scripts`, **no** `allow-same-origin`, **no** `allow-popups-to-escape-sandbox`. Not `srcdoc`. Never parent `innerHTML`. One-line sandbox note under the preview card. |
 | Mark-read | Display `GET /v1/messages/{id}` never sets `markRead`. Select issues `POST /v1/messages/{id}:read` with CSRF (`messages.read`, `mail.write`). |

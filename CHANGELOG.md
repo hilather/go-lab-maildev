@@ -6,6 +6,26 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Added
 
+- None.
+
+### Changed
+
+- None.
+
+### Fixed
+
+- None.
+
+### Removed or deprecated
+
+- None.
+
+## 1.0.0-rc.4
+
+Fourth candidate. Tag only on a green CI SHA via the Release `tag-gate`. Notes: [docs/releases/v1.0.0-rc.4.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.4.md). Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Receive-only; no Compose.
+
+### Added
+
 - `POST /v1/messages/{id}:read` / MCP `mail_message_read` (`messages.read`, `mail.write`) marks one message read without bumping `storeGeneration`. ADR 0009 / D19.
 
 ### Changed

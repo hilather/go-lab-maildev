@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
@@ -84,11 +85,13 @@ describe("InboxPage", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
 
     renderApp(
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route path="/" element={<InboxPage />} />
-        </Route>
-      </Routes>,
+      <StrictMode>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<InboxPage />} />
+          </Route>
+        </Routes>
+      </StrictMode>,
     );
 
     expect(await screen.findByText("App")).toBeInTheDocument();

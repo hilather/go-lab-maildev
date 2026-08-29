@@ -35,6 +35,7 @@ export function MessagePage({ messageId = "", embedded = false, onDeleted, onBec
   const id = messageId;
   const becameRead = useRef(onBecameRead);
   becameRead.current = onBecameRead;
+  const marked = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +52,8 @@ export function MessagePage({ messageId = "", embedded = false, onDeleted, onBec
         setMsg(next);
         setTab(next.hasHTML ? "html" : "text");
         setError("");
-        if (!next.read && canWrite) {
+        if (!next.read && canWrite && !marked.current.has(id)) {
+          marked.current.add(id);
           try {
             await markMessageRead(id);
             if (!cancelled) {
@@ -59,7 +61,7 @@ export function MessagePage({ messageId = "", embedded = false, onDeleted, onBec
               becameRead.current?.();
             }
           } catch {
-            // Inspector still shows the GET body; unread badge stays until retry.
+            marked.current.delete(id);
           }
         }
       } catch (err) {

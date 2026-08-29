@@ -2,8 +2,8 @@
 
 Status: Implemented (MCP-001)
 Owners: MCP, Application
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
-Related ADRs: 0004, 0006, 0008
+Last reviewed: 2026-08-29 (D19 mail_message_read)
+Related ADRs: 0004, 0006, 0008, 0009
 
 Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are frozen in [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Protocol pin: [docs/adr/0006-pin-mcp-protocol-versions.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md).
 
@@ -47,6 +47,7 @@ Resources mirror GET representations. Clients without resource support use the `
 | `mail_message_delete` | `messages.delete` | `mail.write` |
 | `mail_messages_clear` | `messages.clear` | `mail.write` |
 | `mail_messages_read_all` | `messages.read_all` | `mail.write` |
+| `mail_message_read` | `messages.read` | `mail.write` |
 | `mail_messages_wait` | `messages.wait` | `mail.read` |
 | `mail_message_extract` | `messages.extract` | `mail.read` |
 | `mail_attachment_get` | `attachments.get` | `mail.read` |

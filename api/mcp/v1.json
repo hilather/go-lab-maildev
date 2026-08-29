@@ -22,6 +22,7 @@
     "mail_message_delete",
     "mail_messages_clear",
     "mail_messages_read_all",
+    "mail_message_read",
     "mail_messages_wait",
     "mail_message_extract",
     "mail_attachment_get",
@@ -42,7 +43,8 @@
     "mail_change_apply",
     "mail_message_delete",
     "mail_messages_clear",
-    "mail_messages_read_all"
+    "mail_messages_read_all",
+    "mail_message_read"
   ],
   "healthNotTools": [
     "health.live",

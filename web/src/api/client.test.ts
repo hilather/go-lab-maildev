@@ -8,6 +8,7 @@ import {
   clearMemoryCSRF,
   createSession,
   listAllMessages,
+  markMessageRead,
   setMemoryCSRF,
 } from "./client";
 import { resetClientState } from "../test/render";
@@ -55,6 +56,22 @@ describe("API client", () => {
     if (!init) {
       throw new Error("expected fetch init");
     }
+    expect(new Headers(init.headers).get(CSRF_HEADER)).toBe("csrf-test");
+  });
+
+  it("sends CSRF on POST mark-read", async () => {
+    setMemoryCSRF("csrf-test");
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response(null, { status: 204 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await markMessageRead("01JTEST");
+    const init = fetchMock.mock.calls[0]?.[1];
+    if (!init) {
+      throw new Error("expected fetch init");
+    }
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("/v1/messages/01JTEST:read");
+    expect((init.method ?? "GET").toUpperCase()).toBe("POST");
     expect(new Headers(init.headers).get(CSRF_HEADER)).toBe("csrf-test");
   });
 

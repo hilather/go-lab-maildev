@@ -6,11 +6,11 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Added
 
-- None.
+- `POST /v1/messages/{id}:read` / MCP `mail_message_read` (`messages.read`, `mail.write`) marks one message read without bumping `storeGeneration`. ADR 0009 / D19.
 
 ### Changed
 
-- None.
+- Embedded inbox SPA is a dark split-pane operator chrome (header chips, left rail with unread badge, captured list + HTML inspector). Select marks read via the new POST, not `GET ?markRead=true`. Clear/delete use in-page confirms. Relative list timestamps.
 
 ### Fixed
 

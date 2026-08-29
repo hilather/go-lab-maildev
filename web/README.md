@@ -4,7 +4,7 @@ React + TypeScript + Vite (Node **22.14.0**). The UI talks REST only (`/v1`).
 
 Browser auth is `POST /v1/session` (bearer **or** Basic) → HttpOnly `labmail_session` + CSRF in the JSON body / `GET /v1/session` reload recovery. Mutations send `X-LabMail-CSRF`. The token is never written to `localStorage` or `sessionStorage`.
 
-Pages: sign-in, inbox list, message view (text / sandboxed HTML preview / headers / raw / attachments), status, scoped audit, gated reset. Live update uses `EventSource` `GET /v1/events/stream` with a 3s `GET /v1/messages` poll fallback.
+Pages: sign-in, split inbox on `/` (captured list + inspector: sandboxed HTML / text / raw / headers), status, scoped audit, gated reset. Dark lab chrome (header chips, left rail, unread badge). Selecting a message `GET`s it without `markRead` and then `POST /v1/messages/{id}:read` with CSRF. Live update uses `EventSource` `GET /v1/events/stream` with a 3s `GET /v1/messages` poll fallback.
 
 There is no Relay, send, outgoing settings, or compose.
 

@@ -150,7 +150,7 @@ func openAPIOperation(c capabilities.Capability, b capabilities.RESTBinding) map
 
 func optionalBody(id capabilities.ID) bool {
 	switch id {
-	case capabilities.StateReset, capabilities.MessagesReadAll:
+	case capabilities.StateReset, capabilities.MessagesReadAll, capabilities.MessagesRead:
 		return true
 	default:
 		return false

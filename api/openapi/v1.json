@@ -1025,6 +1025,54 @@
         ]
       }
     },
+    "/v1/messages/{id}:read": {
+      "post": {
+        "description": "Set one message read bit. Does not bump storeGeneration.",
+        "operationId": "post_v1_messages_id_read",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Mark message read"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "application/problem+json domain error"
+          }
+        },
+        "summary": "Mark message read",
+        "tags": [
+          "messages"
+        ],
+        "x-capability-id": "messages.read",
+        "x-idempotent": true,
+        "x-mutating": true,
+        "x-required-scopes": [
+          "mail.write"
+        ]
+      }
+    },
     "/v1/messages:read-all": {
       "post": {
         "description": "Set every read bit. Does not bump storeGeneration.",

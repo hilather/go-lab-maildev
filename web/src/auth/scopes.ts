@@ -14,6 +14,13 @@ export function formatAddress(name: string, address: string): string {
   return address || name || "(none)";
 }
 
+export function senderDisplay(name: string, address: string): string {
+  if (name.trim() !== "") {
+    return name;
+  }
+  return address || "(none)";
+}
+
 export function formatBytes(n: number): string {
   if (n < 1024) {
     return `${n} B`;

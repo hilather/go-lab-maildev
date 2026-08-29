@@ -156,6 +156,16 @@ func (s *Server) registerTools() {
 		}
 		return countJSON{Updated: n}, nil
 	})
+	addTool(s, "mail_message_read", messageReadDesc, true, true, func(ctx context.Context, actor app.Actor, in messageIDIn) (any, error) {
+		if in.ID == "" {
+			return nil, domainerr.ValidationFailed("id is required",
+				domainerr.FieldViolation{Path: "id", Code: "required", Message: "id is required"})
+		}
+		if err := s.svc.MarkRead(ctx, actor, in.ID); err != nil {
+			return nil, err
+		}
+		return map[string]any{"ok": true}, nil
+	})
 	addTool(s, "mail_messages_wait", messagesWaitDesc, false, true, func(ctx context.Context, actor app.Actor, in waitIn) (any, error) {
 		win, err := in.toWait()
 		if err != nil {
@@ -350,6 +360,7 @@ const (
 	messageDeleteDesc   = "State-changing. Delete one message by id."
 	messagesClearDesc   = "State-changing. Delete every message. Does not bump epoch."
 	messagesReadAllDesc = "State-changing. Set every read bit. Does not bump storeGeneration."
+	messageReadDesc     = "State-changing. Set one message read bit. Does not bump storeGeneration."
 	messagesWaitDesc    = "Read-only. Block until a matching message arrives or the timeout fires."
 	messageExtractDesc  = "Read-only. Extract URLs and OTP-like tokens using the frozen RE2 set."
 	attachmentGetDesc   = "Read-only. Download one attachment as base64."

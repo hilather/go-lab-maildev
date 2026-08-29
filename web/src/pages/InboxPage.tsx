@@ -1,30 +1,49 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { APIError, clearMessages, listAllMessages } from "../api/client";
 import type { Message } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
-import { SCOPE_WRITE, formatAddress } from "../auth/scopes";
-import { useInboxLive } from "../hooks/useInboxLive";
+import { SCOPE_WRITE, senderDisplay } from "../auth/scopes";
+import { useLive } from "../hooks/LiveProvider";
+import { ConfirmBar } from "../ui/ConfirmBar";
+import { formatRelativeReceived } from "../ui/relativeTime";
+import { MessagePage } from "./MessagePage";
+
+function matchesFilter(m: Message, q: string): boolean {
+  if (q === "") {
+    return true;
+  }
+  const needle = q.toLowerCase();
+  if (m.subject.toLowerCase().includes(needle)) {
+    return true;
+  }
+  if (m.envelope.from.toLowerCase().includes(needle)) {
+    return true;
+  }
+  return m.from.some((a) => a.name.toLowerCase().includes(needle) || a.address.toLowerCase().includes(needle));
+}
 
 export function InboxPage() {
   const { hasScope } = useAuth();
   const canWrite = hasScope(SCOPE_WRITE);
+  const { subscribeRefresh, decrementUnread } = useLive();
+  const [params, setParams] = useSearchParams();
+  const selectedId = params.get("id") ?? "";
   const [items, setItems] = useState<Message[]>([]);
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
-  const [generation, setGeneration] = useState<number | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
   const refreshSeq = useRef(0);
 
   const refresh = useCallback(() => {
     const seq = ++refreshSeq.current;
     void (async () => {
       try {
-        const list = await listAllMessages(filter === "" ? {} : { subjectContains: filter });
+        const list = await listAllMessages();
         if (seq !== refreshSeq.current) {
           return;
         }
         setItems(list.items);
-        setGeneration(list.storeGeneration);
         setError("");
       } catch (err) {
         if (seq !== refreshSeq.current) {
@@ -33,81 +52,131 @@ export function InboxPage() {
         setError(err instanceof APIError ? err.message : "Could not load inbox.");
       }
     })();
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  const mode = useInboxLive(refresh, true);
+  useEffect(() => subscribeRefresh(refresh), [subscribeRefresh, refresh]);
+
+  const visible = useMemo(() => items.filter((m) => matchesFilter(m, filter)), [items, filter]);
+
+  function select(id: string) {
+    const next = new URLSearchParams(params);
+    next.set("id", id);
+    setParams(next, { replace: true });
+  }
+
+  function clearSelection() {
+    const next = new URLSearchParams(params);
+    next.delete("id");
+    setParams(next, { replace: true });
+  }
 
   async function onClear() {
-    if (!window.confirm("Delete every captured message?")) {
-      return;
-    }
     try {
       await clearMessages();
+      setConfirmClear(false);
+      clearSelection();
       refresh();
     } catch (err) {
       setError(err instanceof APIError ? err.message : "Clear failed.");
     }
   }
 
+  function onBecameRead(id: string) {
+    setItems((cur) => cur.map((m) => (m.id === id ? { ...m, read: true } : m)));
+    decrementUnread();
+  }
+
   return (
-    <main className="page">
-      <h1>Inbox</h1>
-      <p className="muted">
-        Live update: {mode === "sse" ? "event stream" : mode === "poll" ? "3s poll fallback" : "connecting…"}.
-        {generation !== null ? ` Store generation ${generation}.` : ""}
-      </p>
-      {error !== "" ? (
-        <p className="banner-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <form
-        className="row"
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          const fd = new FormData(ev.currentTarget);
-          setFilter(String(fd.get("q") ?? "").trim());
-        }}
-      >
-        <div className="field">
-          <label htmlFor="inbox-filter">Subject contains</label>
-          <input id="inbox-filter" name="q" defaultValue={filter} />
+    <div className="inbox">
+      <section className="captured" aria-label="Captured messages">
+        <div className="captured__head">
+          <h1 className="captured__title">Captured</h1>
         </div>
-        <button type="submit">Filter</button>
-        {canWrite ? (
-          <button type="button" onClick={() => void onClear()}>
-            Clear inbox
-          </button>
+        <label className="sr-only" htmlFor="inbox-filter">
+          Filter subject or from
+        </label>
+        <input
+          id="inbox-filter"
+          className="captured__search"
+          placeholder="Filter subject or from"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        {error !== "" ? (
+          <p className="banner-error" role="alert">
+            {error}
+          </p>
         ) : null}
-      </form>
-      {items.length === 0 ? (
-        <p>No messages.</p>
-      ) : (
-        <>
-          <p className="muted">Showing {items.length} messages.</p>
+        {canWrite ? (
+          confirmClear ? (
+            <ConfirmBar
+              title="Delete every captured message?"
+              confirmLabel="Clear inbox"
+              danger
+              onConfirm={() => void onClear()}
+              onCancel={() => setConfirmClear(false)}
+            />
+          ) : (
+            <div className="captured__tools">
+              <button type="button" className="btn-ghost" onClick={() => setConfirmClear(true)}>
+                Clear inbox
+              </button>
+            </div>
+          )
+        ) : null}
+        {visible.length === 0 ? (
+          <p className="captured__empty">No messages.</p>
+        ) : (
           <ul className="mail-list">
-            {items.map((m) => (
-              <li key={m.id}>
-                <Link to={`/messages/${encodeURIComponent(m.id)}`}>
-                  <span className="unread-dot" data-read={m.read ? "true" : "false"} aria-hidden="true" />
-                  <span>
-                    <span className="subject">{m.subject || "(no subject)"}</span>
-                    <span className="muted">
-                      {" "}
-                      {m.from.map((a) => formatAddress(a.name, a.address)).join(", ") || m.envelope.from}
+            {visible.map((m) => {
+              const from = m.from[0];
+              const sender = from ? senderDisplay(from.name, from.address) : senderDisplay("", m.envelope.from);
+              const selected = m.id === selectedId;
+              const att = m.attachments.length;
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    className={selected ? "mail-row mail-row--selected" : "mail-row"}
+                    data-read={m.read ? "true" : "false"}
+                    onClick={() => select(m.id)}
+                  >
+                    <span className="unread-dot" data-read={m.read ? "true" : "false"} aria-hidden="true" />
+                    <span className="mail-row__body">
+                      <span className="mail-row__top">
+                        <span className="mail-row__from">{sender}</span>
+                        <time dateTime={m.receivedAt}>{formatRelativeReceived(m.receivedAt)}</time>
+                      </span>
+                      <span className="mail-row__subject">{m.subject || "(no subject)"}</span>
+                      {att > 0 ? (
+                        <span className="mail-row__hint">
+                          {att} attachment{att === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
                     </span>
-                  </span>
-                  <time dateTime={m.receivedAt}>{m.receivedAt}</time>
-                </Link>
-              </li>
-            ))}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
-        </>
-      )}
-    </main>
+        )}
+      </section>
+      <section className="inspector" aria-label="Message">
+        {selectedId === "" ? (
+          <p className="inspector__empty">Select a captured message.</p>
+        ) : (
+          <MessagePage
+            messageId={selectedId}
+            embedded
+            onDeleted={clearSelection}
+            onBecameRead={() => onBecameRead(selectedId)}
+          />
+        )}
+      </section>
+    </div>
   );
 }

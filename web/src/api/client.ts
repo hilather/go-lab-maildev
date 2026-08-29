@@ -198,6 +198,13 @@ export function attachmentURL(id: string, attId: string): string {
   return `/v1/messages/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attId)}`;
 }
 
+export async function markMessageRead(id: string): Promise<void> {
+  const resp = await apiFetch(`/v1/messages/${encodeURIComponent(id)}:read`, { method: "POST" });
+  if (resp.status !== 204) {
+    await readJSON<unknown>(resp);
+  }
+}
+
 export async function deleteMessage(id: string): Promise<void> {
   const resp = await apiFetch(`/v1/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (resp.status !== 204) {

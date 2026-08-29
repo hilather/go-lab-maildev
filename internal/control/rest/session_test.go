@@ -106,7 +106,17 @@ func TestSessionCookieAndCSRF(t *testing.T) {
 		t.Fatalf("GET /v1/session must return csrf for cookie recovery: %s", grec.Body.String())
 	}
 
-	insertMail(t, svc, "sess", "x")
+	id := insertMail(t, svc, "sess", "x")
+	mark := httptestReq(http.MethodPost, "/v1/messages/"+id+":read", "")
+	mark.AddCookie(&http.Cookie{Name: auth.CookieName, Value: cookie})
+	mrec := doRaw(h, mark)
+	requireProblem(t, mrec, http.StatusForbidden, "forbidden")
+	mark = httptestReq(http.MethodPost, "/v1/messages/"+id+":read", "")
+	mark.AddCookie(&http.Cookie{Name: auth.CookieName, Value: cookie})
+	mark.Header.Set(auth.CSRFHeader, csrf)
+	mrec = doRaw(h, mark)
+	requireStatus(t, mrec, http.StatusNoContent)
+
 	// Cookie mutation without CSRF is 403.
 	del := httptestReq(http.MethodDelete, "/v1/messages", "")
 	del.AddCookie(&http.Cookie{Name: auth.CookieName, Value: cookie})
@@ -322,4 +332,35 @@ func TestApplyRoleDemotionClearsSessions(t *testing.T) {
 	if decodeJSON(t, brec)["role"] != model.RoleViewer {
 		t.Fatalf("bearer after demotion=%s", brec.Body.String())
 	}
+}
+
+func TestMarkReadForbiddenForViewer(t *testing.T) {
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte(testBearerToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer\n      tokens:\n        - id: viewer\n          secretFile: " + tok + "\n          role: viewer\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc, err := app.Boot(t.Context(), app.Options{BootstrapPath: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(svc.Close)
+	v, err := auth.FromSpec(svc.Active().Canonical.Spec.Management.Auth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(Config{Service: svc, Auth: v, RatePerSec: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := insertMail(t, svc, "viewer-unread", "x")
+	req := httptestReq(http.MethodPost, "/v1/messages/"+id+":read", "")
+	req.Header.Set("Authorization", "Bearer "+testBearerToken)
+	got := doRaw(s.Handler(), req)
+	requireProblem(t, got, http.StatusForbidden, "forbidden")
 }

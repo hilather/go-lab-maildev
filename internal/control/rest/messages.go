@@ -227,6 +227,15 @@ func parseStoreGeneration(raw string) (uint64, error) {
 	return n, nil
 }
 
+func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request, instance string, ctx context.Context, actor app.Actor, id string) {
+	if err := s.svc.MarkRead(ctx, actor, id); err != nil {
+		s.writeProblem(w, r, instance, asDomain(err))
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+	_ = r
+}
+
 func (s *Server) handleReadAll(w http.ResponseWriter, r *http.Request, instance string, ctx context.Context, actor app.Actor) {
 	n, err := s.svc.MarkAllRead(ctx, actor)
 	if err != nil {

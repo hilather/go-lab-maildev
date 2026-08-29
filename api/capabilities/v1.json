@@ -619,6 +619,31 @@
       ]
     },
     {
+      "id": "messages.read",
+      "title": "Mark message read",
+      "version": "v1",
+      "description": "Set one message read bit. Does not bump storeGeneration.",
+      "requiredScopes": [
+        "mail.write"
+      ],
+      "mutating": true,
+      "idempotent": true,
+      "rest": [
+        {
+          "method": "POST",
+          "path": "/v1/messages/{id}:read"
+        }
+      ],
+      "mcp": {
+        "tools": [
+          "mail_message_read"
+        ]
+      },
+      "serviceMethods": [
+        "MarkRead"
+      ]
+    },
+    {
       "id": "messages.wait",
       "title": "Wait for message",
       "version": "v1",

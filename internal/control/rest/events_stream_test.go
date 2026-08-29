@@ -74,6 +74,9 @@ func TestEventsStream(t *testing.T) {
 		}
 	}()
 
+	// Insert immediately after headers: the subscriber must already be
+	// registered (subscribe-before-flush). A 2s wait is not a retry of
+	// a missed event — mail.received is not replayed.
 	id := insertMail(t, svc, "sse-sub", "body")
 	got := waitFrame(t, frames, app.InboxMailReceived)
 	if got.data["id"] != id || got.data["storeGeneration"] == nil {

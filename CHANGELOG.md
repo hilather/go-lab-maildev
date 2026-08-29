@@ -14,7 +14,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
-- None.
+- `GET /v1/events/stream` registers the inbox subscriber before flushing HTTP 200 so `mail.received` cannot be lost between header receipt and subscribe (events are not replayed).
 
 ### Removed or deprecated
 

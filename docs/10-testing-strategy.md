@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-29 (inbox SPA shell / mark-read tests)
+Last reviewed: 2026-08-29 (SSE subscribe-before-flush)
 Related ADRs: 0002, 0004, 0008, 0009
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -14,7 +14,7 @@ Every area has regressions. A bug fix starts with a failing test. CI has no opti
 | Unit | config decode/unknown fields/reserved names/byte sizes; store caps/wipe/wait/race; auth scopes; domainerr mapping; extract regex; OpenMetrics labels/health | `internal/*` |
 | SMTP protocol | 3a: greeting–DATA, SIZE, limits, 452/451 epoch; 3b: AUTH LOGIN/PLAIN transcripts, STARTTLS optional/required + handshake | `internal/smtp/server` with `internal/smtptest`; transcripts in `testdata/smtp` |
 | MIME | multipart/alternative, attachments, base64, quoted-printable, broken MIME still stored | `internal/mimeparse` + `testdata/mime` |
-| REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json | `internal/control/rest` |
+| REST contract | OpenAPI, auth 401, list/get/delete/clear/wait/extract, problem+json. `TestEventsStream` inserts as soon as SSE headers return (subscribe-before-flush; events are not replayed) | `internal/control/rest` |
 | Compat | Array + relay 403 + `/healthz` + `testdata/compat` goldens. `TestMaildevScenarioCompat` (401 + Basic + subject + SendMail). `TestSideBySideMaildev221` (`cmd/labmail`) sends the same `net/smtp.SendMail` + `/email` + `/healthz` probe to LabMail `serve` and, when Docker works, `maildev/maildev:2.2.1` | `internal/control/compat`, `internal/compatcheck`, `cmd/labmail` |
 | MCP | 2026-07-28 initialize, tools/list, tool call, origin, bearer | `internal/control/mcp` |
 | Parity | every `PARITY_REQUIRED` capability: same input types, scopes, errors, side effects | `internal/capabilities` + rest/mcp tests (`make test-parity`) |

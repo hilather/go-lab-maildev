@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-29 (D19 messages.read)
+Last reviewed: 2026-08-29 (SSE subscribe-before-flush)
 Related ADRs: 0004, 0005, 0007, 0008, 0009
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
@@ -167,7 +167,7 @@ event: store.wiped
 data: {"storeGeneration":21}
 ```
 
-Heartbeat comment every 15s. MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
+Heartbeat comment every 15s. The handler registers the store subscriber **before** writing and flushing the 200 so a client that observes an open stream cannot miss a later insert (events are not replayed). MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
 
 ## Preview
 

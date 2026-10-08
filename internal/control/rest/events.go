@@ -3,7 +3,6 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
@@ -19,17 +18,12 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, instance s
 		s.writeProblem(w, r, instance, asDomain(errStreaming))
 		return
 	}
-	// Recheck only a stream whose actor came from this live cookie. Bearer
-	// and dev-loopback (including a stale cookie that missed at connect)
-	// leave cookieValue empty and are not tied to a session row.
-	var cookieValue string
-	if s.cfg.Auth != nil && s.cfg.Sessions != nil && strings.TrimSpace(r.Header.Get("Authorization")) == "" {
-		if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" {
-			if _, hit := s.cfg.Sessions.View(c.Value); hit {
-				cookieValue = c.Value
-			}
-		}
-	}
+	// Recheck the cookie Lookup stored when it authorized this request.
+	// Do not View again here: a delete between Lookup and this function
+	// would miss and leave the stream unbound. Bearer and a stale cookie
+	// that missed at Lookup never set the value, so those streams stay
+	// unbound (including dev-loopback).
+	cookieValue := authCookieFrom(r.Context())
 	// Register fan-out before the client observes 200. Events are not
 	// replayed; TestEventsStream inserts as soon as Do returns.
 	ch, cancel := s.svc.Subscribe(r.Context(), actor, 32)

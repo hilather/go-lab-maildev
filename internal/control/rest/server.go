@@ -119,6 +119,9 @@ type Server struct {
 	logger       *observability.Logger
 	sseHeartbeat time.Duration
 	mounts       *http.ServeMux
+	// afterAuthenticate runs after a successful authenticate and before
+	// authorize. Tests delete the cookie session in that gap. Nil in production.
+	afterAuthenticate func()
 
 	cursorMu  sync.Mutex
 	cursorKey []byte
@@ -380,10 +383,13 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	actor, err := s.authenticate(r, isHealthCap(rt.cap))
+	r, actor, err := s.authenticate(r, isHealthCap(rt.cap))
 	if err != nil {
 		s.writeProblem(w, r, instance, err)
 		return
+	}
+	if s.afterAuthenticate != nil {
+		s.afterAuthenticate()
 	}
 	if err := s.authorize(r, actor, rt.cap); err != nil {
 		s.writeProblem(w, r, instance, err)

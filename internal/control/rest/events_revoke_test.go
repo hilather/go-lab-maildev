@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -119,6 +120,92 @@ func TestSSEStopsWhenSessionRevoked(t *testing.T) {
 			}
 		case <-deadline:
 			return
+		}
+	}
+}
+
+// TestEventsStreamClosesWhenSessionDeletedAfterLookup: Lookup authorizes the
+// cookie, then the session is removed before handleEvents chooses whether to
+// recheck. No mail.received is delivered and the stream ends.
+func TestEventsStreamClosesWhenSessionDeletedAfterLookup(t *testing.T) {
+	s, svc, _ := newAuthServer(t)
+	s.sseHeartbeat = 20 * time.Millisecond
+	var drop atomic.Value
+	s.afterAuthenticate = func() {
+		v, _ := drop.Load().(string)
+		if v == "" {
+			return
+		}
+		drop.Store("")
+		s.cfg.Sessions.Delete(v)
+	}
+	t.Cleanup(func() { s.afterAuthenticate = nil })
+
+	ts := httptest.NewServer(s.Handler())
+	t.Cleanup(ts.Close)
+
+	loginReq, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/session", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loginReq.Header.Set("Authorization", "Bearer "+testBearerToken)
+	loginRes, err := http.DefaultClient.Do(loginReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loginBody, _ := io.ReadAll(loginRes.Body)
+	_ = loginRes.Body.Close()
+	if loginRes.StatusCode != http.StatusOK {
+		t.Fatalf("login status=%d body=%s", loginRes.StatusCode, loginBody)
+	}
+	var cookie *http.Cookie
+	for _, c := range loginRes.Cookies() {
+		if c.Name == auth.CookieName {
+			cookie = c
+		}
+	}
+	if cookie == nil || cookie.Value == "" {
+		t.Fatal("missing session cookie")
+	}
+	drop.Store(cookie.Value)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	streamReq, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/v1/events/stream", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	streamReq.AddCookie(cookie)
+	streamRes, err := http.DefaultClient.Do(streamReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = streamRes.Body.Close() }()
+	if streamRes.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(streamRes.Body)
+		t.Fatalf("stream status=%d body=%s", streamRes.StatusCode, b)
+	}
+	frames, _, done := readSSE(streamRes.Body)
+	insertMail(t, svc, "after-lookup-gap", "secret subject")
+
+	deadline := time.After(750 * time.Millisecond)
+	for {
+		select {
+		case ev := <-frames:
+			if ev.event == app.InboxMailReceived {
+				t.Fatal("session deleted after Lookup still received mail.received")
+			}
+		case <-done:
+			select {
+			case ev := <-frames:
+				if ev.event == app.InboxMailReceived {
+					t.Fatal("session deleted after Lookup still received mail.received")
+				}
+			default:
+			}
+			return
+		case <-deadline:
+			t.Fatal("stream stayed open after the authorizing cookie's session was deleted")
 		}
 	}
 }

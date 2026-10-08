@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"strings"
@@ -13,6 +14,16 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/config"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
+
+// authCookieKey is the cookie value Lookup accepted for this request.
+// handleEvents rechecks that value. A miss closes the stream. Bearer and a
+// stale cookie that missed at Lookup do not set it.
+type authCookieKey struct{}
+
+func authCookieFrom(ctx context.Context) string {
+	v, _ := ctx.Value(authCookieKey{}).(string)
+	return v
+}
 
 func actorOf(p auth.Principal, transport string) app.Actor {
 	return app.Actor{
@@ -41,12 +52,12 @@ func stubActor(r *http.Request) app.Actor {
 	return actor
 }
 
-func (s *Server) authenticate(r *http.Request, skip bool) (app.Actor, error) {
+func (s *Server) authenticate(r *http.Request, skip bool) (*http.Request, app.Actor, error) {
 	if skip {
-		return app.Actor{ID: "probe", Class: "startup", Transport: "rest"}, nil
+		return r, app.Actor{ID: "probe", Class: "startup", Transport: "rest"}, nil
 	}
 	if s.cfg.Auth == nil {
-		return stubActor(r), nil
+		return r, stubActor(r), nil
 	}
 
 	hdr := strings.TrimSpace(r.Header.Get("Authorization"))
@@ -57,24 +68,28 @@ func (s *Server) authenticate(r *http.Request, skip bool) (app.Actor, error) {
 			AllowBasic:    s.cfg.Auth.BasicEnabled(),
 		})
 		if err != nil {
-			return app.Actor{}, err
+			return r, app.Actor{}, err
 		}
-		return actorOf(p, "rest"), nil
+		return r, actorOf(p, "rest"), nil
 	}
 
 	if c, err := r.Cookie(auth.CookieName); err == nil && c.Value != "" && s.cfg.Sessions != nil {
 		sess, _, ok := s.cfg.Sessions.Lookup(c.Value)
 		if ok {
-			return actorOf(auth.PrincipalFromSession(sess), "rest"), nil
+			// Bind the stream to this cookie now. A later View in handleEvents
+			// can miss if the session is deleted in between, and that miss
+			// must close the stream rather than leave it unbound.
+			r = r.WithContext(context.WithValue(r.Context(), authCookieKey{}, c.Value))
+			return r, actorOf(auth.PrincipalFromSession(sess), "rest"), nil
 		}
 		// Stale/unknown cookie must not block dev-loopback-unauth.
 	}
 
 	p, err := s.cfg.Auth.Authenticate(auth.Request{RemoteAddr: r.RemoteAddr})
 	if err != nil {
-		return app.Actor{}, err
+		return r, app.Actor{}, err
 	}
-	return actorOf(p, "rest"), nil
+	return r, actorOf(p, "rest"), nil
 }
 
 func (s *Server) authorize(r *http.Request, actor app.Actor, cap capabilities.Capability) error {

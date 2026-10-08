@@ -18,6 +18,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 - `labmail mcp-stdio` no longer keeps the startup administrator after that token is demoted or removed. The startup secret is authenticated again; if it does not match, the process actor is dropped.
 - `GET /v1/events/stream` stops delivering mailbox events, including subject, after that cookie session is deleted or loses `mail.read`.
 - REST plan/apply rejects case-variant bare durations and byte sizes (`GreetingDelay`, `MaxBytes`) the same way as the canonical spelling. REST JSON request bodies reject unknown fields. Bodies that used to apply with extra JSON fields or a case-variant bare number now return `validation_failed`.
+- MCP `mail_change_plan`, `mail_change_apply`, and `mail_state_validate` accept duration and byte-size strings and reject bare numbers, same as REST.
 
 ### Removed or deprecated
 

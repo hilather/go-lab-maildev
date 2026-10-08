@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Architecture, SMTP, Control Plane
-Last reviewed: 2026-08-29 (v1.0.0-rc.4 notes pointer)
+Last reviewed: 2026-10-07 (jsonschema-go direct dependency)
 Related ADRs: 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0009
 
 ## Problem statement
@@ -238,6 +238,7 @@ internal/audit            ring
 | `github.com/modelcontextprotocol/go-sdk v1.7.0` | Family MCP |
 | `github.com/emersion/go-message` | MIME adapter only |
 | `github.com/oklog/ulid/v2` | Crockford ULID message ids (MIT) |
+| `github.com/google/jsonschema-go v0.4.3` | MCP tool input schema inference (MIT; already required transitively by go-sdk) |
 
 No Prometheus client (`github.com/prometheus/*` forbidden, LabDNS `import_test.go` style). Metrics are **hand-rolled OpenMetrics** text in `internal/observability`. No other SMTP/MIME/HTTP frameworks. Prefer `net/http`, `log/slog`, `crypto/tls`. New deps need a PR justification and license check (Apache-2.0 compatible).
 

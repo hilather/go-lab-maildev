@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/hilather/go-lab-maildev/internal/app"
 	"github.com/hilather/go-lab-maildev/internal/buildinfo"
 	"github.com/hilather/go-lab-maildev/internal/capabilities"
@@ -48,7 +49,7 @@ func (s *Server) registerTools() {
 		}
 		return fromStateView(v)
 	})
-	addTool(s, "mail_state_validate", validateDesc, false, true, func(ctx context.Context, actor app.Actor, in validateIn) (any, error) {
+	addToolSchema(s, "mail_state_validate", validateDesc, false, true, validateToolInputSchema, func(ctx context.Context, actor app.Actor, in validateIn) (any, error) {
 		vin, err := in.toValidate()
 		if err != nil {
 			return nil, asDomain(err)
@@ -59,15 +60,23 @@ func (s *Server) registerTools() {
 		}
 		return fromPlan(p), nil
 	})
-	addTool(s, "mail_change_plan", planDesc, false, true, func(ctx context.Context, actor app.Actor, in changeIn) (any, error) {
-		p, err := s.svc.Plan(ctx, actor, in.toChange())
+	addToolSchema(s, "mail_change_plan", planDesc, false, true, changeToolInputSchema, func(ctx context.Context, actor app.Actor, in changeIn) (any, error) {
+		ch, err := in.toChange()
+		if err != nil {
+			return nil, asDomain(err)
+		}
+		p, err := s.svc.Plan(ctx, actor, ch)
 		if err != nil {
 			return nil, err
 		}
 		return fromPlan(p), nil
 	})
-	addTool(s, "mail_change_apply", applyDesc, true, true, func(ctx context.Context, actor app.Actor, in changeIn) (any, error) {
-		r, err := s.svc.Apply(ctx, actor, in.toChange())
+	addToolSchema(s, "mail_change_apply", applyDesc, true, true, changeToolInputSchema, func(ctx context.Context, actor app.Actor, in changeIn) (any, error) {
+		ch, err := in.toChange()
+		if err != nil {
+			return nil, asDomain(err)
+		}
+		r, err := s.svc.Apply(ctx, actor, ch)
 		if err != nil {
 			return nil, err
 		}
@@ -292,6 +301,10 @@ func (s *Server) listMessages(ctx context.Context, actor app.Actor, in listIn) (
 }
 
 func addTool[In any](s *Server, name, desc string, mutating, idempotent bool, h func(context.Context, app.Actor, In) (any, error)) {
+	addToolSchema(s, name, desc, mutating, idempotent, nil, h)
+}
+
+func addToolSchema[In any](s *Server, name, desc string, mutating, idempotent bool, schema *jsonschema.Schema, h func(context.Context, app.Actor, In) (any, error)) {
 	caps := capabilities.LookupTool(name)
 	title := name
 	if len(caps) > 0 && caps[0].Title != "" {
@@ -308,12 +321,16 @@ func addTool[In any](s *Server, name, desc string, mutating, idempotent bool, h 
 		DestructiveHint: boolPtr(mutating && !idempotent),
 		OpenWorldHint:   boolPtr(false),
 	}
-	sdk.AddTool(s.sdk, &sdk.Tool{
+	tool := &sdk.Tool{
 		Name:        name,
 		Title:       title,
 		Description: desc,
 		Annotations: ann,
-	}, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
+	}
+	if schema != nil {
+		tool.InputSchema = schema
+	}
+	sdk.AddTool(s.sdk, tool, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
 		if err := ctx.Err(); err != nil {
 			return toolErrorResult(canceledError(err)), nil, nil
 		}

@@ -104,7 +104,7 @@ The numbered pack is the source of truth after FND-001. Do not invent paths, typ
 
 - Prefer the Go standard library and small, well-maintained libraries.
 - Pin direct dependencies and review transitive changes.
-- Allowed 1.0 direct deps: `gopkg.in/yaml.v3`, `github.com/modelcontextprotocol/go-sdk v1.7.0`, `github.com/emersion/go-message` (MIME adapter only), `github.com/oklog/ulid/v2`.
+- Allowed 1.0 direct deps: `gopkg.in/yaml.v3`, `github.com/modelcontextprotocol/go-sdk v1.7.0`, `github.com/emersion/go-message` (MIME adapter only), `github.com/oklog/ulid/v2`, `github.com/google/jsonschema-go v0.4.3` (MCP tool input schema inference; MIT; already required transitively by go-sdk).
 - No Prometheus client (`github.com/prometheus/*` forbidden). Metrics are hand-rolled OpenMetrics.
 - No SMTP/MIME/HTTP frameworks beyond the allowlist. New deps need a PR justification and license check (Apache-2.0 compatible).
 

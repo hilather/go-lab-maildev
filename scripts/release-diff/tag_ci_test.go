@@ -169,7 +169,7 @@ func TestFetchSelectsTagPushCIRun(t *testing.T) {
 			if r.URL.Query().Get("head_sha") != sha || r.URL.Query().Get("event") != "push" || r.URL.Query().Get("per_page") != "100" {
 				t.Errorf("runs query %s", r.URL.RawQuery)
 			}
-			fmt.Fprintf(w, `{"workflow_runs":[
+			_, _ = fmt.Fprintf(w, `{"workflow_runs":[
 				{"id":1,"path":".github/workflows/ci.yml","event":"pull_request","head_sha":%q,"head_branch":"feature","status":"completed","conclusion":"success","created_at":"2026-10-01T00:00:00Z"},
 				{"id":2,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":"main","status":"completed","conclusion":"success","created_at":"2026-10-02T00:00:00Z"},
 				{"id":9,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":"","status":"completed","conclusion":"success","created_at":"2026-10-03T00:00:00Z"},
@@ -209,7 +209,7 @@ func TestFetchRejectsNonTagRuns(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, `{"workflow_runs":[
+		_, _ = fmt.Fprintf(w, `{"workflow_runs":[
 			{"id":1,"path":".github/workflows/ci.yml","event":"pull_request","head_sha":%q,"head_branch":"feature","status":"completed","conclusion":"success","created_at":"2026-10-01T00:00:00Z"},
 			{"id":2,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":"main","status":"completed","conclusion":"success","created_at":"2026-10-02T00:00:00Z"}
 		]}`, sha, sha)
@@ -235,7 +235,7 @@ func TestFetchPendingAndTerminal(t *testing.T) {
 			if strings.HasSuffix(r.URL.Path, "/jobs") {
 				jobs++
 			}
-			fmt.Fprintf(w, `{"workflow_runs":[{"id":7,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":%q,"status":"in_progress","conclusion":"","created_at":"2026-10-04T00:00:00Z"}]}`, sha, tag)
+			_, _ = fmt.Fprintf(w, `{"workflow_runs":[{"id":7,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":%q,"status":"in_progress","conclusion":"","created_at":"2026-10-04T00:00:00Z"}]}`, sha, tag)
 		}))
 		t.Cleanup(srv.Close)
 		withGitHubAPI(t, srv.URL)
@@ -253,13 +253,13 @@ func TestFetchPendingAndTerminal(t *testing.T) {
 			assertGitHubHeaders(t, r, token)
 			switch r.URL.Path {
 			case "/repos/hilather/go-lab-maildev/actions/runs":
-				fmt.Fprintf(w, `{"workflow_runs":[
+				_, _ = fmt.Fprintf(w, `{"workflow_runs":[
 					{"id":10,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":%q,"status":"completed","conclusion":"success","created_at":"2026-10-01T00:00:00Z"},
 					{"id":11,"path":".github/workflows/ci.yml","event":"push","head_sha":%q,"head_branch":%q,"status":"completed","conclusion":"failure","created_at":"2026-10-02T00:00:00Z"}
 				]}`, sha, tag, sha, tag)
 			case "/repos/hilather/go-lab-maildev/actions/runs/11/jobs":
 				jobsFor = append(jobsFor, "11")
-				fmt.Fprintf(w, `{"jobs":[{"name":"unit","status":"completed","conclusion":"failure","completed_at":"2026-10-02T00:05:00Z","head_sha":%q}]}`, sha)
+				_, _ = fmt.Fprintf(w, `{"jobs":[{"name":"unit","status":"completed","conclusion":"failure","completed_at":"2026-10-02T00:05:00Z","head_sha":%q}]}`, sha)
 			default:
 				http.NotFound(w, r)
 			}

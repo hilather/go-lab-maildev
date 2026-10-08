@@ -227,6 +227,18 @@ func (s *App) Subscribe(ctx context.Context, actor Actor, buffer int) (<-chan In
 	}
 }
 
+// OnAuthPreflight registers a check run inside Reset, under s.mu, after the
+// bootstrap candidate compiles and before the inbox wipe or snapshot swap.
+// The registrar takes s.mu and must not be called from resetLocked.
+func (s *App) OnAuthPreflight(fn func(model.MgmtAuthSpec) error) {
+	if s == nil || fn == nil {
+		return
+	}
+	s.mu.Lock()
+	s.authPreflight = append(s.authPreflight, fn)
+	s.mu.Unlock()
+}
+
 // OnReset registers a hook invoked after a successful Reset (cursor rotation).
 func (s *App) OnReset(fn func()) {
 	if s == nil || fn == nil {

@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Integration, Platform
-Last reviewed: 2026-08-18 (SWAP-001 review + management TLS)
+Last reviewed: 2026-10-08 (LoadFile stays lenient; runtime compile reads secrets)
 Related ADRs: 0005, 0006, 0007
 
 This document is the bill of materials for replacing `maildev/maildev:2.2.1` in `mcp-integration-lab` with LabMail. SWAP-001 lands the overlay in **this** repo. The compose/image pin change is a follow-up in that repo after `v1.0.0-rc.1`. DEP-001 image files are stacked later and are not required here.
@@ -263,7 +263,7 @@ Design assigned `examples/labmail.yaml` to **both** SWAP-001 (this lab overlay: 
 On stack:
 
 - Keep **this** file as the lab overlay (copy target `profiles/default/labmail/bootstrap.yaml`).
-- DEP-001 must **not** mount this file as the compose-smoke config unless `test-container.sh` mints `labmail-token` + `maildev-web-password` at 0o644 and compose mounts them. `LoadFile` succeeds without those files; `labmail serve` / `FromSpec` does not. DEP-001 `TestExampleAndContainerYAML` only `LoadFile`s and will not catch that serve failure.
+- DEP-001 must **not** mount this file as the compose-smoke config unless `test-container.sh` mints `labmail-token` + `maildev-web-password` at 0o644 and compose mounts them. `LoadFile` and `labmail validate` succeed without those files. Runtime compile (`labmail serve`, reset, and `POST /v1/state:validate`) and `FromSpec` do not. DEP-001 `TestExampleAndContainerYAML` only `LoadFile`s and will not catch that serve failure.
 - Preferred split: move the lab overlay to `examples/labmail/bootstrap.yaml` and leave `examples/labmail.yaml` for DEP-001 smoke. Do that on the stack PR, not by inventing a second schema here.
 
 ## SWAP-001 checklist (in this repo)

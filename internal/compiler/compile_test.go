@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,57 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
 )
+
+func TestValidateMissingSecretFile(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing.token")
+	doc := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer\n      tokens:\n        - id: admin\n          secretFile: " + missing + "\n          role: administrator\n"
+	st, err := config.Load([]byte(doc))
+	if err != nil {
+		t.Fatalf("Load of an absent secretFile must still succeed: %v", err)
+	}
+	_, err = Compile(context.Background(), st, CompileOpts{})
+	de, ok := domainerr.As(err)
+	if !ok || de.Code != domainerr.CodeValidationFailed {
+		t.Fatalf("compile err=%v want validation_failed", err)
+	}
+	if !authFileViolation(de, "spec.management.auth.tokens[0].secretFile", "unresolved_reference", missing) {
+		t.Fatalf("violations=%+v want unresolved secretFile %s", de.FieldViolations, missing)
+	}
+}
+
+func TestValidateMissingPasswordFile(t *testing.T) {
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte("0123456789abcdef0123456789abcdef\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(dir, "missing.pass")
+	doc := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n      basic:\n        username: admin\n        passwordFile: " + missing + "\n        tokenRef: admin\n"
+	st, err := config.Load([]byte(doc))
+	if err != nil {
+		t.Fatalf("Load of an absent passwordFile must still succeed: %v", err)
+	}
+	_, err = Compile(context.Background(), st, CompileOpts{})
+	de, ok := domainerr.As(err)
+	if !ok || de.Code != domainerr.CodeValidationFailed {
+		t.Fatalf("compile err=%v want validation_failed", err)
+	}
+	if !authFileViolation(de, "spec.management.auth.basic.passwordFile", "unresolved_reference", missing) {
+		t.Fatalf("violations=%+v want unresolved passwordFile %s", de.FieldViolations, missing)
+	}
+}
+
+func authFileViolation(de *domainerr.Error, path, code, needle string) bool {
+	if de == nil {
+		return false
+	}
+	for _, fv := range de.FieldViolations {
+		if fv.Path == path && fv.Code == code && strings.Contains(fv.Message, needle) {
+			return true
+		}
+	}
+	return false
+}
 
 func TestCompileNilState(t *testing.T) {
 	_, err := Compile(context.Background(), nil, CompileOpts{})

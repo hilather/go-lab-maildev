@@ -182,6 +182,7 @@ func New(cfg Config) (*Server, error) {
 		sseHeartbeat: hb,
 		cursorKey:    key,
 	}
+	s.svc.OnAuthPreflight(auth.Preflight)
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
 	s.svc.OnApply(s.reloadAuth)
@@ -412,7 +413,9 @@ func (s *Server) reloadAuth() {
 	}
 	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
 	if err != nil {
-		// Keep the previous verifier and live UI sessions.
+		// TOCTOU backstop only. Reset already refused an unreadable management
+		// secret before the swap. If the file disappears after that check,
+		// keep the previous verifier and live sessions.
 		return
 	}
 	changed := !s.cfg.Auth.Equivalent(next)

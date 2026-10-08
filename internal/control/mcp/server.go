@@ -176,6 +176,7 @@ func New(cfg Config) (*Server, error) {
 	if !cfg.AllowLegacyClients {
 		s.sdk.AddReceivingMiddleware(pinProtocolMiddleware)
 	}
+	s.svc.OnAuthPreflight(auth.Preflight)
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
 	s.svc.OnApply(s.reloadAuth)
@@ -382,7 +383,9 @@ func (s *Server) reloadAuth() {
 	}
 	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
 	if err != nil {
-		// Keep the previous verifier and the startup actor.
+		// TOCTOU backstop only. Reset already refused an unreadable management
+		// secret before the swap. If the file disappears after that check,
+		// keep the previous verifier and the startup actor.
 		return
 	}
 	changed := !s.cfg.Auth.Equivalent(next)

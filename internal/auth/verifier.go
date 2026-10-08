@@ -80,7 +80,7 @@ func FromSpec(spec model.MgmtAuthSpec) (*Verifier, error) {
 		raw, err := readSecretFile(tok.SecretFile)
 		if err != nil {
 			return nil, domainerr.ValidationFailed("token secret is unavailable",
-				domainerr.FieldViolation{Path: indexPath("spec.management.auth.tokens", i) + ".secretFile", Code: "unresolved_reference", Message: "token secret file does not resolve"})
+				domainerr.FieldViolation{Path: indexPath("spec.management.auth.tokens", i) + ".secretFile", Code: "unresolved_reference", Message: "token secret file does not resolve: " + tok.SecretFile})
 		}
 		if len(raw) < MinTokenBytes {
 			zero(raw)
@@ -117,7 +117,7 @@ func FromSpec(spec model.MgmtAuthSpec) (*Verifier, error) {
 		pw, err := readSecretFile(basic.PasswordFile)
 		if err != nil {
 			return nil, domainerr.ValidationFailed("basic password is unavailable",
-				domainerr.FieldViolation{Path: "spec.management.auth.basic.passwordFile", Code: "unresolved_reference", Message: "basic password file does not resolve"})
+				domainerr.FieldViolation{Path: "spec.management.auth.basic.passwordFile", Code: "unresolved_reference", Message: "basic password file does not resolve: " + basic.PasswordFile})
 		}
 		if len(pw) == 0 {
 			return nil, domainerr.ValidationFailed("basic password is empty",
@@ -131,6 +131,14 @@ func FromSpec(spec model.MgmtAuthSpec) (*Verifier, error) {
 		zero(pw)
 	}
 	return v, nil
+}
+
+// Preflight loads spec the way a live verifier would. Reset runs it under the
+// app lock, after the candidate compiles and before the inbox wipe or the
+// snapshot swap. A failure is validation_failed and names the unreadable file.
+func Preflight(spec model.MgmtAuthSpec) error {
+	_, err := FromSpec(spec)
+	return err
 }
 
 // OnIdentityChange registers a hook fired after Replace when the compiled

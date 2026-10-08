@@ -29,7 +29,7 @@ func Compile(ctx context.Context, st *model.State, opts CompileOpts) (*snapshot.
 	if err != nil {
 		return nil, err
 	}
-	if err := config.Validate(n); err != nil {
+	if err := config.ValidateRuntime(n); err != nil {
 		return nil, err
 	}
 	rev, err := config.Revision(n)

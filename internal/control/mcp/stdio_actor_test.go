@@ -43,7 +43,10 @@ func TestStdioActorLosesAdminAfterDemotion(t *testing.T) {
 		ID: p.ID, Class: p.Class, Role: p.Role,
 		Scopes: append([]string(nil), p.Scopes...), Transport: "mcp",
 	}
-	s, err := New(Config{Service: svc, Auth: v, FixedActor: &fixed, RatePerSec: -1})
+	s, err := New(Config{
+		Service: svc, Auth: v, FixedActor: &fixed,
+		StdioSecret: testBearerToken, RatePerSec: -1,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

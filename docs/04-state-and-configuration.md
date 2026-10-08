@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-10-07 (change-operation key case; idempotency revision)
+Last reviewed: 2026-10-08 (reset refuses an unreadable management secret)
 Related ADRs: 0003, 0008
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -196,12 +196,13 @@ Config mutations (plan/apply) use `expectedRevision` = `runtimeRevision`. Inbox 
 `POST /v1/state:reset` / `mail_state_reset`:
 
 1. Re-read bootstrap path (never write it).
-2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`.
-3. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
-4. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
-5. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
-6. Existing SMTP sessions re-load the new snapshot on the next command (or die on QUIT/timeout). New sessions pick up `smtp.behavior` on the greeting.
-7. Audit `state.reset`.
+2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`. Runtime compile reads each management `secretFile` and basic `passwordFile`. A missing or unreadable file is `unresolved_reference` and the violation names that path. `labmail validate` and `LoadFile` do not require those files to exist, so a lab overlay that names `/run/secrets` still loads on a host without the mounts. `POST /v1/state:validate`, reset, and process boot use the runtime compile.
+3. Auth preflight (`auth.FromSpec`) under the reset lock, before any inbox wipe or snapshot swap. A failure is `validation_failed` and names the unreadable file. The previous snapshot, bearer, stdio actor, and sessions stay. Apply cannot change `spec.management.auth` (its operations are SMTP and store only), so Apply does not run this preflight.
+4. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
+5. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
+6. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
+7. Existing SMTP sessions re-load the new snapshot on the next command (or die on QUIT/timeout). New sessions pick up `smtp.behavior` on the greeting.
+8. Audit `state.reset`.
 
 Restart is equivalent: process memory dies; spill dir is wiped on next start.
 

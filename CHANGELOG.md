@@ -16,7 +16,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
-- Cookie sessions are cleared when `Replace` changes compiled auth identity, including when MCP reloads the shared verifier before REST. A failed secret reread still keeps sessions.
+- Cookie sessions are cleared when `Replace` changes compiled auth identity, including when MCP reloads the shared verifier before REST. A reset whose management secret or password file cannot be read is refused with `validation_failed`; the previous snapshot, bearer, stdio actor, and sessions stay.
 - `labmail mcp-stdio` no longer keeps the startup administrator after that token is demoted or removed. The startup secret is authenticated again; if it does not match, the process actor is dropped.
 - `GET /v1/events/stream` stops delivering mailbox events, including subject, after that cookie session is deleted or loses `mail.read`. The recheck uses the cookie Lookup accepted, so deleting that session after authentication and before the stream's first check still ends the stream.
 - REST plan/apply rejects case-variant bare durations and byte sizes (`GreetingDelay`, `MaxBytes`) the same way as the canonical spelling, including when those fields sit under a case-variant `operations` key (`Operations`). Two keys that match `operations` case-insensitively are `validation_failed` and neither is applied. REST JSON request bodies reject unknown fields. Bodies that used to apply with extra JSON fields or a case-variant bare number now return `validation_failed`.

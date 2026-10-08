@@ -43,6 +43,7 @@ type App struct {
 	bootstrapPath string
 	idemp         *idempCache
 	audit         *audit.Fanout
+	authPreflight []func(model.MgmtAuthSpec) error
 	resetHooks    []func()
 	applyHooks    []func()
 	metrics       *observability.Registry

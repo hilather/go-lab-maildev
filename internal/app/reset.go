@@ -54,6 +54,17 @@ func (s *App) resetLocked(ctx context.Context, actor Actor, in ResetIn) (*ApplyR
 		return nil, nil, err
 	}
 
+	// Auth preflight before the inbox wipe and the snapshot swap. A candidate
+	// whose management secret cannot be loaded leaves the previous snapshot,
+	// verifier, stdio actor, and sessions unchanged.
+	if next.Canonical != nil {
+		for _, fn := range s.authPreflight {
+			if err := fn(next.Canonical.Spec.Management.Auth); err != nil {
+				return nil, nil, asDomain(err)
+			}
+		}
+	}
+
 	// Validate new store options (including creatable spill dir) before
 	// Wipe so a failed Reset cannot empty the inbox under the old snapshot.
 	if s.inbox != nil {

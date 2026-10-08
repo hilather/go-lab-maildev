@@ -12,6 +12,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 - Go toolchain pinned to go1.26.8 (go.mod `toolchain`, CI `GO_VERSION`, Dockerfile); 1.26.0–1.26.7 lack current stdlib security fixes.
 - Web development dependency `source-map-js` updates from 1.2.1 to 1.2.2 (GHSA-68fv-2mgg-jv7q, high: event-loop denial of service through indexed source-map section offsets). Lockfile only; the built web assets are byte-identical.
+- Web development dependency `undici` updates from 8.10.0 to 8.10.2 (via jsdom; GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3 and GHSA-vp8m-p9jh-q5pm high, plus eight moderate or low undici advisories) and `vitest` / `@vitest/*` (including `@vitest/mocker`) from 4.1.10 to 4.1.11 (GHSA-82fw-gwwq-j7x9, moderate). Lockfile only; the built web assets are byte-identical.
 - Raise `golang.org/x/sys` from v0.41.0 to v0.47.0 (GO-2026-5024, fixed in v0.44.0) and `golang.org/x/text` from v0.14.0 to v0.41.0 (GO-2026-5970 fixed in v0.39.0, GO-2026-6629 fixed in v0.41.0); `golang.org/x/sync` moves to v0.22.0 with x/text. govulncheck found these in required modules only; no LabMail code path called them.
 
 ### Fixed

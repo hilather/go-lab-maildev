@@ -22,7 +22,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 - REST plan/apply rejects case-variant bare durations and byte sizes (`GreetingDelay`, `MaxBytes`) the same way as the canonical spelling, including when those fields sit under a case-variant `operations` key (`Operations`). Two keys that match `operations` case-insensitively are `validation_failed` and neither is applied. REST JSON request bodies reject unknown fields. Bodies that used to apply with extra JSON fields or a case-variant bare number now return `validation_failed`.
 - MCP `mail_change_plan`, `mail_change_apply`, and `mail_state_validate` accept duration and byte-size strings and reject bare numbers, same as REST.
 - Replaying an idempotency key after a later apply has moved the runtime revision returns `idempotency_conflict` instead of the old `applied` result. A retry whose cached runtime revision still equals the live revision replays the cached result, including its generation and audit event id, even if an intervening apply rebuilt the same canonical state.
-- `DELETE /v1/messages/{id}` and `DELETE /v1/messages` honor `expectedStoreGeneration` in a JSON body that has no `Content-Type`.
+- `DELETE /v1/messages/{id}` and `DELETE /v1/messages` honor `expectedStoreGeneration` in a JSON body that has no `Content-Type`. `DELETE /v1/messages/{id}` and `DELETE /v1/messages` with any other non-JSON Content-Type now return 400.
 - Release `tag-gate` accepts only the CI run for that tag push. A pull-request or `main` check for the same SHA does not qualify. CI now runs on `v*` tags. The tag name is passed to the notes step as `RELEASE_REF`, not interpolated into the shell.
 
 ### Removed or deprecated

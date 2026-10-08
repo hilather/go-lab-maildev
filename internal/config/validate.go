@@ -1,12 +1,14 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
 	"strings"
 
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
 )
@@ -19,9 +21,12 @@ func Validate(st *model.State) error {
 	return validate(st, false)
 }
 
-// ValidateRuntime is Validate plus a read of each management secretFile and
-// basic passwordFile. A missing or unreadable file is unresolved_reference.
-// state:validate, reset, and process boot use it via compiler.Compile.
+// ValidateRuntime is Validate plus a read of each management secretFile.
+// basic passwordFile is read only when mode is bearer_and_basic (an empty
+// mode counts as that default) and basic.username is non-empty, matching
+// auth.FromSpec. A missing or unreadable password file, or one whose lines
+// are blank or comments, is unresolved_reference.
+// state:validate, reset, plan, apply, and process boot use it via compiler.Compile.
 func ValidateRuntime(st *model.State) error {
 	return validate(st, true)
 }
@@ -379,7 +384,9 @@ func validateManagement(m *model.ManagementSpec, requireAuthFiles bool, vs *[]do
 				Message: "basic.tokenRef " + basic.TokenRef + " does not match a token id",
 			})
 		}
-		checkAuthPasswordFile("spec.management.auth.basic.passwordFile", basic.PasswordFile, requireAuthFiles, vs)
+		if basicPasswordRead(m.Auth.Mode, basic.Username) {
+			checkAuthPasswordFile("spec.management.auth.basic.passwordFile", basic.PasswordFile, requireAuthFiles, vs)
+		}
 	}
 	if m.BodyLimit <= 0 {
 		*vs = append(*vs, domainerr.FieldViolation{Path: "spec.management.bodyLimit", Code: violationInvalidValue, Message: "bodyLimit must be > 0"})
@@ -555,9 +562,14 @@ func requireExistingFile(path, file string, vs *[]domainerr.FieldViolation) {
 // unreadable file is unresolved_reference and the message names that path.
 // config.Load leaves requireFile false so a lab overlay that names an absent
 // /run/secrets path still loads. compiler.Compile sets it.
+//
+// An empty or comment-only token file stays invalid_value. FromSpec reports
+// unresolved_reference for that file, because readSecretFile fails before the
+// length check, but both paths refuse the document. That is not the
+// password-file gap, where runtime validate used to succeed.
 func checkTokenSecretLength(path, file string, requireFile bool, vs *[]domainerr.FieldViolation) {
-	b, err := os.ReadFile(file)
-	if err != nil {
+	n, err := auth.UsableSecretLineLen(file)
+	if err != nil && !errors.Is(err, os.ErrInvalid) {
 		if requireFile {
 			*vs = append(*vs, domainerr.FieldViolation{
 				Path:    path,
@@ -567,35 +579,35 @@ func checkTokenSecretLength(path, file string, requireFile bool, vs *[]domainerr
 		}
 		return
 	}
-	for _, line := range strings.Split(string(b), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if len(line) < 32 {
-			*vs = append(*vs, domainerr.FieldViolation{
-				Path:    path,
-				Code:    violationInvalidValue,
-				Message: "token secret must be at least 32 bytes",
-			})
-		}
-		return
+	if err != nil || n < auth.MinTokenBytes {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    path,
+			Code:    violationInvalidValue,
+			Message: "token secret must be at least 32 bytes",
+		})
 	}
-	*vs = append(*vs, domainerr.FieldViolation{
-		Path:    path,
-		Code:    violationInvalidValue,
-		Message: "token secret must be at least 32 bytes",
-	})
+}
+
+// basicPasswordRead is the auth.FromSpec condition for opening
+// basic.passwordFile: mode bearer_and_basic (empty mode is that default)
+// and a non-empty username. bearer and dev-loopback-unauth leave it unread.
+func basicPasswordRead(mode, username string) bool {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		mode = model.MgmtAuthBearerAndBasic
+	}
+	return mode == model.MgmtAuthBearerAndBasic && strings.TrimSpace(username) != ""
 }
 
 // checkAuthPasswordFile reports unresolved_reference when a named basic
-// password file cannot be read. Empty paths are a different violation.
-// Lenient loads skip the read so an absent /run/secrets password still loads.
+// password file cannot be read or has no usable line. Empty paths are a
+// different violation. Lenient loads skip the read so an absent /run/secrets
+// password still loads. The line rule is auth.UsableSecretLineLen.
 func checkAuthPasswordFile(path, file string, requireFile bool, vs *[]domainerr.FieldViolation) {
 	if !requireFile || strings.TrimSpace(file) == "" {
 		return
 	}
-	if _, err := os.ReadFile(file); err != nil {
+	if _, err := auth.UsableSecretLineLen(file); err != nil {
 		*vs = append(*vs, domainerr.FieldViolation{
 			Path:    path,
 			Code:    violationUnresolved,

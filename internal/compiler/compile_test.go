@@ -34,13 +34,9 @@ func TestValidateMissingSecretFile(t *testing.T) {
 
 func TestValidateMissingPasswordFile(t *testing.T) {
 	dir := t.TempDir()
-	tok := filepath.Join(dir, "token")
-	if err := os.WriteFile(tok, []byte("0123456789abcdef0123456789abcdef\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	tok := writeTokenFile(t, dir)
 	missing := filepath.Join(dir, "missing.pass")
-	doc := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n      basic:\n        username: admin\n        passwordFile: " + missing + "\n        tokenRef: admin\n"
-	st, err := config.Load([]byte(doc))
+	st, err := config.Load([]byte(basicManagementDoc(model.MgmtAuthBearerAndBasic, tok, missing)))
 	if err != nil {
 		t.Fatalf("Load of an absent passwordFile must still succeed: %v", err)
 	}
@@ -52,6 +48,81 @@ func TestValidateMissingPasswordFile(t *testing.T) {
 	if !authFileViolation(de, "spec.management.auth.basic.passwordFile", "unresolved_reference", missing) {
 		t.Fatalf("violations=%+v want unresolved passwordFile %s", de.FieldViolations, missing)
 	}
+}
+
+// TestCompileBearerSkipsMissingPasswordFile: FromSpec reads basic.passwordFile
+// only for bearer_and_basic with a username. A bearer document with a complete
+// basic block and a missing password file must still compile.
+func TestCompileBearerSkipsMissingPasswordFile(t *testing.T) {
+	assertCompileSkipsMissingPasswordFile(t, model.MgmtAuthBearer)
+}
+
+// TestCompileDevLoopbackSkipsMissingPasswordFile is the same skip for
+// dev-loopback-unauth.
+func TestCompileDevLoopbackSkipsMissingPasswordFile(t *testing.T) {
+	assertCompileSkipsMissingPasswordFile(t, model.MgmtAuthDevLoopbackUnauth)
+}
+
+func assertCompileSkipsMissingPasswordFile(t *testing.T, mode string) {
+	t.Helper()
+	dir := t.TempDir()
+	tok := writeTokenFile(t, dir)
+	missing := filepath.Join(dir, "missing.pass")
+	st, err := config.Load([]byte(basicManagementDoc(mode, tok, missing)))
+	if err != nil {
+		t.Fatalf("Load of an absent passwordFile must still succeed: %v", err)
+	}
+	if _, err := Compile(context.Background(), st, CompileOpts{}); err != nil {
+		t.Fatalf("compile err=%v want success for mode %s", err, mode)
+	}
+}
+
+// TestCompileBlankPasswordFile: a readable password file with no usable line
+// is the same unresolved_reference as a missing file. FromSpec's readSecretFile
+// returns os.ErrInvalid for empty and comment-only files.
+func TestCompileBlankPasswordFile(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "empty", body: ""},
+		{name: "comment_only", body: "# keep\n\n  \n# out\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tok := writeTokenFile(t, dir)
+			pw := filepath.Join(dir, "pass")
+			if err := os.WriteFile(pw, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			st, err := config.Load([]byte(basicManagementDoc(model.MgmtAuthBearerAndBasic, tok, pw)))
+			if err != nil {
+				t.Fatalf("Load of a blank passwordFile must still succeed: %v", err)
+			}
+			_, err = Compile(context.Background(), st, CompileOpts{})
+			de, ok := domainerr.As(err)
+			if !ok || de.Code != domainerr.CodeValidationFailed {
+				t.Fatalf("compile err=%v want validation_failed", err)
+			}
+			if !authFileViolation(de, "spec.management.auth.basic.passwordFile", "unresolved_reference", pw) {
+				t.Fatalf("violations=%+v want unresolved passwordFile %s", de.FieldViolations, pw)
+			}
+		})
+	}
+}
+
+func writeTokenFile(t *testing.T, dir string) string {
+	t.Helper()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte("0123456789abcdef0123456789abcdef\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return tok
+}
+
+func basicManagementDoc(mode, tokenFile, passwordFile string) string {
+	return "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: " + mode + "\n      tokens:\n        - id: admin\n          secretFile: " + tokenFile + "\n          role: administrator\n      basic:\n        username: admin\n        passwordFile: " + passwordFile + "\n        tokenRef: admin\n"
 }
 
 func authFileViolation(de *domainerr.Error, path, code, needle string) bool {

@@ -396,6 +396,17 @@ func readSecretFile(path string) ([]byte, error) {
 	return nil, os.ErrInvalid
 }
 
+// UsableSecretLineLen is the byte length of the first usable line in path.
+// Blank lines and lines whose first non-space character is '#' are skipped,
+// the same rule as readSecretFile. The line is zeroed before return. A file
+// with no usable line returns os.ErrInvalid.
+func UsableSecretLineLen(path string) (int, error) {
+	b, err := readSecretFile(path)
+	n := len(b)
+	zero(b)
+	return n, err
+}
+
 func zero(b []byte) {
 	for i := range b {
 		b[i] = 0

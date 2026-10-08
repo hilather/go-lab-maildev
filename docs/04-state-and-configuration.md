@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-10-08 (reset refuses a partial token removal when another secret is unreadable)
+Last reviewed: 2026-10-08 (only state:validate reads management secrets at compile)
 Related ADRs: 0003, 0008
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -17,7 +17,7 @@ labmail canonicalize --config path.yaml
 labmail serve --config path.yaml [--smtp-listen ADDR] [--management-listen ADDR|off]
 ```
 
-`validate` and `canonicalize` stop at compile. `serve` then binds SMTP and management from the compiled snapshot. Live reads and mutations:
+`validate` and `canonicalize` stop at compile. That compile does not read management secret files, and neither do boot, plan, or apply. `serve` then binds SMTP and, unless `--management-listen` is `off`, management. With management off, absent secret files do not block boot. With management bound, `auth.FromSpec` reads the files and a failure names the unavailable secret (`basic password is unavailable`, or the token secret is unavailable) instead of a generic compile error. Only `POST /v1/state:validate` and MCP `mail_state_validate` read management secret files during compile. Live reads and mutations:
 
 | Capability | REST | MCP |
 |---|---|---|
@@ -196,7 +196,7 @@ Config mutations (plan/apply) use `expectedRevision` = `runtimeRevision`. Inbox 
 `POST /v1/state:reset` / `mail_state_reset`:
 
 1. Re-read bootstrap path (never write it).
-2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`. Runtime compile reads each management `secretFile`. It reads basic `passwordFile` only when mode is `bearer_and_basic` and `basic.username` is non-empty (an empty mode is that default, the same condition as `auth.FromSpec`). A missing or unreadable file is `unresolved_reference` and the violation names that path. A password file that exists but has only blank or comment lines is the same violation. `labmail validate` and `LoadFile` do not require those files to exist, so a lab overlay that names `/run/secrets` still loads on a host without the mounts. `POST /v1/state:validate`, reset, process boot, plan, and apply compile with `ValidateRuntime`. An unreadable management secret on the live spec fails an SMTP or store plan or apply before any snapshot swap.
+2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`. This compile does not read management secret files. `labmail validate`, `LoadFile`, boot, plan, and apply are the same, so a lab overlay that names `/run/secrets` still loads on a host without the mounts, and an unreadable management secret on the live spec does not block an SMTP or store plan or apply. Only `POST /v1/state:validate` (and MCP `mail_state_validate`) opts compile into `ValidateRuntime`. That read covers each management `secretFile`. It reads basic `passwordFile` only when mode is `bearer_and_basic` and `basic.username` is non-empty (an empty mode is that default, the same condition as `auth.FromSpec`). A missing or unreadable file is `unresolved_reference` and the violation names that path. A password file that exists but has only blank or comment lines is the same violation.
 3. Auth preflight (`auth.FromSpec`) under the reset lock, before any inbox wipe or snapshot swap. A failure is `validation_failed` and names the unreadable file. The previous snapshot, bearer, stdio actor, and sessions stay. That includes a candidate that removes one token while another token's secret file, or the basic password file, cannot be read: nothing from the candidate is committed. Apply cannot change `spec.management.auth` (its operations are SMTP and store only), so Apply does not run this preflight. `reloadAuth` keeps the previous verifier only if a secret file disappears after this check.
 4. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
 5. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.

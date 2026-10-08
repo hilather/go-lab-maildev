@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Integration, Platform
-Last reviewed: 2026-10-08 (LoadFile stays lenient; runtime compile reads secrets)
+Last reviewed: 2026-10-08 (LoadFile stays lenient; only state:validate reads management secrets at compile)
 Related ADRs: 0005, 0006, 0007
 
 This document is the bill of materials for replacing `maildev/maildev:2.2.1` in `mcp-integration-lab` with LabMail. SWAP-001 lands the overlay in **this** repo. The compose/image pin change is a follow-up in that repo after `v1.0.0-rc.1`. DEP-001 image files are stacked later and are not required here.

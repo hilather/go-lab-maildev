@@ -14,22 +14,27 @@ import (
 )
 
 // Validate checks a (preferably normalized) state. It does not mutate st.
-// A missing management secretFile or passwordFile is not a violation here:
-// lab overlays name /run/secrets paths that are absent when the YAML is
-// loaded. compiler.Compile uses Validate unless CompileOpts.RequireAuthFiles
-// is set.
+// Absent or unreadable (permission) token and password files are not
+// violations: lab overlays name /run/secrets paths that are absent when the
+// YAML is loaded. A present token file is still length-checked; a short,
+// empty, or comment-only token is invalid_value. Basic password files are
+// not opened. compiler.Compile uses Validate unless CompileOpts.RequireAuthFiles
+// is set. Boot, plan, apply, reset compile, and labmail validate use this path.
 func Validate(st *model.State) error {
 	return validate(st, false)
 }
 
-// ValidateRuntime is Validate plus a read of each management secretFile.
-// basic passwordFile is read only when mode is bearer_and_basic (an empty
-// mode counts as that default) and basic.username is non-empty, matching
-// auth.FromSpec. A missing or unreadable password file, or one whose lines
-// are blank or comments, is unresolved_reference.
-// Only state:validate opts in, through compiler.Compile. Boot, plan, apply,
-// and reset do not. Reset refuses an unreadable secret in auth.Preflight.
-// Process start with management bound fails in auth.FromSpec.
+// ValidateRuntime is the state:validate opt-in on top of Validate. It
+// requires each management secretFile to be readable. basic.passwordFile is
+// opened only when mode is bearer_and_basic (an empty mode counts as that
+// default) and basic.username is non-empty, matching auth.FromSpec. A
+// missing or unreadable file on those reads, or a password file whose lines
+// are blank or comments, is unresolved_reference. A present token that is
+// short, empty, or comment-only stays invalid_value. Boot, plan, apply,
+// reset compile, and labmail validate stay on Validate: absent or unreadable
+// token and password files do not fail them, and a present token file is
+// still length-checked. auth.FromSpec opens password files on reset
+// preflight, process start with management bound, and mcp-stdio start.
 func ValidateRuntime(st *model.State) error {
 	return validate(st, true)
 }

@@ -99,8 +99,10 @@ func Boot(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return nil, asDomain(err)
 	}
-	// Lenient compile. state:validate opts into secret-file reads.
-	// A bound management listener checks them later in auth.FromSpec.
+	// Lenient compile. An absent or unreadable (permission) token or password
+	// file does not fail boot. A present token file is still length-checked.
+	// state:validate opts into ValidateRuntime. A bound management listener
+	// checks the files later in auth.FromSpec.
 	snap, err := compiler.Compile(ctx, st, compiler.CompileOpts{})
 	if err != nil {
 		return nil, asDomain(err)

@@ -13,7 +13,7 @@ import (
 
 // TestPlanApplySMTPOnlyAfterManagementSecretDeleted: an SMTP-only plan and
 // apply must succeed after the live spec's management secret files are
-// removed. Plan and apply do not read those files. state:validate does.
+// removed. Absent files do not fail plan or apply. state:validate reads them.
 func TestPlanApplySMTPOnlyAfterManagementSecretDeleted(t *testing.T) {
 	dir := t.TempDir()
 	tok := filepath.Join(dir, "token")

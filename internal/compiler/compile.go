@@ -9,9 +9,11 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/snapshot"
 )
 
-// CompileOpts controls revision metadata, the compile clock, and whether
-// management secret files are read. RequireAuthFiles is the state:validate
-// opt-in. Boot, plan, apply, and reset leave it false.
+// CompileOpts controls revision metadata and the compile clock.
+// RequireAuthFiles opts state:validate into config.ValidateRuntime, which
+// fails an absent or unreadable token file and opens basic password files.
+// Boot, plan, apply, and reset leave it false. Those compiles still
+// length-check a present token file and do not open basic password files.
 type CompileOpts struct {
 	Now               time.Time
 	BootstrapRevision model.Revision

@@ -165,7 +165,8 @@ func (s *App) Validate(ctx context.Context, actor Actor, in ValidateIn) (*Plan, 
 	if err := rejectUnimplementedSMTP(base.Spec.SMTP); err != nil {
 		return nil, err
 	}
-	// state:validate is the only compile that reads management secret files.
+	// state:validate opts into ValidateRuntime. Lenient compile still
+	// length-checks a present token file and does not open basic password files.
 	next, err := compileCandidate(ctx, base, prev, s.now(), true)
 	if err != nil {
 		return nil, asDomain(err)

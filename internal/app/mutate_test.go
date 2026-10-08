@@ -94,13 +94,8 @@ func TestApplyIdempotencyIncludesExpectedRevision(t *testing.T) {
 		Operations:       first.Operations,
 	})
 	requireCode(t, err, domainerr.CodeIdempotencyConflict)
-	replay, err := svc.Apply(ctx, actor(), first)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if replay.Generation != res.Generation || replay.RuntimeRevision != res.RuntimeRevision {
-		t.Fatal("exact retry must replay the cached apply")
-	}
+	_, err = svc.Apply(ctx, actor(), first)
+	requireCode(t, err, domainerr.CodeIdempotencyConflict)
 }
 
 func TestApplyRequiresExpectedRevision(t *testing.T) {

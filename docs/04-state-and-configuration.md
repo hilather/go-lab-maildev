@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-10-07 (change-operation key case)
+Last reviewed: 2026-10-07 (change-operation key case; idempotency revision)
 Related ADRs: 0003, 0008
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -232,7 +232,7 @@ Envelope (LabDNS-shaped):
 | `replaceAdmission` | `admission`: admission object | |
 | `replaceSMTPBehavior` | `behavior`: `{greetingDelay, commandDelay, dropOnConnect, closeAfterVerb, replies}` | `behavior` is required. `{}` clears scripting back to stock SMTP. Omitted/empty fields inside a present object are the runtime no-op. Delays max 30s. Not a random chaos engine (D16). Live on the next command. |
 
-`:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
+`:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity, and when a cached apply's runtime revision is not the live revision. A retry whose cached runtime revision equals the live revision replays the cached result, including its generation and audit event id, even if an intervening apply rebuilt the same canonical state. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
 
 Duration and byte-size keys inside REST change-operation JSON bodies are matched case-insensitively. A case-variant bare number (`GreetingDelay`, `MaxBytes`) is the same rejection as the canonical spelling. A case-variant string (`GreetingDelay: "30s"`, `MaxBytes: "10MiB"`) is the canonical value. Config documents and the `state` raw document stay exact: `GreetingDelay` there is an unknown field. YAML key case stays strict.
 

@@ -80,6 +80,15 @@ func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*Apply
 	if hit, err := s.idemp.lookup(in.IdempotencyKey, fp); err != nil {
 		return nil, nil, err
 	} else if hit != nil && hit.apply != nil {
+		snap, err := s.active()
+		if err != nil {
+			return nil, nil, err
+		}
+		// Keep the entry. A later exact retry stays idempotency_conflict
+		// instead of falling through to revision_conflict.
+		if hit.apply.RuntimeRevision != snap.Revision {
+			return nil, nil, domainerr.IdempotencyConflict("idempotency key was applied at a different runtime revision")
+		}
 		return cloneApply(hit.apply), append([]func(){}, s.applyHooks...), nil
 	}
 	cand, err := s.buildCandidate(ctx, in, true)

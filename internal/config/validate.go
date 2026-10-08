@@ -35,8 +35,12 @@ func Validate(st *model.State) error {
 // token and password files do not fail them, and a present token file is
 // still length-checked. auth.FromSpec opens password files on reset
 // preflight, process start with management bound, mcp-stdio start, and
-// the live reloadAuth after each successful apply or reset. A failed
-// FromSpec there is swallowed and the previous verifier stays.
+// the live reloadAuth after each successful apply or reset. Reset
+// preflight, management-bound process start, and mcp-stdio start return
+// the FromSpec error (the reset is refused before the wipe and snapshot
+// swap; the process exits). Only the live reloadAuth hook (REST
+// internal/control/rest/server.go, MCP internal/control/mcp/server.go)
+// discards a failed FromSpec and keeps the verifier already installed.
 func ValidateRuntime(st *model.State) error {
 	return validate(st, true)
 }

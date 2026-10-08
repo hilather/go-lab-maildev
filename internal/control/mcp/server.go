@@ -383,7 +383,8 @@ func (s *Server) reloadAuth() {
 	}
 	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
 	if err != nil {
-		// TOCTOU backstop only. Reset already refused an unreadable management
+		// TOCTOU backstop only. A committed change must not reach this return:
+		// Reset's auth preflight already refused an unreadable management
 		// secret before the swap. If the file disappears after that check,
 		// keep the previous verifier and the startup actor.
 		return

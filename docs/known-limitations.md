@@ -2,7 +2,7 @@
 
 Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.4** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that is **not** claimed here.
 
-Last reviewed: 2026-08-29 (v1.0.0-rc.4)
+Last reviewed: 2026-10-07 (tag-gate accepts only the tag push CI run)
 
 This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.4.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.4.md).
 
@@ -73,7 +73,7 @@ Design PRs 1–14, the side-by-side probe, `spec.smtp.behavior`, originAllowlist
 - Healthcheck plane is HTTP `/v1/health/ready` (not SMTP/`node`). Ready still requires SMTP bound.
 - Dockerfile and `make test-container` are in-tree. This candidate does not publish a `ghcr.io/hilather/labmail` digest, SBOM, or provenance.
 - Application binaries built without ldflags report version `dev`. The notes version `1.0.0-rc.4` is the candidate identity for the tag, not the default `dev` string.
-- Required GitHub Actions green-on-tag is enforced by Release `tag-gate`.
+- Required GitHub Actions green-on-tag is enforced by Release `tag-gate`, which accepts only the CI workflow run for that tag push (`event=push`, ref that tag, same SHA). A pull-request or main check for the same commit does not qualify. Pushing the `v*` tag is what starts that CI run.
 
 ## Explicit non-goals (unchanged)
 

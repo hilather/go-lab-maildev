@@ -61,7 +61,7 @@ The numbered pack is the source of truth after FND-001. Do not invent paths, typ
 - Every release tag must include complete release notes describing all functionality differences from the previous release (`docs/releases/<tag>.md`).
 - Release notes must cover additions, behavior changes, bug fixes, removals, security changes, REST changes, MCP changes, SMTP semantics, configuration/schema changes, deployment changes, compatibility impact, migrations, and known limitations.
 - Residual limitations live in `docs/known-limitations.md`. Do not claim public-MTA completeness. Do not claim AUTH/STARTTLS, the hardened image, or swap overlay examples unless those siblings are in the tree.
-- A `v*` tag is created only after Release `tag-gate` sees every required CI job green on that SHA.
+- A `v*` tag is created only after Release `tag-gate` sees every required CI job green on the CI run for that tag push (`event=push`, ref that tag, same SHA). A pull-request or main check for the same commit does not qualify. Pushing the `v*` tag is what starts that CI run.
 - A raw commit list or automatically generated pull-request list is not sufficient.
 - Breaking changes require explicit migration guidance and the version increment required by the compatibility policy.
 - Release notes and changelog entries are part of the release artifact and must be reviewed before tagging.

@@ -51,7 +51,10 @@ func TestEvaluateChecks(t *testing.T) {
 	jobs := requiredCIJobs()
 	var runs []checkRun
 	for _, j := range jobs {
-		runs = append(runs, checkRun{Name: "CI / " + j, Status: "completed", Conclusion: "success", HeadSHA: "abc"})
+		runs = append(runs, checkRun{
+			Name: "CI / " + j, Status: "completed", Conclusion: "success", HeadSHA: "abc",
+			Event: "push", Ref: "refs/tags/v9.9.9",
+		})
 	}
 	if err := evaluateChecks(jobs, runs, "abc"); err != nil {
 		t.Fatal(err)

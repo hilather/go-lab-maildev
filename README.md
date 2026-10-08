@@ -378,7 +378,9 @@ make build
 Required CI jobs: format, lint, unit, race, fuzz-smoke, generated-file,
 documentation, security-scan, changelog, parity, config-compat, container-test,
 web. None are optional. `make test-container` needs Docker. A `v*` tag is
-refused unless Release `tag-gate` sees those jobs green on the exact SHA.
+refused unless Release `tag-gate` sees those jobs green on the CI run for that
+tag push (`event=push`, ref that tag, same SHA). A pull-request or main check
+for the same commit does not qualify. Pushing the `v*` tag starts that CI run.
 
 ---
 

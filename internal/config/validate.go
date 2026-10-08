@@ -34,7 +34,9 @@ func Validate(st *model.State) error {
 // reset compile, and labmail validate stay on Validate: absent or unreadable
 // token and password files do not fail them, and a present token file is
 // still length-checked. auth.FromSpec opens password files on reset
-// preflight, process start with management bound, and mcp-stdio start.
+// preflight, process start with management bound, mcp-stdio start, and
+// the live reloadAuth after each successful apply or reset. A failed
+// FromSpec there is swallowed and the previous verifier stays.
 func ValidateRuntime(st *model.State) error {
 	return validate(st, true)
 }

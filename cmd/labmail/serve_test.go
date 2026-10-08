@@ -590,7 +590,9 @@ func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
 
 // TestServeManagementOffBootsWithAbsentSecretFile is the D2 regression:
 // SMTP-only serve must boot when management secret files are absent.
-// --management-listen off does not open those files.
+// serveFromConfig calls config.LoadFile before managementListen, so a
+// present token file is still opened and length-checked. Only password
+// files stay unopened, and an absent file does not block boot.
 func TestServeManagementOffBootsWithAbsentSecretFile(t *testing.T) {
 	dir := t.TempDir()
 	missingTok := filepath.Join(dir, "missing.token")

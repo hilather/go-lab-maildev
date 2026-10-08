@@ -80,7 +80,12 @@ type Config struct {
 	// Auth is the shared verifier. Nil keeps unit tests stub-open (Basic still rejected).
 	Auth *auth.Verifier
 	// FixedActor is used by mcp-stdio when there is no HTTP Authorization header.
+	// New copies it into an atomic pointer; reloadAuth swaps that pointer.
 	FixedActor *app.Actor
+	// StdioSecret is the mcp-stdio startup bearer. Empty for HTTP MCP and for
+	// dev-loopback stdio. It is re-authenticated when compiled identity changes
+	// and must not be logged or audited.
+	StdioSecret string
 }
 
 // Server is the official-SDK adapter. Third-party MCP types do not escape it.
@@ -94,6 +99,10 @@ type Server struct {
 	inflight chan struct{}
 	rate     *limiter
 	closed   atomic.Bool
+
+	// stdioSecret is copied from Config.StdioSecret once in New.
+	stdioSecret string
+	fixedActor  atomic.Pointer[app.Actor]
 
 	cursorMu  sync.Mutex
 	cursorKey []byte
@@ -138,13 +147,18 @@ func New(cfg Config) (*Server, error) {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	s := &Server{
-		cfg:       cfg,
-		svc:       cfg.Service,
-		maxBody:   maxBody,
-		timeout:   timeout,
-		inflight:  make(chan struct{}, n),
-		rate:      newLimiter(cfg.RatePerSec, cfg.RateBurst),
-		cursorKey: key,
+		cfg:         cfg,
+		svc:         cfg.Service,
+		maxBody:     maxBody,
+		timeout:     timeout,
+		inflight:    make(chan struct{}, n),
+		rate:        newLimiter(cfg.RatePerSec, cfg.RateBurst),
+		cursorKey:   key,
+		stdioSecret: cfg.StdioSecret,
+	}
+	if cfg.FixedActor != nil {
+		cp := *cfg.FixedActor
+		s.fixedActor.Store(&cp)
 	}
 	sdkOpts := &sdk.ServerOptions{
 		Instructions: "LabMail control plane. Use typed mail_* tools; do not assume connection state. Protocol " + ProtocolVersion + ".",
@@ -335,12 +349,14 @@ func (s *Server) actorFrom(ctx context.Context) app.Actor {
 		}
 		return a
 	}
-	if s != nil && s.cfg.FixedActor != nil {
-		out := *s.cfg.FixedActor
-		if out.Transport == "" {
-			out.Transport = "mcp"
+	if s != nil {
+		if fixed := s.fixedActor.Load(); fixed != nil {
+			out := *fixed
+			if out.Transport == "" {
+				out.Transport = "mcp"
+			}
+			return out
 		}
-		return out
 	}
 	if a.Transport == "" {
 		a.Transport = "mcp"
@@ -366,7 +382,28 @@ func (s *Server) reloadAuth() {
 	}
 	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
 	if err != nil {
+		// Keep the previous verifier and the startup actor.
 		return
 	}
+	changed := !s.cfg.Auth.Equivalent(next)
 	s.cfg.Auth.Replace(next)
+	if !changed {
+		return
+	}
+	// Re-snapshot only by authenticating the original secret. A recreated
+	// token id with a new secret must not inherit the old process scopes.
+	// An empty secret (the no-token-file path, including dev-loopback) drops
+	// the actor. Re-auth runs even when the pointer is currently nil so a
+	// later restore of the same secret brings the actor back.
+	if s.stdioSecret != "" {
+		p, authErr := next.AuthenticateBearer(s.stdioSecret)
+		if authErr != nil {
+			s.fixedActor.Store(nil)
+			return
+		}
+		a := actorOf(p)
+		s.fixedActor.Store(&a)
+		return
+	}
+	s.fixedActor.Store(nil)
 }

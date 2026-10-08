@@ -2,7 +2,7 @@
 
 Status: Implemented (MCP-001)
 Owners: MCP, Application
-Last reviewed: 2026-10-08 (reset refuses an unreadable management secret)
+Last reviewed: 2026-10-08 (stdio actor refresh follows verifier identity)
 Related ADRs: 0004, 0006, 0008, 0009
 
 Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are frozen in [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Protocol pin: [docs/adr/0006-pin-mcp-protocol-versions.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md).
@@ -12,7 +12,7 @@ Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are 
 - SDK: `github.com/modelcontextprotocol/go-sdk v1.7.0`
 - Protocol: `2026-07-28`
 - Transport: Streamable HTTP `POST /mcp` on the management listener
-- Optional: `labmail mcp-stdio --config … --token-file …` (stdout = protocol, stderr = logs). When compiled auth identity changes, mcp-stdio re-authenticates that startup secret and replaces the process actor, or drops the actor if the secret is absent or no longer matches. A reset whose management secret or password file cannot be read is refused with `validation_failed`; the previous snapshot, verifier, and startup actor stay. If that file disappears after the reset check, the previous verifier and startup actor stay.
+- Optional: `labmail mcp-stdio --config … --token-file …` (stdout = protocol, stderr = logs). When compiled auth identity changes, the verifier's OnIdentityChange hook re-authenticates mcp-stdio's startup secret and replaces the process actor, or drops the actor if the secret is absent or no longer matches. That hook runs whichever of REST or MCP reloads the shared verifier first. A reset whose management secret or password file cannot be read is refused with `validation_failed`; the previous snapshot, verifier, and startup actor stay. If that file disappears after the reset check, the previous verifier and startup actor stay.
 - `Stateless: true`
 - Auth: bearer only (Basic is not an MCP client convention)
 - Origin check: same `auth.CheckOrigin` as REST (**missing Origin allowed**; D17 / D18). Same `originAllowlist` sentinels `"*"` / `"private"` / exact. Live-read from the snapshot. `file://` and `Origin: null` stay denied.

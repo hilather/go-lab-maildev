@@ -80,11 +80,12 @@ type Config struct {
 	// Auth is the shared verifier. Nil keeps unit tests stub-open (Basic still rejected).
 	Auth *auth.Verifier
 	// FixedActor is used by mcp-stdio when there is no HTTP Authorization header.
-	// New copies it into an atomic pointer; reloadAuth swaps that pointer.
+	// New copies it into an atomic pointer. OnIdentityChange swaps that pointer
+	// after a non-equivalent Replace, independent of REST/MCP reload order.
 	FixedActor *app.Actor
 	// StdioSecret is the mcp-stdio startup bearer. Empty for HTTP MCP and for
-	// dev-loopback stdio. It is re-authenticated when compiled identity changes
-	// and must not be logged or audited.
+	// dev-loopback stdio. OnIdentityChange re-authenticates it and must not
+	// log or audit the value.
 	StdioSecret string
 }
 
@@ -180,6 +181,12 @@ func New(cfg Config) (*Server, error) {
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
 	s.svc.OnApply(s.reloadAuth)
+	if s.cfg.Auth != nil {
+		// Session clearing uses this same hook. Firing here, after Replace
+		// has swapped the index, does not depend on which adapter's
+		// reloadAuth runs first.
+		s.cfg.Auth.OnIdentityChange(s.refreshStdioActor)
+	}
 	s.registerTools()
 	s.registerResources()
 	s.startInboxFanout()
@@ -389,18 +396,20 @@ func (s *Server) reloadAuth() {
 		// keep the previous verifier and the startup actor.
 		return
 	}
-	changed := !s.cfg.Auth.Equivalent(next)
 	s.cfg.Auth.Replace(next)
-	if !changed {
+}
+
+// refreshStdioActor re-snapshots the process actor from the startup secret.
+// A recreated token id with a new secret must not inherit the old scopes.
+// An empty secret (the no-token-file path, including dev-loopback) drops
+// the actor. Re-auth runs even when the pointer is currently nil so a later
+// restore of the same secret brings the actor back. The secret is not logged.
+func (s *Server) refreshStdioActor() {
+	if s.cfg.Auth == nil {
 		return
 	}
-	// Re-snapshot only by authenticating the original secret. A recreated
-	// token id with a new secret must not inherit the old process scopes.
-	// An empty secret (the no-token-file path, including dev-loopback) drops
-	// the actor. Re-auth runs even when the pointer is currently nil so a
-	// later restore of the same secret brings the actor back.
 	if s.stdioSecret != "" {
-		p, authErr := next.AuthenticateBearer(s.stdioSecret)
+		p, authErr := s.cfg.Auth.AuthenticateBearer(s.stdioSecret)
 		if authErr != nil {
 			s.fixedActor.Store(nil)
 			return

@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Git tag (vX.Y.Z) or commit to gate
+        description: Release tag (v*) to gate
         required: true
         type: string
 
@@ -38,7 +38,7 @@ jobs:
   tag-gate:
     name: tag-gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,10 +65,16 @@ jobs:
 
       - name: Resolve notes path
         id: gate
+        env:
+          RELEASE_REF: ${{ github.event.inputs.ref || github.ref_name }}
         run: |
           set -euo pipefail
-          ref="${{ github.event.inputs.ref || github.ref_name }}"
-          ref="${ref#refs/tags/}"
+          ref="${RELEASE_REF#refs/tags/}"
+          re='^v[0-9A-Za-z.+-]+$'
+          if [[ ! "$ref" =~ $re ]]; then
+            echo "ref is not a release tag (v*)" >&2
+            exit 1
+          fi
           notes="docs/releases/${ref}.md"
           if [ ! -f "${notes}" ]; then
             echo "missing release notes ${notes}" >&2
@@ -84,4 +90,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_SHA: ${{ steps.rev.outputs.sha }}
+          RELEASE_TAG: ${{ steps.gate.outputs.ref }}
         run: go run ./scripts/release-diff -require-ci

@@ -43,6 +43,7 @@ type App struct {
 	bootstrapPath string
 	idemp         *idempCache
 	audit         *audit.Fanout
+	authPreflight []func(model.MgmtAuthSpec) error
 	resetHooks    []func()
 	applyHooks    []func()
 	metrics       *observability.Registry
@@ -98,6 +99,10 @@ func Boot(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return nil, asDomain(err)
 	}
+	// Lenient compile. An absent or unreadable (permission) token or password
+	// file does not fail boot. A present token file is still length-checked.
+	// state:validate opts into ValidateRuntime. A bound management listener
+	// checks the files later in auth.FromSpec.
 	snap, err := compiler.Compile(ctx, st, compiler.CompileOpts{})
 	if err != nil {
 		return nil, asDomain(err)
@@ -211,8 +216,8 @@ func cloneState(st *model.State) (*model.State, error) {
 	return &out, nil
 }
 
-func compileCandidate(ctx context.Context, st *model.State, prev *snapshot.Snapshot, now time.Time) (*snapshot.Snapshot, error) {
-	opts := compiler.CompileOpts{Now: now}
+func compileCandidate(ctx context.Context, st *model.State, prev *snapshot.Snapshot, now time.Time, requireAuthFiles bool) (*snapshot.Snapshot, error) {
+	opts := compiler.CompileOpts{Now: now, RequireAuthFiles: requireAuthFiles}
 	if prev != nil {
 		opts.BootstrapRevision = prev.BootstrapRevision
 		opts.Generation = prev.Generation + 1

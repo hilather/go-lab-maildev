@@ -2,10 +2,10 @@
 
 Status: Proposed normative behavior
 Owners: Platform, Operations
-Last reviewed: 2026-08-29 (v1.0.0-rc.4 notes pointer)
+Last reviewed: 2026-10-07 (tag-gate accepts only the tag push CI run)
 Related ADRs: 0001, 0003, 0008
 
-DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here. A `v*` tag is refused unless [`.github/workflows/release.yml`](https://github.com/hilather/go-lab-maildev/blob/main/.github/workflows/release.yml) `tag-gate` sees required CI green on that SHA. Current notes: [docs/releases/v1.0.0-rc.4.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.4.md).
+DEP-001 shipped the hardened image, `examples/compose.smoke.yaml`, `examples/labmail.yaml`, and `scripts/test-container.sh`. Ports and image posture stay frozen here. A `v*` tag is refused unless [`.github/workflows/release.yml`](https://github.com/hilather/go-lab-maildev/blob/main/.github/workflows/release.yml) `tag-gate` sees required CI green on the CI run for that tag push (`event=push`, ref that tag, same SHA). A pull-request or `main` check for the same commit does not qualify. Pushing the `v*` tag is what starts that CI run. Current notes: [docs/releases/v1.0.0-rc.4.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.4.md).
 
 ## CLI
 

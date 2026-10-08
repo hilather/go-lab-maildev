@@ -588,6 +588,118 @@ func TestReadyUnreadyAfterSMTPShutdown(t *testing.T) {
 	}
 }
 
+// TestServeManagementOffBootsWithAbsentSecretFile is the D2 regression:
+// SMTP-only serve must boot when management secret files are absent.
+// serveFromConfig calls config.LoadFile before managementListen, so a
+// present token file is still opened and length-checked. Only password
+// files stay unopened, and an absent file does not block boot.
+func TestServeManagementOffBootsWithAbsentSecretFile(t *testing.T) {
+	dir := t.TempDir()
+	missingTok := filepath.Join(dir, "missing.token")
+	missingPw := filepath.Join(dir, "missing.pass")
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + missingTok + "\n          role: administrator\n      basic:\n        username: admin\n        passwordFile: " + missingPw + "\n        tokenRef: admin\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(missingTok); !os.IsNotExist(err) {
+		t.Fatalf("token path must be absent: %v", err)
+	}
+	if _, err := os.Stat(missingPw); !os.IsNotExist(err) {
+		t.Fatalf("password path must be absent: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var stdout, stderr safeBuffer
+	done := make(chan int, 1)
+	go func() {
+		done <- serveCmd(ctx, []string{
+			"--config", cfg,
+			"--smtp-listen", "127.0.0.1:0",
+			"--management-listen", "off",
+		}, &stdout, &stderr)
+	}()
+
+	deadline := time.Now().Add(5 * time.Second)
+	var smtpAddr string
+	for time.Now().Before(deadline) && smtpAddr == "" {
+		out := stdout.String()
+		errText := stderr.String()
+		select {
+		case code := <-done:
+			t.Fatalf("serve exit %d stdout=%q stderr=%q", code, out, errText)
+		default:
+		}
+		if strings.Contains(errText, "labmail serve:") && !strings.Contains(out, "labmail smtp listen=") {
+			t.Fatalf("serve failed before bind stdout=%q stderr=%q", out, errText)
+		}
+		if strings.Contains(out, "labmail smtp listen=") && strings.Contains(out, "labmail management: not bound") {
+			smtpAddr = waitPrefix(t, &stdout, "labmail smtp listen=")
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if smtpAddr == "" {
+		t.Fatalf("serve did not boot stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+
+	msg := []byte("Subject: absent-secret\r\n\r\nboot with management off\r\n")
+	if err := smtp.SendMail(smtpAddr, nil, "alice@lab.test", []string{"bob@lab.test"}, msg); err != nil {
+		t.Fatalf("SendMail: %v stderr=%q", err, stderr.String())
+	}
+
+	cancel()
+	select {
+	case code := <-done:
+		if code != 0 {
+			t.Fatalf("serve exit %d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("serve did not exit")
+	}
+	if !strings.Contains(stdout.String(), "labmail: shutting down") {
+		t.Fatalf("stdout=%q want clean shutdown", stdout.String())
+	}
+}
+
+// TestServeManagementBoundAbsentBasicPassword pins the process-start error
+// when management is bound and basic.passwordFile is absent. auth.FromSpec
+// reports "basic password is unavailable". Compile must not replace that
+// with "Candidate state is invalid".
+func TestServeManagementBoundAbsentBasicPassword(t *testing.T) {
+	dir := t.TempDir()
+	tok := filepath.Join(dir, "token")
+	if err := os.WriteFile(tok, []byte(serveTestToken+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	missingPw := filepath.Join(dir, "missing.pass")
+	cfg := filepath.Join(dir, "labmail.yaml")
+	body := "apiVersion: labmail.dev/v1alpha1\nkind: LabMail\nmetadata:\n  name: t\nspec:\n  management:\n    auth:\n      mode: bearer_and_basic\n      tokens:\n        - id: admin\n          secretFile: " + tok + "\n          role: administrator\n      basic:\n        username: admin\n        passwordFile: " + missingPw + "\n        tokenRef: admin\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := serveCmd(context.Background(), []string{
+		"--config", cfg,
+		"--smtp-listen", "127.0.0.1:0",
+		"--management-listen", "127.0.0.1:0",
+	}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("exit %d want 1 stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	got := stderr.String()
+	if !strings.Contains(got, "basic password is unavailable") {
+		t.Fatalf("stderr=%q want basic password is unavailable", got)
+	}
+	if strings.Contains(got, "Candidate state is invalid") {
+		t.Fatalf("stderr=%q still has the generic compile error", got)
+	}
+	if strings.Contains(stdout.String(), "smtp listen=") {
+		t.Fatalf("failed serve printed a bind line: %q", stdout.String())
+	}
+}
+
 func waitSMTPListen(t *testing.T, stdout *safeBuffer) string {
 	t.Helper()
 	return waitPrefix(t, stdout, "labmail smtp listen=")

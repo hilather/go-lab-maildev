@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Last reviewed: 2026-10-08 (lenient compile still length-checks a present token file)
 Related ADRs: 0003, 0008
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -17,7 +17,7 @@ labmail canonicalize --config path.yaml
 labmail serve --config path.yaml [--smtp-listen ADDR] [--management-listen ADDR|off]
 ```
 
-`validate` and `canonicalize` stop at compile. `serve` then binds SMTP and management from the compiled snapshot. Live reads and mutations:
+`validate` and `canonicalize` stop at compile. Absent or unreadable (permission) token and password files do not fail that compile, boot, plan, apply, reset compile, or `labmail validate`. A present token file is still length-checked there: a short, empty, or comment-only token is `invalid_value` ("token secret must be at least 32 bytes"). Basic password files are opened only by `ValidateRuntime` (state:validate, `bearer_and_basic` plus a non-empty username, empty mode counting as that default) and by `auth.FromSpec` (reset preflight, process start with management bound, `labmail mcp-stdio` start, and the live reloadAuth after each successful apply or reset). `serve` then binds SMTP and, unless `--management-listen` is `off`, management. With management off, absent secret files do not block boot. With management bound, `auth.FromSpec` reads the files and a failure names the unavailable secret (`basic password is unavailable`, or the token secret is unavailable) instead of a generic compile error. Live reads and mutations:
 
 | Capability | REST | MCP |
 |---|---|---|
@@ -196,12 +196,13 @@ Config mutations (plan/apply) use `expectedRevision` = `runtimeRevision`. Inbox 
 `POST /v1/state:reset` / `mail_state_reset`:
 
 1. Re-read bootstrap path (never write it).
-2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`.
-3. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
-4. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
-5. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
-6. Existing SMTP sessions re-load the new snapshot on the next command (or die on QUIT/timeout). New sessions pick up `smtp.behavior` on the greeting.
-7. Audit `state.reset`.
+2. Validate + compile. On failure, leave current config **and** inbox unchanged; return `validation_failed`. Absent or unreadable (permission) token and password files do not fail this compile. `labmail validate`, `LoadFile`, boot, plan, and apply are the same, so a lab overlay that names `/run/secrets` still loads on a host without the mounts, and a permission-unreadable management secret on the live spec does not block an SMTP or store plan or apply. A present token file is still length-checked on those paths: a short, empty, or comment-only token is `invalid_value` ("token secret must be at least 32 bytes"). Only `POST /v1/state:validate` (and MCP `mail_state_validate`) opts compile into `ValidateRuntime`. That read covers each management `secretFile`. An absent or unreadable token file is `unresolved_reference` and the violation names that path. A present short, empty, or comment-only token stays `invalid_value`. It reads basic `passwordFile` only when mode is `bearer_and_basic` and `basic.username` is non-empty (an empty mode is that default, the same condition as `auth.FromSpec`). A missing or unreadable password file, or one with only blank or comment lines, is `unresolved_reference` and names that path. `auth.FromSpec` opens those password files on reset preflight, on process start with management bound, on `labmail mcp-stdio` start, and on the live reloadAuth after each successful apply or reset.
+3. Auth preflight (`auth.FromSpec`) under the reset lock, before any inbox wipe or snapshot swap. A failure is `validation_failed` and names the unreadable file. The previous snapshot, bearer, stdio actor, and sessions stay. That includes a candidate that removes one token while another token's secret file, or the basic password file, cannot be read: nothing from the candidate is committed. Apply cannot change `spec.management.auth` (its operations are SMTP and store only), so Apply does not run this preflight. `reloadAuth` keeps the previous verifier only if a secret file disappears after this check.
+4. Preflight store options (caps + creatable `spillDirectory`) and reject unimplemented SMTP AUTH/TLS. On failure, leave current config **and** inbox unchanged.
+5. `store.ResetTo` — **the only epoch bump** (same as Wipe, then install the new store options under one lock). Empties the index, unlinks spill, increments `epoch` and `storeGeneration`. In-flight DATA inserts with the old epoch fail `451`.
+6. Atomically swap the config snapshot, clear the idempotency LRU, increment config `generation`.
+7. Existing SMTP sessions re-load the new snapshot on the next command (or die on QUIT/timeout). New sessions pick up `smtp.behavior` on the greeting.
+8. Audit `state.reset`.
 
 Restart is equivalent: process memory dies; spill dir is wiped on next start.
 
@@ -232,7 +233,9 @@ Envelope (LabDNS-shaped):
 | `replaceAdmission` | `admission`: admission object | |
 | `replaceSMTPBehavior` | `behavior`: `{greetingDelay, commandDelay, dropOnConnect, closeAfterVerb, replies}` | `behavior` is required. `{}` clears scripting back to stock SMTP. Omitted/empty fields inside a present object are the runtime no-op. Delays max 30s. Not a random chaos engine (D16). Live on the next command. |
 
-`:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
+`:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity, and when a cached apply's runtime revision is not the live revision. A retry whose cached runtime revision equals the live revision replays the cached result, including its generation and audit event id, even if an intervening apply rebuilt the same canonical state. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
+
+Duration and byte-size keys inside REST change-operation JSON bodies are matched case-insensitively. A case-variant bare number (`GreetingDelay`, `MaxBytes`) is the same rejection as the canonical spelling. A case-variant string (`GreetingDelay: "30s"`, `MaxBytes: "10MiB"`) is the canonical value. Config documents and the `state` raw document stay exact: `GreetingDelay` there is an unknown field. YAML key case stays strict.
 
 Fine-grained record CRUD is unnecessary. Agents that need a different sink posture should change YAML and reset, or apply one of the above.
 

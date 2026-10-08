@@ -3,10 +3,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,6 +41,10 @@ func main() {
 		return
 	}
 	if *requireCI {
+		tag := strings.TrimSpace(os.Getenv("RELEASE_TAG"))
+		if tag == "" {
+			fatal(fmt.Errorf("RELEASE_TAG is required for -require-ci"))
+		}
 		sha, err := gitOutput(root, "rev-parse", "HEAD")
 		if err != nil {
 			fatal(err)
@@ -48,7 +54,7 @@ func main() {
 		if err != nil {
 			fatal(err)
 		}
-		if err := evaluateChecks(jobs, runs, strings.TrimSpace(sha)); err != nil {
+		if err := evaluateChecksForTag(jobs, runs, strings.TrimSpace(sha), tag); err != nil {
 			fatal(err)
 		}
 		return
@@ -157,12 +163,26 @@ func hasHeading(notes, heading string) bool {
 	return false
 }
 
+type checkSuite struct {
+	Event string `json:"event"`
+}
+
 type checkRun struct {
-	Name        string    `json:"name"`
-	Status      string    `json:"status"`
-	Conclusion  string    `json:"conclusion"`
-	HeadSHA     string    `json:"headSha"`
-	CompletedAt time.Time `json:"completedAt,omitempty"`
+	Name        string     `json:"name"`
+	Status      string     `json:"status"`
+	Conclusion  string     `json:"conclusion"`
+	HeadSHA     string     `json:"headSha"`
+	CompletedAt time.Time  `json:"completedAt,omitempty"`
+	Event       string     `json:"event"`
+	Ref         string     `json:"ref"`
+	CheckSuite  checkSuite `json:"checkSuite"`
+}
+
+func (r checkRun) effectiveEvent() string {
+	if r.Event != "" {
+		return r.Event
+	}
+	return r.CheckSuite.Event
 }
 
 type fixtureFile struct {
@@ -196,64 +216,164 @@ func loadCheckRuns(fixturePath string) ([]checkRun, error) {
 	if token == "" {
 		return nil, fmt.Errorf("GH_TOKEN or GITHUB_TOKEN is required for -require-ci (or pass -ci-fixture)")
 	}
-	return fetchGitHubChecks(token, repo, sha)
+	tag := strings.TrimSpace(os.Getenv("RELEASE_TAG"))
+	if tag == "" {
+		return nil, fmt.Errorf("RELEASE_TAG is required for -require-ci (or pass -ci-fixture)")
+	}
+	return pollTagCI(token, repo, sha, tag)
 }
 
-type ghCheckRuns struct {
-	CheckRuns []struct {
+var (
+	githubAPI      = "https://api.github.com"
+	ciPollInterval = 15 * time.Second
+	ciPollTimeout  = 40 * time.Minute
+	errCIPending   = errors.New("ci run for the tag push is not complete")
+)
+
+type ghWorkflowRuns struct {
+	WorkflowRuns []ghWorkflowRun `json:"workflow_runs"`
+}
+
+type ghWorkflowRun struct {
+	ID         int64  `json:"id"`
+	Path       string `json:"path"`
+	Event      string `json:"event"`
+	HeadSHA    string `json:"head_sha"`
+	HeadBranch string `json:"head_branch"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	CreatedAt  string `json:"created_at"`
+}
+
+type ghJobs struct {
+	Jobs []struct {
 		Name        string `json:"name"`
 		Status      string `json:"status"`
 		Conclusion  string `json:"conclusion"`
-		HeadSHA     string `json:"head_sha"`
 		CompletedAt string `json:"completed_at"`
-	} `json:"check_runs"`
+		HeadSHA     string `json:"head_sha"`
+	} `json:"jobs"`
 }
 
-func fetchGitHubChecks(token, repo, sha string) ([]checkRun, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/commits/%s/check-runs?per_page=100&filter=latest", repo, sha)
+func pollTagCI(token, repo, sha, tag string) ([]checkRun, error) {
+	deadline := time.Now().Add(ciPollTimeout)
+	for {
+		runs, err := fetchTagCIJobs(token, repo, sha, tag)
+		if err == nil || !errors.Is(err, errCIPending) || !time.Now().Before(deadline) {
+			return runs, err
+		}
+		wait := ciPollInterval
+		if remaining := time.Until(deadline); remaining < wait {
+			wait = remaining
+		}
+		if wait > 0 {
+			time.Sleep(wait)
+		}
+	}
+}
+
+func fetchTagCIJobs(token, repo, sha, tag string) ([]checkRun, error) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	var out []checkRun
-	for url != "" {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+	listURL := fmt.Sprintf("%s/repos/%s/actions/runs?head_sha=%s&event=push&per_page=100",
+		strings.TrimRight(githubAPI, "/"), repo, url.QueryEscape(sha))
+	var runs []ghWorkflowRun
+	for listURL != "" {
+		body, hdr, err := githubGet(client, token, listURL)
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept", "application/vnd.github+json")
-		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode >= 300 {
-			return nil, fmt.Errorf("github check-runs: %s: %s", resp.Status, strings.TrimSpace(string(body)))
-		}
-		var doc ghCheckRuns
+		var doc ghWorkflowRuns
 		if err := json.Unmarshal(body, &doc); err != nil {
 			return nil, err
 		}
-		for _, r := range doc.CheckRuns {
+		runs = append(runs, doc.WorkflowRuns...)
+		listURL = nextLink(hdr.Get("Link"))
+	}
+	chosen, err := pickTagCIRun(runs, sha, tag)
+	if err != nil {
+		return nil, err
+	}
+	jobsURL := fmt.Sprintf("%s/repos/%s/actions/runs/%d/jobs?per_page=100",
+		strings.TrimRight(githubAPI, "/"), repo, chosen.ID)
+	var jobs []checkRun
+	for jobsURL != "" {
+		body, hdr, err := githubGet(client, token, jobsURL)
+		if err != nil {
+			return nil, err
+		}
+		var doc ghJobs
+		if err := json.Unmarshal(body, &doc); err != nil {
+			return nil, err
+		}
+		for _, j := range doc.Jobs {
 			item := checkRun{
-				Name:       r.Name,
-				Status:     r.Status,
-				Conclusion: r.Conclusion,
-				HeadSHA:    r.HeadSHA,
+				Name:       j.Name,
+				Status:     j.Status,
+				Conclusion: j.Conclusion,
+				HeadSHA:    chosen.HeadSHA,
+				Event:      "push",
+				Ref:        "refs/tags/" + tag,
 			}
-			if r.CompletedAt != "" {
-				if ts, err := time.Parse(time.RFC3339, r.CompletedAt); err == nil {
+			if j.CompletedAt != "" {
+				if ts, err := time.Parse(time.RFC3339, j.CompletedAt); err == nil {
 					item.CompletedAt = ts
 				}
 			}
-			out = append(out, item)
+			jobs = append(jobs, item)
 		}
-		url = nextLink(resp.Header.Get("Link"))
+		jobsURL = nextLink(hdr.Get("Link"))
 	}
-	return out, nil
+	return jobs, nil
+}
+
+func pickTagCIRun(runs []ghWorkflowRun, sha, tag string) (*ghWorkflowRun, error) {
+	var best *ghWorkflowRun
+	var bestCreated time.Time
+	for i := range runs {
+		r := &runs[i]
+		if r.Path != ".github/workflows/ci.yml" || r.Event != "push" || r.HeadSHA != sha {
+			continue
+		}
+		if r.HeadBranch == "" || r.HeadBranch != tag {
+			continue
+		}
+		created, _ := time.Parse(time.RFC3339, r.CreatedAt)
+		if best == nil || r.ID > best.ID || (r.ID == best.ID && created.After(bestCreated)) {
+			cp := *r
+			best = &cp
+			bestCreated = created
+		}
+	}
+	if best == nil {
+		return nil, fmt.Errorf("no ci.yml push run for tag %s at %s: %w", tag, sha, errCIPending)
+	}
+	if !strings.EqualFold(best.Status, "completed") {
+		return nil, fmt.Errorf("ci run %d for tag %s is %s: %w", best.ID, tag, best.Status, errCIPending)
+	}
+	return best, nil
+}
+
+func githubGet(client *http.Client, token, rawURL string) ([]byte, http.Header, error) {
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil, fmt.Errorf("github actions: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+	return body, resp.Header, nil
 }
 
 func nextLink(header string) string {
@@ -272,9 +392,20 @@ func nextLink(header string) string {
 }
 
 func evaluateChecks(required []string, runs []checkRun, wantSHA string) error {
+	return evaluateTagged(required, runs, wantSHA, "")
+}
+
+func evaluateChecksForTag(required []string, runs []checkRun, wantSHA, wantTag string) error {
+	if strings.TrimSpace(wantTag) == "" {
+		return fmt.Errorf("RELEASE_TAG is required")
+	}
+	return evaluateTagged(required, runs, wantSHA, wantTag)
+}
+
+func evaluateTagged(required []string, runs []checkRun, wantSHA, wantTag string) error {
 	var problems []string
 	for _, name := range required {
-		hits, wrongSHA := matchingRuns(runs, name, wantSHA)
+		hits, wrongSHA := matchingRuns(runs, name, wantSHA, wantTag)
 		if len(hits) == 0 {
 			if wrongSHA > 0 {
 				problems = append(problems, fmt.Sprintf("%s: head SHA != tag commit %s", name, wantSHA))
@@ -298,7 +429,7 @@ func evaluateChecks(required []string, runs []checkRun, wantSHA string) error {
 	return nil
 }
 
-func matchingRuns(runs []checkRun, name, wantSHA string) (hits []checkRun, wrongSHA int) {
+func matchingRuns(runs []checkRun, name, wantSHA, wantTag string) (hits []checkRun, wrongSHA int) {
 	for _, r := range runs {
 		if !checkNameMatches(r.Name, name) {
 			continue
@@ -309,9 +440,32 @@ func matchingRuns(runs []checkRun, name, wantSHA string) (hits []checkRun, wrong
 			wrongSHA++
 			continue
 		}
+		if !tagPushRun(r, wantTag) {
+			continue
+		}
 		hits = append(hits, r)
 	}
 	return hits, wrongSHA
+}
+
+// tagPushRun reports whether r is a push of a tag. wantTag empty accepts any
+// refs/tags/ name. A non-empty wantTag accepts only that tag.
+func tagPushRun(r checkRun, wantTag string) bool {
+	if r.effectiveEvent() != "push" {
+		return false
+	}
+	const prefix = "refs/tags/"
+	if !strings.HasPrefix(r.Ref, prefix) {
+		return false
+	}
+	name := r.Ref[len(prefix):]
+	if name == "" {
+		return false
+	}
+	if wantTag == "" {
+		return true
+	}
+	return name == wantTag
 }
 
 func latestCompleted(runs []checkRun) *checkRun {

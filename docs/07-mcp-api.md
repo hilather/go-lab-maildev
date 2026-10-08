@@ -2,7 +2,7 @@
 
 Status: Implemented (MCP-001)
 Owners: MCP, Application
-Last reviewed: 2026-08-29 (D19 mail_message_read)
+Last reviewed: 2026-10-08 (stdio actor refresh follows verifier identity)
 Related ADRs: 0004, 0006, 0008, 0009
 
 Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are frozen in [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Protocol pin: [docs/adr/0006-pin-mcp-protocol-versions.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0006-pin-mcp-protocol-versions.md).
@@ -12,7 +12,7 @@ Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are 
 - SDK: `github.com/modelcontextprotocol/go-sdk v1.7.0`
 - Protocol: `2026-07-28`
 - Transport: Streamable HTTP `POST /mcp` on the management listener
-- Optional: `labmail mcp-stdio --config … --token-file …` (stdout = protocol, stderr = logs)
+- Optional: `labmail mcp-stdio --config … --token-file …` (stdout = protocol, stderr = logs). When compiled auth identity changes, the verifier's OnIdentityChange hook re-authenticates mcp-stdio's startup secret and replaces the process actor, or drops the actor if the secret is absent or no longer matches. That hook runs whichever of REST or MCP reloads the shared verifier first. A reset whose management secret or password file cannot be read is refused with `validation_failed`; the previous snapshot, verifier, and startup actor stay. If that file disappears after the reset check, the previous verifier and startup actor stay.
 - `Stateless: true`
 - Auth: bearer only (Basic is not an MCP client convention)
 - Origin check: same `auth.CheckOrigin` as REST (**missing Origin allowed**; D17 / D18). Same `originAllowlist` sentinels `"*"` / `"private"` / exact. Live-read from the snapshot. `file://` and `Origin: null` stay denied.
@@ -22,7 +22,7 @@ Native management API is `/v1` + `POST /mcp`. Capability IDs and tool names are 
 - `spec.management.mcp.allowLegacyClients` default **false** (D17). TacLab equivalent: `api.mcp.allow_legacy_clients`. LabDNS has **no** knob (hard pin); the lab patches LabDNS. LabMail ships the TacLab knob so MCPJungle (`mark3labs/mcp-go v0.48`) can register without a LabMail patch. Integration-lab bootstrap sets `true`.
 - `subscriptions/listen` stays 2026-07-28 even when the pin is relaxed.
 
-Tool input/output schemas are generated from the same Go request/response types as REST. MCP structured content is the operation result **without** the HTTP problem envelope; domain `code` is always present on errors.
+`mail_change_plan`, `mail_change_apply`, and `mail_state_validate` accept duration and byte-size strings in operations the same way REST does (`30s`, `10MiB`). Bare numbers are `validation_failed`. Those tool schemas list `string` and `integer` so the number reaches that coercer. Other tool input schemas, and output schemas, are still inferred from the Go types. MCP structured content is the operation result **without** the HTTP problem envelope; domain `code` is always present on errors.
 
 Resources mirror GET representations. Clients without resource support use the `mail_*` read tools.
 
@@ -54,7 +54,7 @@ Resources mirror GET representations. Clients without resource support use the `
 | `mail_audit_query` | `audit.list` | `mail.audit.read` |
 | `mail_audit_get` | `audit.get` | `mail.audit.read` |
 
-`mail_change_plan` / `mail_change_apply` accept the same closed operation set as REST, including `replaceSMTPBehavior` (`spec.smtp.behavior` QA handshake scripting). There is no dedicated MCP tool per op.
+`mail_change_plan`, `mail_change_apply`, and `mail_state_validate` accept the same closed operation set as REST, including `replaceSMTPBehavior` (`spec.smtp.behavior` QA handshake scripting). Operation durations and byte sizes use the same strings as REST (`30s`, `10MiB`). A bare number is `validation_failed`. The schema lists `string` and `integer` so the number reaches that coercer. There is no dedicated MCP tool per op.
 
 Health live/ready, OpenAPI, UI assets, session/CSRF, `/v1/metrics`, `/email` compat, `/healthz`, `/config`, and `GET /v1/messages/{id}/preview` are **not** MCP tools.
 

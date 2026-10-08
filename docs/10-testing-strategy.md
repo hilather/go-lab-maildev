@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Quality, SMTP, Control Plane
-Last reviewed: 2026-08-29 (remaining SPA page chrome)
+Last reviewed: 2026-10-07 (tag-gate accepts only the tag push CI run)
 Related ADRs: 0002, 0004, 0008, 0009
 
 Every area has regressions. A bug fix starts with a failing test. CI has no optional jobs (LabDNS rule).
@@ -45,7 +45,7 @@ FND-001 implements `format`, `lint`, `vet`, `build`, `test`, `test-race`, `test-
 
 ## Required CI (GA-001)
 
-Jobs: format, lint, unit, race, fuzz-smoke, generated-file, documentation, security-scan, changelog, parity, config-compat, container-test, web. There is no optional or bypassable job. Tag creation is gated by `.github/workflows/release.yml` (`tag-gate`): notes file present, required headings, generated files clean, every required CI job success on the exact tag commit.
+Jobs: format, lint, unit, race, fuzz-smoke, generated-file, documentation, security-scan, changelog, parity, config-compat, container-test, web. There is no optional or bypassable job. Tag creation is gated by `.github/workflows/release.yml` (`tag-gate`): notes file present, required headings, generated files clean, and every required CI job success on the CI workflow run for that tag push (`event=push`, ref that tag, same SHA). A pull-request or `main` check for the same commit does not qualify. Pushing the `v*` tag is what starts that CI run.
 
 ## Frozen fixtures present on this tree
 

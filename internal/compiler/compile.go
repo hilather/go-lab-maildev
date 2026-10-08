@@ -10,10 +10,15 @@ import (
 )
 
 // CompileOpts controls revision metadata and the compile clock.
+// RequireAuthFiles opts state:validate into config.ValidateRuntime, which
+// fails an absent or unreadable token file and opens basic password files.
+// Boot, plan, apply, and reset leave it false. Those compiles still
+// length-check a present token file and do not open basic password files.
 type CompileOpts struct {
 	Now               time.Time
 	BootstrapRevision model.Revision
 	Generation        model.Generation
+	RequireAuthFiles  bool
 }
 
 // Compile normalizes and validates st (copy-on-write) and hashes canonical JSON.
@@ -29,7 +34,12 @@ func Compile(ctx context.Context, st *model.State, opts CompileOpts) (*snapshot.
 	if err != nil {
 		return nil, err
 	}
-	if err := config.Validate(n); err != nil {
+	if opts.RequireAuthFiles {
+		err = config.ValidateRuntime(n)
+	} else {
+		err = config.Validate(n)
+	}
+	if err != nil {
 		return nil, err
 	}
 	rev, err := config.Revision(n)

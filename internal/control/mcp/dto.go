@@ -1,7 +1,9 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/hilather/go-lab-maildev/internal/app"
@@ -28,16 +30,16 @@ type exportIn struct {
 }
 
 type changeIn struct {
-	ExpectedRevision string            `json:"expectedRevision,omitempty"`
-	IdempotencyKey   string            `json:"idempotencyKey,omitempty"`
-	Reason           string            `json:"reason,omitempty"`
-	Force            bool              `json:"force,omitempty"`
-	Operations       []model.Operation `json:"operations,omitempty"`
+	ExpectedRevision string          `json:"expectedRevision,omitempty"`
+	IdempotencyKey   string          `json:"idempotencyKey,omitempty"`
+	Reason           string          `json:"reason,omitempty"`
+	Force            bool            `json:"force,omitempty"`
+	Operations       json.RawMessage `json:"operations,omitempty"`
 }
 
 type validateIn struct {
-	State      json.RawMessage   `json:"state,omitempty"`
-	Operations []model.Operation `json:"operations,omitempty"`
+	State      json.RawMessage `json:"state,omitempty"`
+	Operations json.RawMessage `json:"operations,omitempty"`
 }
 
 type resetIn struct {
@@ -94,14 +96,18 @@ type auditQueryIn struct {
 	Limit int `json:"limit,omitempty"`
 }
 
-func (in changeIn) toChange() app.ChangeIn {
+func (in changeIn) toChange() (app.ChangeIn, error) {
+	ops, err := decodeOperations(in.Operations)
+	if err != nil {
+		return app.ChangeIn{}, err
+	}
 	return app.ChangeIn{
 		ExpectedRevision: model.Revision(in.ExpectedRevision),
 		IdempotencyKey:   in.IdempotencyKey,
 		Reason:           in.Reason,
 		Force:            in.Force,
-		Operations:       in.Operations,
-	}
+		Operations:       ops,
+	}, nil
 }
 
 func (in validateIn) toValidate() (app.ValidateIn, error) {
@@ -109,7 +115,47 @@ func (in validateIn) toValidate() (app.ValidateIn, error) {
 	if err != nil {
 		return app.ValidateIn{}, err
 	}
-	return app.ValidateIn{State: st, Operations: in.Operations}, nil
+	ops, err := decodeOperations(in.Operations)
+	if err != nil {
+		return app.ValidateIn{}, err
+	}
+	return app.ValidateIn{State: st, Operations: ops}, nil
+}
+
+// decodeOperations coerces a raw operations array the way REST does.
+// Empty or JSON null is a nil slice and is not decoded.
+func decodeOperations(raw json.RawMessage) ([]model.Operation, error) {
+	trimmed := trimSpaceJSON(raw)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		return nil, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(trimmed))
+	dec.UseNumber()
+	var tree any
+	if err := dec.Decode(&tree); err != nil {
+		return nil, operationsJSONError(err)
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return nil, domainerr.ValidationFailed("invalid operations",
+			domainerr.FieldViolation{Path: "operations", Code: "invalid_value", Message: "trailing JSON is not allowed"})
+	}
+	if vs := config.CoerceWireChange(tree); len(vs) > 0 {
+		return nil, domainerr.ValidationFailed("invalid operations", vs...)
+	}
+	encoded, err := json.Marshal(tree)
+	if err != nil {
+		return nil, operationsJSONError(err)
+	}
+	var ops []model.Operation
+	if err := json.Unmarshal(encoded, &ops); err != nil {
+		return nil, operationsJSONError(err)
+	}
+	return ops, nil
+}
+
+func operationsJSONError(err error) error {
+	return domainerr.ValidationFailed("invalid operations",
+		domainerr.FieldViolation{Path: "operations", Code: "invalid_value", Message: err.Error()})
 }
 
 func decodeCandidateState(raw json.RawMessage) (*model.State, error) {

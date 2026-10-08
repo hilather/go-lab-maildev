@@ -1,18 +1,51 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"os"
 	"strings"
 
+	"github.com/hilather/go-lab-maildev/internal/auth"
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 	"github.com/hilather/go-lab-maildev/internal/model"
 )
 
 // Validate checks a (preferably normalized) state. It does not mutate st.
+// Absent or unreadable (permission) token and password files are not
+// violations: lab overlays name /run/secrets paths that are absent when the
+// YAML is loaded. A present token file is still length-checked; a short,
+// empty, or comment-only token is invalid_value. Basic password files are
+// not opened. compiler.Compile uses Validate unless CompileOpts.RequireAuthFiles
+// is set. Boot, plan, apply, reset compile, and labmail validate use this path.
 func Validate(st *model.State) error {
+	return validate(st, false)
+}
+
+// ValidateRuntime is the state:validate opt-in on top of Validate. It
+// requires each management secretFile to be readable. basic.passwordFile is
+// opened only when mode is bearer_and_basic (an empty mode counts as that
+// default) and basic.username is non-empty, matching auth.FromSpec. A
+// missing or unreadable file on those reads, or a password file whose lines
+// are blank or comments, is unresolved_reference. A present token that is
+// short, empty, or comment-only stays invalid_value. Boot, plan, apply,
+// reset compile, and labmail validate stay on Validate: absent or unreadable
+// token and password files do not fail them, and a present token file is
+// still length-checked. auth.FromSpec opens password files on reset
+// preflight, process start with management bound, mcp-stdio start, and
+// the live reloadAuth after each successful apply or reset. Reset
+// preflight, management-bound process start, and mcp-stdio start return
+// the FromSpec error (the reset is refused before the wipe and snapshot
+// swap; the process exits). Only the live reloadAuth hook (REST
+// internal/control/rest/server.go, MCP internal/control/mcp/server.go)
+// discards a failed FromSpec and keeps the verifier already installed.
+func ValidateRuntime(st *model.State) error {
+	return validate(st, true)
+}
+
+func validate(st *model.State, requireAuthFiles bool) error {
 	if st == nil {
 		return domainerr.ValidationFailed("nil state",
 			domainerr.FieldViolation{Path: "", Code: violationRequired, Message: "state is nil"})
@@ -22,7 +55,7 @@ func Validate(st *model.State) error {
 	validateListeners(&st.Spec.Listeners, &vs)
 	validateSMTP(&st.Spec.SMTP, &vs)
 	validateStore(&st.Spec.Store, &vs)
-	validateManagement(&st.Spec.Management, &vs)
+	validateManagement(&st.Spec.Management, requireAuthFiles, &vs)
 	validateObservability(&st.Spec.Observability, &vs)
 	if len(vs) > 0 {
 		return domainerr.ValidationFailed("Candidate state is invalid.", vs...)
@@ -311,7 +344,7 @@ func validateStore(s *model.StoreSpec, vs *[]domainerr.FieldViolation) {
 	}
 }
 
-func validateManagement(m *model.ManagementSpec, vs *[]domainerr.FieldViolation) {
+func validateManagement(m *model.ManagementSpec, requireAuthFiles bool, vs *[]domainerr.FieldViolation) {
 	switch m.Auth.Mode {
 	case "", model.MgmtAuthBearer, model.MgmtAuthBearerAndBasic, model.MgmtAuthDevLoopbackUnauth:
 	default:
@@ -335,7 +368,7 @@ func validateManagement(m *model.ManagementSpec, vs *[]domainerr.FieldViolation)
 		if strings.TrimSpace(tok.SecretFile) == "" {
 			*vs = append(*vs, domainerr.FieldViolation{Path: path + ".secretFile", Code: violationRequired, Message: "token secretFile is required"})
 		} else {
-			checkTokenSecretLength(path+".secretFile", tok.SecretFile, vs)
+			checkTokenSecretLength(path+".secretFile", tok.SecretFile, requireAuthFiles, vs)
 		}
 		if tok.Role != "" && !model.KnownRole(tok.Role) {
 			*vs = append(*vs, domainerr.FieldViolation{Path: path + ".role", Code: violationInvalidValue, Message: "role must be viewer, operator, or administrator"})
@@ -364,6 +397,9 @@ func validateManagement(m *model.ManagementSpec, vs *[]domainerr.FieldViolation)
 				Code:    violationUnresolved,
 				Message: "basic.tokenRef " + basic.TokenRef + " does not match a token id",
 			})
+		}
+		if basicPasswordRead(m.Auth.Mode, basic.Username) {
+			checkAuthPasswordFile("spec.management.auth.basic.passwordFile", basic.PasswordFile, requireAuthFiles, vs)
 		}
 	}
 	if m.BodyLimit <= 0 {
@@ -535,30 +571,62 @@ func requireExistingFile(path, file string, vs *[]domainerr.FieldViolation) {
 	}
 }
 
-// checkTokenSecretLength fails if the file exists and the first secret line
-// is shorter than 32 bytes so validate matches serve/FromSpec.
-func checkTokenSecretLength(path, file string, vs *[]domainerr.FieldViolation) {
-	b, err := os.ReadFile(file)
-	if err != nil {
-		return
-	}
-	for _, line := range strings.Split(string(b), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if len(line) < 32 {
+// checkTokenSecretLength fails when the file can be read and the first secret
+// line is shorter than 32 bytes. When requireFile is set, a missing or
+// unreadable file is unresolved_reference and the message names that path.
+// config.Load leaves requireFile false so a lab overlay that names an absent
+// /run/secrets path still loads. compiler.Compile sets it only when
+// CompileOpts.RequireAuthFiles is true (state:validate).
+//
+// An empty or comment-only token file stays invalid_value. FromSpec reports
+// unresolved_reference for that file, because readSecretFile fails before the
+// length check, but both paths refuse the document. That is not the
+// password-file gap, where runtime validate used to succeed.
+func checkTokenSecretLength(path, file string, requireFile bool, vs *[]domainerr.FieldViolation) {
+	n, err := auth.UsableSecretLineLen(file)
+	if err != nil && !errors.Is(err, os.ErrInvalid) {
+		if requireFile {
 			*vs = append(*vs, domainerr.FieldViolation{
 				Path:    path,
-				Code:    violationInvalidValue,
-				Message: "token secret must be at least 32 bytes",
+				Code:    violationUnresolved,
+				Message: "token secret file does not resolve: " + file,
 			})
 		}
 		return
 	}
-	*vs = append(*vs, domainerr.FieldViolation{
-		Path:    path,
-		Code:    violationInvalidValue,
-		Message: "token secret must be at least 32 bytes",
-	})
+	if err != nil || n < auth.MinTokenBytes {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    path,
+			Code:    violationInvalidValue,
+			Message: "token secret must be at least 32 bytes",
+		})
+	}
+}
+
+// basicPasswordRead is the auth.FromSpec condition for opening
+// basic.passwordFile: mode bearer_and_basic (empty mode is that default)
+// and a non-empty username. bearer and dev-loopback-unauth leave it unread.
+func basicPasswordRead(mode, username string) bool {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		mode = model.MgmtAuthBearerAndBasic
+	}
+	return mode == model.MgmtAuthBearerAndBasic && strings.TrimSpace(username) != ""
+}
+
+// checkAuthPasswordFile reports unresolved_reference when a named basic
+// password file cannot be read or has no usable line. Empty paths are a
+// different violation. Lenient loads skip the read so an absent /run/secrets
+// password still loads. The line rule is auth.UsableSecretLineLen.
+func checkAuthPasswordFile(path, file string, requireFile bool, vs *[]domainerr.FieldViolation) {
+	if !requireFile || strings.TrimSpace(file) == "" {
+		return
+	}
+	if _, err := auth.UsableSecretLineLen(file); err != nil {
+		*vs = append(*vs, domainerr.FieldViolation{
+			Path:    path,
+			Code:    violationUnresolved,
+			Message: "basic password file does not resolve: " + file,
+		})
+	}
 }

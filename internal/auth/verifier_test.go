@@ -221,6 +221,76 @@ func TestFromSpecRejectsUnknownRole(t *testing.T) {
 	}
 }
 
+func TestReplaceFiresOnIdentityChange(t *testing.T) {
+	spec, dir := testSpec(t, model.MgmtAuthBearerAndBasic)
+	a, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	a.OnIdentityChange(func() { n++ })
+	a.OnIdentityChange(func() { n++ })
+
+	same, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Replace(same)
+	if n != 0 {
+		t.Fatalf("equivalent replace fired %d hooks", n)
+	}
+
+	pw := writeSecret(t, dir, "pass2", "other-web-pass")
+	spec.Basic.PasswordFile = pw
+	basicNext, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Replace(basicNext)
+	if n != 2 {
+		t.Fatalf("basic-only replace fired hooks to %d, want 2", n)
+	}
+	oldBasic := Request{
+		Authorization: "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:lab-web-pass")),
+		AllowBasic:    true,
+	}
+	newBasic := Request{
+		Authorization: "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:other-web-pass")),
+		AllowBasic:    true,
+	}
+	if _, err := a.Authenticate(oldBasic); err == nil {
+		t.Fatal("old basic password still accepted after replace")
+	}
+	p, err := a.Authenticate(newBasic)
+	if err != nil || p.Role != model.RoleAdministrator {
+		t.Fatalf("new basic after replace: %+v %v", p, err)
+	}
+
+	again, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Replace(again)
+	if n != 2 {
+		t.Fatalf("second equivalent replace fired hooks to %d, want 2", n)
+	}
+
+	spec.Tokens[0].Role = model.RoleViewer
+	spec.Tokens[0].Scopes = nil
+	view, err := FromSpec(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Replace(view)
+	if n != 4 {
+		t.Fatalf("role replace fired hooks to %d, want 4", n)
+	}
+	a.Replace(nil)
+	if n != 4 {
+		t.Fatalf("nil next fired hooks to %d", n)
+	}
+}
+
 func TestWWWAuthenticate(t *testing.T) {
 	got := WWWAuthenticate(true)
 	if len(got) != 2 || !strings.Contains(got[0], "Bearer") || !strings.Contains(got[1], "Basic") {

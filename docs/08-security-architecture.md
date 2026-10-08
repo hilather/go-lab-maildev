@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Security, SMTP, Control Plane
-Last reviewed: 2026-08-29 (inbox SPA mark-read POST)
+Last reviewed: 2026-10-08 (stdio actor refresh follows verifier identity)
 Related ADRs: 0002, 0003, 0005, 0007, 0008, 0009
 
 LabMail is a lab sink, not a public MX. The critical invariant is receive-only: outbound SMTP must be unrepresentable.
@@ -46,7 +46,7 @@ auto-relay-rules, relay, smarthost, smartHost, forwardTo, mx, deliver
 
 - Tokens: **≥256 bits** entropy (TacLab ADR 0010), compared as SHA-256 digests in the in-memory index. Bootstrap file is the only durable secret.
 - Basic: `username` exact match + constant-time password compare; then the principal is `tokens[basic.tokenRef]`. Failed Basic and failed Bearer both return `401` `unauthenticated` with `WWW-Authenticate: Bearer realm="labmail"` **and** (if basic enabled) `WWW-Authenticate: Basic realm="labmail"`.
-- UI session cookie name **`labmail_session`**: `HttpOnly`, `SameSite=Lax`, `Secure` iff management TLS; CSRF header `X-LabMail-CSRF` required on cookie-authenticated mutations even over HTTP (`POST /v1/session`, `DELETE /v1/session`). `GET /v1/session` returns the CSRF secret for a valid cookie (reload recovery). Session JSON (and other REST JSON) is `Cache-Control: no-store`. Native `GET /v1/messages/{id}` defaults `markRead=false`; the SPA display GET does not pass `markRead=true`. Selecting a message issues `POST /v1/messages/{id}:read` with `X-LabMail-CSRF` (`mail.write`). Compat `GET /email/:id` still marks read. Token files are reread on reset and apply; the session table is cleared only when the compiled auth identity changes. A failed secret reread keeps the previous verifier and live sessions.
+- UI session cookie name **`labmail_session`**: `HttpOnly`, `SameSite=Lax`, `Secure` iff management TLS; CSRF header `X-LabMail-CSRF` required on cookie-authenticated mutations even over HTTP (`POST /v1/session`, `DELETE /v1/session`). `GET /v1/session` returns the CSRF secret for a valid cookie (reload recovery). Session JSON (and other REST JSON) is `Cache-Control: no-store`. Native `GET /v1/messages/{id}` defaults `markRead=false`; the SPA display GET does not pass `markRead=true`. Selecting a message issues `POST /v1/messages/{id}:read` with `X-LabMail-CSRF` (`mail.write`). Compat `GET /email/:id` still marks read. Token files are reread on reset and apply; the session table is cleared only when the compiled auth identity changes. Session clear is fired by `Verifier.Replace` when identity changes, independent of MCP/REST hook order. A reset whose management secret or password file cannot be read is refused with `validation_failed` before the inbox wipe or snapshot swap, so the previous snapshot, bearer, stdio actor, and sessions stay. A secret reread that fails after that check keeps the previous verifier and live sessions. mcp-stdio’s fixed actor is re-authenticated from the startup secret, or dropped, by the verifier's OnIdentityChange hook, so REST and MCP reload order does not matter. `GET /v1/events/stream` rechecks the bearer secret, Basic credential, cookie session, or dev-loopback-unauth mode that opened it, on each event and heartbeat, and stops without a further `mail.received` when that credential is revoked or loses `mail.read`.
 - No `.well-known/oauth-protected-resource` (ADR 0005: lab static bearer).
 - `X-Forwarded-For` is not trusted.
 - No CORS headers. OPTIONS is not a success path (`403` `CORS is disabled` even when `"*"` or `"private"` is set).

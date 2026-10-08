@@ -27,6 +27,7 @@ type Service interface {
 	Wait(ctx context.Context, actor Actor, in WaitIn) (*model.Message, error)
 	Extract(ctx context.Context, actor Actor, id string) (*ExtractResult, error)
 	Subscribe(ctx context.Context, actor Actor, buffer int) (<-chan InboxEvent, func())
+	OnAuthPreflight(fn func(model.MgmtAuthSpec) error)
 	OnReset(fn func())
 	OnApply(fn func())
 

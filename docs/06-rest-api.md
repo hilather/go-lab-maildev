@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-08-29 (SSE subscribe-before-flush)
+Last reviewed: 2026-10-08 (SSE credential recheck)
 Related ADRs: 0004, 0005, 0007, 0008, 0009
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
@@ -73,7 +73,7 @@ Ready becomes unready as soon as SMTP `Shutdown` begins (`Accepting()` is false)
 
 Operator how-to (loopback/tunnel/Vite vs exact vs `"private"` vs `"*"`): [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook). YAML edit + reset or restart; there is no apply op.
 
-Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Plan/apply identity is `expectedRevision` + `force` + `reason` + operations. Idempotency LRU default 256; reset clears it.
+Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Plan/apply identity is `expectedRevision` + `force` + `reason` + operations. Idempotency LRU default 256; reset clears it. REST JSON request bodies reject unknown fields (`validation_failed`). Duration and byte-size keys inside change operations are matched case-insensitively; a case-variant bare number is rejected the same way as the canonical spelling. The `state` member stays exact-match. `DELETE /v1/messages/{id}` and `DELETE /v1/messages` honor `expectedStoreGeneration` in a non-empty JSON body even when `Content-Type` is absent. A present non-JSON content type is still 400. `application/json; charset=utf-8` is JSON.
 
 ## Message list (native)
 
@@ -167,7 +167,7 @@ event: store.wiped
 data: {"storeGeneration":21}
 ```
 
-Heartbeat comment every 15s. The handler registers the store subscriber **before** writing and flushing the 200 so a client that observes an open stream cannot miss a later insert (events are not replayed). MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
+Heartbeat comment every 15s. The handler registers the store subscriber **before** writing and flushing the 200 so a client that observes an open stream cannot miss a later insert (events are not replayed). Before each event and on each heartbeat the handler re-authenticates the credential that opened the stream and requires `mail.read` on the live principal (`mail.admin` satisfies it). A bearer secret or Basic credential is checked against the live verifier. A cookie session uses the non-sliding view of the cookie Lookup accepted, so deleting that session after authentication and before the stream's first check still ends the stream, and an open stream does not extend the 4h idle window. A `dev-loopback-unauth` stream stays open only while the live mode is still `dev-loopback-unauth` and the remote is still loopback. Failure ends the stream without a further `mail.received`. MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
 
 ## Preview
 

@@ -80,6 +80,15 @@ func (s *App) applyLocked(ctx context.Context, actor Actor, in ChangeIn) (*Apply
 	if hit, err := s.idemp.lookup(in.IdempotencyKey, fp); err != nil {
 		return nil, nil, err
 	} else if hit != nil && hit.apply != nil {
+		snap, err := s.active()
+		if err != nil {
+			return nil, nil, err
+		}
+		// Keep the entry. A later exact retry stays idempotency_conflict
+		// instead of falling through to revision_conflict.
+		if hit.apply.RuntimeRevision != snap.Revision {
+			return nil, nil, domainerr.IdempotencyConflict("idempotency key was applied at a different runtime revision")
+		}
 		return cloneApply(hit.apply), append([]func(){}, s.applyHooks...), nil
 	}
 	cand, err := s.buildCandidate(ctx, in, true)
@@ -156,7 +165,9 @@ func (s *App) Validate(ctx context.Context, actor Actor, in ValidateIn) (*Plan, 
 	if err := rejectUnimplementedSMTP(base.Spec.SMTP); err != nil {
 		return nil, err
 	}
-	next, err := compileCandidate(ctx, base, prev, s.now())
+	// state:validate opts into ValidateRuntime. Lenient compile still
+	// length-checks a present token file and does not open basic password files.
+	next, err := compileCandidate(ctx, base, prev, s.now(), true)
 	if err != nil {
 		return nil, asDomain(err)
 	}
@@ -204,7 +215,7 @@ func (s *App) buildCandidate(ctx context.Context, in ChangeIn, requireRev bool) 
 	if err := rejectUnimplementedSMTP(copied.Spec.SMTP); err != nil {
 		return nil, err
 	}
-	next, err := compileCandidate(ctx, copied, prev, s.now())
+	next, err := compileCandidate(ctx, copied, prev, s.now(), false)
 	if err != nil {
 		return nil, asDomain(err)
 	}

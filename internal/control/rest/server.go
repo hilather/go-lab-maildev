@@ -119,6 +119,9 @@ type Server struct {
 	logger       *observability.Logger
 	sseHeartbeat time.Duration
 	mounts       *http.ServeMux
+	// afterAuthenticate runs after a successful authenticate and before
+	// authorize. Tests delete the cookie session in that gap. Nil in production.
+	afterAuthenticate func()
 
 	cursorMu  sync.Mutex
 	cursorKey []byte
@@ -159,6 +162,13 @@ func New(cfg Config) (*Server, error) {
 		sessions = auth.NewStore(auth.DefaultSessionConfig())
 		cfg.Sessions = sessions
 	}
+	if cfg.Auth != nil {
+		// Clear is keyed off verifier identity, not OnApply registration order.
+		// MCP reloadAuth may Replace the shared verifier before REST's hook runs.
+		cfg.Auth.OnIdentityChange(func() {
+			sessions.Clear()
+		})
+	}
 	s := &Server{
 		cfg:          cfg,
 		svc:          cfg.Service,
@@ -172,6 +182,7 @@ func New(cfg Config) (*Server, error) {
 		sseHeartbeat: hb,
 		cursorKey:    key,
 	}
+	s.svc.OnAuthPreflight(auth.Preflight)
 	s.svc.OnReset(s.RotateCursors)
 	s.svc.OnReset(s.reloadAuth)
 	s.svc.OnApply(s.reloadAuth)
@@ -373,10 +384,13 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	actor, err := s.authenticate(r, isHealthCap(rt.cap))
+	r, actor, err := s.authenticate(r, isHealthCap(rt.cap))
 	if err != nil {
 		s.writeProblem(w, r, instance, err)
 		return
+	}
+	if s.afterAuthenticate != nil {
+		s.afterAuthenticate()
 	}
 	if err := s.authorize(r, actor, rt.cap); err != nil {
 		s.writeProblem(w, r, instance, err)
@@ -399,7 +413,10 @@ func (s *Server) reloadAuth() {
 	}
 	next, err := auth.FromSpec(snap.Canonical.Spec.Management.Auth)
 	if err != nil {
-		// Keep the previous verifier and live UI sessions.
+		// TOCTOU backstop only. A committed change must not reach this return:
+		// Reset's auth preflight already refused an unreadable management
+		// secret before the swap. If the file disappears after that check,
+		// keep the previous verifier and live sessions.
 		return
 	}
 	changed := !s.cfg.Auth.Equivalent(next)

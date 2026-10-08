@@ -1,13 +1,59 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+// safeRecorder lets a test poll an SSE body while the handler writes it.
+// httptest.ResponseRecorder is not safe for that concurrent use.
+type safeRecorder struct {
+	mu          sync.Mutex
+	header      http.Header
+	code        int
+	wroteHeader bool
+	body        bytes.Buffer
+}
+
+func newSafeRecorder() *safeRecorder {
+	return &safeRecorder{header: make(http.Header)}
+}
+
+func (r *safeRecorder) Header() http.Header { return r.header }
+
+func (r *safeRecorder) WriteHeader(status int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.wroteHeader {
+		return
+	}
+	r.code = status
+	r.wroteHeader = true
+}
+
+func (r *safeRecorder) Write(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if !r.wroteHeader {
+		r.code = http.StatusOK
+		r.wroteHeader = true
+	}
+	return r.body.Write(p)
+}
+
+func (r *safeRecorder) Flush() {}
+
+func (r *safeRecorder) snapshot() (code int, body string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.code, r.body.String()
+}
 
 func listenRPC(id int, proto string) string {
 	return rpcCall(id, methodListen, map[string]any{
@@ -35,7 +81,7 @@ func TestListenAcknowledgesMessagesURI(t *testing.T) {
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set(headerMethod, methodListen)
 	req.Header.Set(headerProtocolVersion, ProtocolVersion)
-	rec := httptest.NewRecorder()
+	rec := newSafeRecorder()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -43,28 +89,33 @@ func TestListenAcknowledgesMessagesURI(t *testing.T) {
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)
+	var got string
 	for time.Now().Before(deadline) {
-		if strings.Contains(rec.Body.String(), "notifications/subscriptions/acknowledged") {
+		_, got = rec.snapshot()
+		if strings.Contains(got, "notifications/subscriptions/acknowledged") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !strings.Contains(rec.Body.String(), "labmail://messages") {
-		t.Fatalf("ack missing uri: %s", rec.Body.String())
+	_, got = rec.snapshot()
+	if !strings.Contains(got, "labmail://messages") {
+		t.Fatalf("ack missing uri: %s", got)
 	}
 
 	insertMail(t, svc, "listen", "body")
 	deadline = time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if strings.Contains(rec.Body.String(), "notifications/resources/updated") {
+		_, got = rec.snapshot()
+		if strings.Contains(got, "notifications/resources/updated") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !strings.Contains(rec.Body.String(), `"uri":"labmail://messages"`) {
-		t.Fatalf("missing URI-only notify: %s", rec.Body.String())
+	_, got = rec.snapshot()
+	if !strings.Contains(got, `"uri":"labmail://messages"`) {
+		t.Fatalf("missing URI-only notify: %s", got)
 	}
-	if strings.Contains(rec.Body.String(), `"subject":"listen"`) {
+	if strings.Contains(got, `"subject":"listen"`) {
 		t.Fatal("listen must not include message bodies")
 	}
 	cancel()
@@ -134,27 +185,31 @@ func TestListenPinWithLegacyClients(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set(headerMethod, methodListen)
-	rec := httptest.NewRecorder()
+	rec := newSafeRecorder()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		s.Handler().ServeHTTP(rec, req)
 	}()
 	deadline := time.Now().Add(2 * time.Second)
+	var code int
+	var got string
 	for time.Now().Before(deadline) {
-		if rec.Code == http.StatusBadRequest {
-			t.Fatalf("listen with only _meta pin rejected: %s", rec.Body.String())
+		code, got = rec.snapshot()
+		if code == http.StatusBadRequest {
+			t.Fatalf("listen with only _meta pin rejected: %s", got)
 		}
-		if strings.Contains(rec.Body.String(), "notifications/subscriptions/acknowledged") {
+		if strings.Contains(got, "notifications/subscriptions/acknowledged") {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if rec.Code == http.StatusBadRequest {
-		t.Fatalf("listen with only _meta pin rejected: %s", rec.Body.String())
+	code, got = rec.snapshot()
+	if code == http.StatusBadRequest {
+		t.Fatalf("listen with only _meta pin rejected: %s", got)
 	}
-	if !strings.Contains(rec.Body.String(), "notifications/subscriptions/acknowledged") {
-		t.Fatalf("listen with only _meta pin did not ack: status=%d body=%s", rec.Code, rec.Body.String())
+	if !strings.Contains(got, "notifications/subscriptions/acknowledged") {
+		t.Fatalf("listen with only _meta pin did not ack: status=%d body=%s", code, got)
 	}
 	cancel()
 	select {

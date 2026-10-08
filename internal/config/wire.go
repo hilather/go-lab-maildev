@@ -15,17 +15,17 @@ func CoerceWireTree(v any) []domainerr.FieldViolation {
 }
 
 // CoerceWireChange folds case-variant duration and byte-size keys inside
-// change operations, then runs CoerceWireTree. A top-level object folds only
-// its operations member (the state member stays exact). An array is treated
-// as the operations list itself. A duplicate fold is one violation and
-// neither key is coerced.
+// change operations, then runs CoerceWireTree. A top-level object folds the
+// one member whose name matches "operations" in any case (encoding/json
+// matches that spelling into the operations field). Two or more such members
+// are a duplicate key and neither value is folded. The state member stays
+// exact. An array is the operations list itself. A duplicate fold inside an
+// operation is one violation and neither key is coerced.
 func CoerceWireChange(v any) []domainerr.FieldViolation {
 	var folded []domainerr.FieldViolation
 	switch x := v.(type) {
 	case map[string]any:
-		if ops, ok := x["operations"]; ok && ops != nil {
-			folded = foldWireKeys(ops, "operations")
-		}
+		folded = foldOperationsMember(x)
 	case []any:
 		folded = foldWireKeys(x, "")
 	}
@@ -33,6 +33,39 @@ func CoerceWireChange(v any) []domainerr.FieldViolation {
 		return folded
 	}
 	return CoerceWireTree(v)
+}
+
+// foldOperationsMember selects every key that matches "operations"
+// case-insensitively. One match is folded even when the spelling is not
+// "operations". Two or more matches are one duplicate-key violation and
+// neither value is folded or coerced.
+func foldOperationsMember(x map[string]any) []domainerr.FieldViolation {
+	keys := make([]string, 0, len(x))
+	for k := range x {
+		keys = append(keys, k)
+	}
+	matches := make([]string, 0, 1)
+	for _, k := range keys {
+		if strings.EqualFold(k, "operations") {
+			matches = append(matches, k)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil
+	case 1:
+		ops := x[matches[0]]
+		if ops == nil {
+			return nil
+		}
+		return foldWireKeys(ops, "operations")
+	default:
+		return []domainerr.FieldViolation{{
+			Path:    "operations",
+			Code:    violationDuplicateKey,
+			Message: `duplicate key "operations"`,
+		}}
+	}
 }
 
 // CanonicalDurationField returns the durationFields spelling for name.

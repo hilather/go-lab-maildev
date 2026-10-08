@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hilather/go-lab-maildev/internal/app"
 )
 
 func applyBody(rev, op string) string {
@@ -115,5 +117,85 @@ func TestRESTApplyIgnoresStateMemberCaseVariant(t *testing.T) {
 	got := svc.Active().Canonical.Spec.SMTP.HideExtensions
 	if len(got) != 1 || got[0] != "SIZE" {
 		t.Fatalf("apply with state member did not apply: %v body=%s", got, rec.Body.String())
+	}
+}
+
+// caseVariantBareUnits is GreetingDelay: 30 and MaxBytes: 1024 under one
+// operations array. encoding/json would store 30ns and 1024 bytes.
+const caseVariantBareUnits = `{"op":"replaceSMTPBehavior","behavior":{"GreetingDelay":30}},{"op":"replaceStoreCaps","store":{"maxMessages":1000,"MaxBytes":1024,"fullPolicy":"reject"}}`
+
+func changeBodyKeyed(rev, key, ops string) string {
+	return fmt.Sprintf(`{"expectedRevision":%q,"reason":"repro",%q:[%s]}`, rev, key, ops)
+}
+
+func assertRuntimeUntouched(t *testing.T, svc *app.App, rev string, delay time.Duration, maxBytes int64) {
+	t.Helper()
+	if got := svc.Active().Canonical.Spec.SMTP.Behavior.GreetingDelay; got != delay {
+		t.Fatalf("greetingDelay=%s want %s", got, delay)
+	}
+	if got := svc.Active().Canonical.Spec.Store.MaxBytes; got != maxBytes {
+		t.Fatalf("maxBytes=%d want %d", got, maxBytes)
+	}
+	if got := string(svc.Active().Revision); got != rev {
+		t.Fatalf("revision changed to %s", got)
+	}
+}
+
+// TestRESTRejectsCaseVariantOperationsKey: the operations member is matched
+// case-insensitively, same as encoding/json. GreetingDelay: 30 and
+// MaxBytes: 1024 under Operations must be validation_failed on plan and apply.
+func TestRESTRejectsCaseVariantOperationsKey(t *testing.T) {
+	s, svc := newTestServer(t)
+	rev := string(svc.Active().Revision)
+	delay := svc.Active().Canonical.Spec.SMTP.Behavior.GreetingDelay
+	maxBytes := svc.Active().Canonical.Spec.Store.MaxBytes
+	h := s.Handler()
+	for _, key := range []string{"Operations", "OPERATIONS"} {
+		body := changeBodyKeyed(rev, key, caseVariantBareUnits)
+		for _, path := range []string{"/v1/changes:plan", "/v1/changes:apply"} {
+			rec := doReq(t, h, http.MethodPost, path, body)
+			requireProblem(t, rec, http.StatusBadRequest, "validation_failed")
+			if !strings.Contains(rec.Body.String(), "bare number") {
+				t.Fatalf("%s %s did not reject bare units: %s", path, key, rec.Body.String())
+			}
+			assertRuntimeUntouched(t, svc, rev, delay, maxBytes)
+		}
+	}
+}
+
+// TestRESTAppliesCaseVariantOperationsKey: one Operations member is folded,
+// so a duration string applies. Rejecting the parent spelling would be wrong.
+func TestRESTAppliesCaseVariantOperationsKey(t *testing.T) {
+	s, svc := newTestServer(t)
+	rev := string(svc.Active().Revision)
+	body := changeBodyKeyed(rev, "Operations", `{"op":"replaceSMTPBehavior","behavior":{"GreetingDelay":"30s"}}`)
+	rec := doReq(t, s.Handler(), http.MethodPost, "/v1/changes:plan", body)
+	requireStatus(t, rec, http.StatusOK)
+	rec = doReq(t, s.Handler(), http.MethodPost, "/v1/changes:apply", body)
+	requireStatus(t, rec, http.StatusOK)
+	if got := svc.Active().Canonical.Spec.SMTP.Behavior.GreetingDelay; got != 30*time.Second {
+		t.Fatalf("Operations GreetingDelay string applied as %s body=%s", got, rec.Body.String())
+	}
+}
+
+// TestRESTRejectsDuplicateOperationsKeys: operations and Operations together
+// are a duplicate key. Neither member is applied.
+func TestRESTRejectsDuplicateOperationsKeys(t *testing.T) {
+	s, svc := newTestServer(t)
+	rev := string(svc.Active().Revision)
+	delay := svc.Active().Canonical.Spec.SMTP.Behavior.GreetingDelay
+	maxBytes := svc.Active().Canonical.Spec.Store.MaxBytes
+	body := fmt.Sprintf(`{"expectedRevision":%q,"reason":"repro","operations":[{"op":"replaceHideExtensions","hideExtensions":["SIZE"]}],"Operations":[%s]}`, rev, caseVariantBareUnits)
+	h := s.Handler()
+	for _, path := range []string{"/v1/changes:plan", "/v1/changes:apply"} {
+		rec := doReq(t, h, http.MethodPost, path, body)
+		requireProblem(t, rec, http.StatusBadRequest, "validation_failed")
+		if !strings.Contains(rec.Body.String(), "duplicate") {
+			t.Fatalf("%s did not report a duplicate operations key: %s", path, rec.Body.String())
+		}
+		assertRuntimeUntouched(t, svc, rev, delay, maxBytes)
+		if len(svc.Active().Canonical.Spec.SMTP.HideExtensions) != 0 {
+			t.Fatal("duplicate operations keys applied hideExtensions")
+		}
 	}
 }

@@ -196,6 +196,30 @@ func TestMCPValidateStateOnlyNoOperations(t *testing.T) {
 	}
 }
 
+// TestMCPCaseVariantOperationsKeyDoesNotApply: the tool schema requires the
+// exact property operations. A case-variant parent key must not install bare
+// GreetingDelay or MaxBytes.
+func TestMCPCaseVariantOperationsKeyDoesNotApply(t *testing.T) {
+	s, svc := newTestServer(t)
+	rev := string(svc.Active().Revision)
+	beforeDelay := svc.Active().Canonical.Spec.SMTP.Behavior.GreetingDelay
+	beforeBytes := svc.Active().Canonical.Spec.Store.MaxBytes
+	args := `{"expectedRevision":"` + rev + `","reason":"repro","Operations":[{"op":"replaceSMTPBehavior","behavior":{"GreetingDelay":30}},{"op":"replaceStoreCaps","store":{"maxMessages":1000,"MaxBytes":1024,"fullPolicy":"reject"}}]}`
+	raw, code := callToolRaw(t, s, "mail_change_apply", args)
+	if got := svc.Active().Canonical.Spec.SMTP.Behavior.GreetingDelay; got != beforeDelay {
+		t.Fatalf("MCP applied Operations GreetingDelay as %s; body=%s", got, raw)
+	}
+	if got := svc.Active().Canonical.Spec.Store.MaxBytes; got != beforeBytes {
+		t.Fatalf("MCP applied Operations MaxBytes as %d; body=%s", got, raw)
+	}
+	if strings.Contains(raw, `"applied":true`) {
+		t.Fatalf("MCP applied a case-variant operations key: status=%d body=%s", code, raw)
+	}
+	if !strings.Contains(raw, "Operations") || !strings.Contains(raw, "additional properties") {
+		t.Fatalf("MCP did not reject the case-variant operations key at the schema: status=%d body=%s", code, raw)
+	}
+}
+
 // TestMCPApplyOmittedOperations: plan and apply with no operations field
 // behave as an empty operation list.
 func TestMCPApplyOmittedOperations(t *testing.T) {

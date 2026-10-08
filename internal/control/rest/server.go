@@ -159,6 +159,13 @@ func New(cfg Config) (*Server, error) {
 		sessions = auth.NewStore(auth.DefaultSessionConfig())
 		cfg.Sessions = sessions
 	}
+	if cfg.Auth != nil {
+		// Clear is keyed off verifier identity, not OnApply registration order.
+		// MCP reloadAuth may Replace the shared verifier before REST's hook runs.
+		cfg.Auth.OnIdentityChange(func() {
+			sessions.Clear()
+		})
+	}
 	s := &Server{
 		cfg:          cfg,
 		svc:          cfg.Service,

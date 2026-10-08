@@ -14,7 +14,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Fixed
 
-- None.
+- Cookie sessions are cleared when `Replace` changes compiled auth identity, including when MCP reloads the shared verifier before REST. A failed secret reread still keeps sessions.
 
 ### Removed or deprecated
 

@@ -22,10 +22,11 @@ const (
 
 // Verifier is the process-local token + Basic index.
 type Verifier struct {
-	mu     sync.RWMutex
-	mode   string
-	tokens []storedToken
-	basic  *basicCred
+	mu       sync.RWMutex
+	mode     string
+	tokens   []storedToken
+	basic    *basicCred
+	onChange []func()
 }
 
 type storedToken struct {
@@ -132,16 +133,40 @@ func FromSpec(spec model.MgmtAuthSpec) (*Verifier, error) {
 	return v, nil
 }
 
+// OnIdentityChange registers a hook fired after Replace when the compiled
+// identity changes (mode, token id/digest/role/scopes, or Basic). Equivalent
+// input does not run hooks. Registration order does not matter: the first
+// successful non-equivalent Replace fires every hook.
+func (v *Verifier) OnIdentityChange(fn func()) {
+	if v == nil || fn == nil {
+		return
+	}
+	v.mu.Lock()
+	v.onChange = append(v.onChange, fn)
+	v.mu.Unlock()
+}
+
 // Replace swaps the compiled index in place so REST/MCP/compat share one pointer.
+// Hooks run only when Equivalent is false. Equivalent and snapshot run before
+// Lock; snapshot takes RLock and must not be called while Lock is held.
 func (v *Verifier) Replace(next *Verifier) {
 	if v == nil || next == nil {
 		return
 	}
+	changed := !v.Equivalent(next)
+	mode, toks, basic := next.snapshot()
 	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.mode = next.mode
-	v.tokens = next.tokens
-	v.basic = next.basic
+	v.mode = mode
+	v.tokens = toks
+	v.basic = basic
+	hooks := append([]func(){}, v.onChange...)
+	v.mu.Unlock()
+	if !changed {
+		return
+	}
+	for _, fn := range hooks {
+		fn()
+	}
 }
 
 // Equivalent reports whether the compiled identity matches: mode, token

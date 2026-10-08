@@ -106,8 +106,10 @@ func TestEventsStreamStopsAfterBearerLosesMailRead(t *testing.T) {
 	assertStreamEndedWithoutMail(t, frames, done)
 }
 
-// TestEventsStreamStopsAfterBasicPasswordChange: a Basic stream ends after
-// the password file changes and reset reloads the verifier.
+// TestEventsStreamStopsAfterBasicPasswordChange: a Basic stream delivers
+// mail.received while the password is still valid, then ends after the
+// password file changes and reset reloads the verifier. A recheck that
+// always returns false fails the live delivery, before the password changes.
 func TestEventsStreamStopsAfterBasicPasswordChange(t *testing.T) {
 	dir := t.TempDir()
 	tok := filepath.Join(dir, "token")
@@ -123,13 +125,25 @@ func TestEventsStreamStopsAfterBasicPasswordChange(t *testing.T) {
 	if err := os.WriteFile(cfgPath, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s, svc := bootConfiguredServer(t, cfgPath, 0)
+	s, svc := bootConfiguredServer(t, cfgPath, 25*time.Millisecond)
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
 
-	frames, _, done := openAuthedStream(t, ts, func(req *http.Request) {
+	frames, heartbeats, done := openAuthedStream(t, ts, func(req *http.Request) {
 		req.SetBasicAuth("admin", "lab-web-pass")
 	})
+	select {
+	case <-heartbeats:
+	case <-done:
+		t.Fatal("valid basic stream closed on heartbeat")
+	case <-time.After(time.Second):
+		t.Fatal("missing heartbeat")
+	}
+	insertMail(t, svc, "while-basic-valid", "body")
+	ev := waitSSE(t, frames, done, app.InboxMailReceived)
+	if ev.data["subject"] != "while-basic-valid" {
+		t.Fatalf("received=%+v", ev)
+	}
 
 	if err := os.WriteFile(pw, []byte("new-web-pass\n"), 0o600); err != nil {
 		t.Fatal(err)

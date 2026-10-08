@@ -47,6 +47,32 @@ func TestSessionExpiryAndCSRF(t *testing.T) {
 	}
 }
 
+func TestSessionViewDoesNotSlide(t *testing.T) {
+	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
+	s := NewStore(SessionConfig{Idle: time.Hour, Absolute: 2 * time.Hour, Max: 4})
+	s.SetClock(func() time.Time { return now })
+	cookie, _, sess, err := s.Create(Principal{ID: "admin", Role: model.RoleAdministrator, Scopes: allScopes()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(30 * time.Minute)
+	got, ok := s.View(cookie)
+	if !ok {
+		t.Fatal("view miss")
+	}
+	if !got.LastSeen.Equal(sess.LastSeen) {
+		t.Fatalf("view slid LastSeen from %s to %s", sess.LastSeen, got.LastSeen)
+	}
+	look, _, ok := s.Lookup(cookie)
+	if !ok || !look.LastSeen.Equal(now) {
+		t.Fatalf("lookup LastSeen=%s want %s ok=%v", look.LastSeen, now, ok)
+	}
+	now = now.Add(61 * time.Minute)
+	if _, ok := s.View(cookie); ok {
+		t.Fatal("expired view hit")
+	}
+}
+
 func TestSessionCookieFlags(t *testing.T) {
 	c := NewSessionCookie("abc", false, 0)
 	if c.Name != CookieName || c.Path != "/" || !c.HttpOnly {

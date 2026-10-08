@@ -16,6 +16,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 - Cookie sessions are cleared when `Replace` changes compiled auth identity, including when MCP reloads the shared verifier before REST. A failed secret reread still keeps sessions.
 - `labmail mcp-stdio` no longer keeps the startup administrator after that token is demoted or removed. The startup secret is authenticated again; if it does not match, the process actor is dropped.
+- `GET /v1/events/stream` stops delivering mailbox events, including subject, after that cookie session is deleted or loses `mail.read`.
 
 ### Removed or deprecated
 

@@ -22,7 +22,7 @@ func TestValidateMissingSecretFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load of an absent secretFile must still succeed: %v", err)
 	}
-	_, err = Compile(context.Background(), st, CompileOpts{})
+	_, err = Compile(context.Background(), st, CompileOpts{RequireAuthFiles: true})
 	de, ok := domainerr.As(err)
 	if !ok || de.Code != domainerr.CodeValidationFailed {
 		t.Fatalf("compile err=%v want validation_failed", err)
@@ -40,7 +40,7 @@ func TestValidateMissingPasswordFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load of an absent passwordFile must still succeed: %v", err)
 	}
-	_, err = Compile(context.Background(), st, CompileOpts{})
+	_, err = Compile(context.Background(), st, CompileOpts{RequireAuthFiles: true})
 	de, ok := domainerr.As(err)
 	if !ok || de.Code != domainerr.CodeValidationFailed {
 		t.Fatalf("compile err=%v want validation_failed", err)
@@ -50,9 +50,10 @@ func TestValidateMissingPasswordFile(t *testing.T) {
 	}
 }
 
-// TestCompileBearerSkipsMissingPasswordFile: FromSpec reads basic.passwordFile
-// only for bearer_and_basic with a username. A bearer document with a complete
-// basic block and a missing password file must still compile.
+// TestCompileBearerSkipsMissingPasswordFile: state:validate reads
+// basic.passwordFile only for bearer_and_basic with a username. A bearer
+// document with a complete basic block and a missing password file must
+// still compile when RequireAuthFiles is set.
 func TestCompileBearerSkipsMissingPasswordFile(t *testing.T) {
 	assertCompileSkipsMissingPasswordFile(t, model.MgmtAuthBearer)
 }
@@ -72,8 +73,24 @@ func assertCompileSkipsMissingPasswordFile(t *testing.T, mode string) {
 	if err != nil {
 		t.Fatalf("Load of an absent passwordFile must still succeed: %v", err)
 	}
-	if _, err := Compile(context.Background(), st, CompileOpts{}); err != nil {
+	if _, err := Compile(context.Background(), st, CompileOpts{RequireAuthFiles: true}); err != nil {
 		t.Fatalf("compile err=%v want success for mode %s", err, mode)
+	}
+}
+
+// TestCompileDefaultAllowsAbsentAuthFiles: boot, plan, apply, and reset use
+// Compile with no opt-in. An absent token secretFile and an absent basic
+// passwordFile are not compile errors on that path.
+func TestCompileDefaultAllowsAbsentAuthFiles(t *testing.T) {
+	dir := t.TempDir()
+	missingTok := filepath.Join(dir, "missing.token")
+	missingPw := filepath.Join(dir, "missing.pass")
+	st, err := config.Load([]byte(basicManagementDoc(model.MgmtAuthBearerAndBasic, missingTok, missingPw)))
+	if err != nil {
+		t.Fatalf("Load of absent auth files must still succeed: %v", err)
+	}
+	if _, err := Compile(context.Background(), st, CompileOpts{}); err != nil {
+		t.Fatalf("default compile err=%v want success with absent secretFile and passwordFile", err)
 	}
 }
 
@@ -100,7 +117,7 @@ func TestCompileBlankPasswordFile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load of a blank passwordFile must still succeed: %v", err)
 			}
-			_, err = Compile(context.Background(), st, CompileOpts{})
+			_, err = Compile(context.Background(), st, CompileOpts{RequireAuthFiles: true})
 			de, ok := domainerr.As(err)
 			if !ok || de.Code != domainerr.CodeValidationFailed {
 				t.Fatalf("compile err=%v want validation_failed", err)

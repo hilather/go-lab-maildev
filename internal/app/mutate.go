@@ -165,7 +165,8 @@ func (s *App) Validate(ctx context.Context, actor Actor, in ValidateIn) (*Plan, 
 	if err := rejectUnimplementedSMTP(base.Spec.SMTP); err != nil {
 		return nil, err
 	}
-	next, err := compileCandidate(ctx, base, prev, s.now())
+	// state:validate is the only compile that reads management secret files.
+	next, err := compileCandidate(ctx, base, prev, s.now(), true)
 	if err != nil {
 		return nil, asDomain(err)
 	}
@@ -213,7 +214,7 @@ func (s *App) buildCandidate(ctx context.Context, in ChangeIn, requireRev bool) 
 	if err := rejectUnimplementedSMTP(copied.Spec.SMTP); err != nil {
 		return nil, err
 	}
-	next, err := compileCandidate(ctx, copied, prev, s.now())
+	next, err := compileCandidate(ctx, copied, prev, s.now(), false)
 	if err != nil {
 		return nil, asDomain(err)
 	}

@@ -99,6 +99,8 @@ func Boot(ctx context.Context, opts Options) (*App, error) {
 	if err != nil {
 		return nil, asDomain(err)
 	}
+	// Lenient compile. state:validate opts into secret-file reads.
+	// A bound management listener checks them later in auth.FromSpec.
 	snap, err := compiler.Compile(ctx, st, compiler.CompileOpts{})
 	if err != nil {
 		return nil, asDomain(err)
@@ -212,8 +214,8 @@ func cloneState(st *model.State) (*model.State, error) {
 	return &out, nil
 }
 
-func compileCandidate(ctx context.Context, st *model.State, prev *snapshot.Snapshot, now time.Time) (*snapshot.Snapshot, error) {
-	opts := compiler.CompileOpts{Now: now}
+func compileCandidate(ctx context.Context, st *model.State, prev *snapshot.Snapshot, now time.Time, requireAuthFiles bool) (*snapshot.Snapshot, error) {
+	opts := compiler.CompileOpts{Now: now, RequireAuthFiles: requireAuthFiles}
 	if prev != nil {
 		opts.BootstrapRevision = prev.BootstrapRevision
 		opts.Generation = prev.Generation + 1

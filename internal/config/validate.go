@@ -16,7 +16,8 @@ import (
 // Validate checks a (preferably normalized) state. It does not mutate st.
 // A missing management secretFile or passwordFile is not a violation here:
 // lab overlays name /run/secrets paths that are absent when the YAML is
-// loaded. compiler.Compile uses ValidateRuntime.
+// loaded. compiler.Compile uses Validate unless CompileOpts.RequireAuthFiles
+// is set.
 func Validate(st *model.State) error {
 	return validate(st, false)
 }
@@ -26,7 +27,9 @@ func Validate(st *model.State) error {
 // mode counts as that default) and basic.username is non-empty, matching
 // auth.FromSpec. A missing or unreadable password file, or one whose lines
 // are blank or comments, is unresolved_reference.
-// state:validate, reset, plan, apply, and process boot use it via compiler.Compile.
+// Only state:validate opts in, through compiler.Compile. Boot, plan, apply,
+// and reset do not. Reset refuses an unreadable secret in auth.Preflight.
+// Process start with management bound fails in auth.FromSpec.
 func ValidateRuntime(st *model.State) error {
 	return validate(st, true)
 }
@@ -561,7 +564,8 @@ func requireExistingFile(path, file string, vs *[]domainerr.FieldViolation) {
 // line is shorter than 32 bytes. When requireFile is set, a missing or
 // unreadable file is unresolved_reference and the message names that path.
 // config.Load leaves requireFile false so a lab overlay that names an absent
-// /run/secrets path still loads. compiler.Compile sets it.
+// /run/secrets path still loads. compiler.Compile sets it only when
+// CompileOpts.RequireAuthFiles is true (state:validate).
 //
 // An empty or comment-only token file stays invalid_value. FromSpec reports
 // unresolved_reference for that file, because readSecretFile fails before the

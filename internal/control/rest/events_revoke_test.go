@@ -19,7 +19,7 @@ import (
 )
 
 // TestSSEStopsWhenSessionRevoked: a cookie session that is deleted must stop
-// receiving inbox events. Authorization is checked only at connect today.
+// receiving inbox events. The stream rechecks that cookie before each event.
 func TestSSEStopsWhenSessionRevoked(t *testing.T) {
 	s, svc, _ := newAuthServer(t)
 	ts := httptest.NewServer(s.Handler())

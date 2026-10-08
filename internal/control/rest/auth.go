@@ -15,14 +15,34 @@ import (
 	"github.com/hilather/go-lab-maildev/internal/domainerr"
 )
 
-// authCookieKey is the cookie value Lookup accepted for this request.
-// handleEvents rechecks that value. A miss closes the stream. Bearer and a
-// stale cookie that missed at Lookup do not set it.
-type authCookieKey struct{}
+// streamCred is the credential that authorized this request. handleEvents
+// rechecks it on each event and heartbeat. secret is a bearer token or a
+// Basic payload and must never be logged.
+type streamCred struct {
+	kind   streamCredKind
+	secret string
+	cookie string
+	remote string
+}
 
-func authCookieFrom(ctx context.Context) string {
-	v, _ := ctx.Value(authCookieKey{}).(string)
-	return v
+type streamCredKind int
+
+const (
+	streamCredBearer streamCredKind = iota + 1
+	streamCredBasic
+	streamCredCookie
+	streamCredLoopback
+)
+
+type streamCredKey struct{}
+
+func streamCredFrom(ctx context.Context) (streamCred, bool) {
+	v, ok := ctx.Value(streamCredKey{}).(streamCred)
+	return v, ok
+}
+
+func withStreamCred(r *http.Request, cred streamCred) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), streamCredKey{}, cred))
 }
 
 func actorOf(p auth.Principal, transport string) app.Actor {
@@ -70,6 +90,16 @@ func (s *Server) authenticate(r *http.Request, skip bool) (*http.Request, app.Ac
 		if err != nil {
 			return r, app.Actor{}, err
 		}
+		scheme, rest, _ := strings.Cut(hdr, " ")
+		kind := streamCredBearer
+		if strings.EqualFold(scheme, "Basic") {
+			kind = streamCredBasic
+		}
+		r = withStreamCred(r, streamCred{
+			kind:   kind,
+			secret: strings.TrimSpace(rest),
+			remote: r.RemoteAddr,
+		})
 		return r, actorOf(p, "rest"), nil
 	}
 
@@ -79,7 +109,11 @@ func (s *Server) authenticate(r *http.Request, skip bool) (*http.Request, app.Ac
 			// Bind the stream to this cookie now. A later View in handleEvents
 			// can miss if the session is deleted in between, and that miss
 			// must close the stream rather than leave it unbound.
-			r = r.WithContext(context.WithValue(r.Context(), authCookieKey{}, c.Value))
+			r = withStreamCred(r, streamCred{
+				kind:   streamCredCookie,
+				cookie: c.Value,
+				remote: r.RemoteAddr,
+			})
 			return r, actorOf(auth.PrincipalFromSession(sess), "rest"), nil
 		}
 		// Stale/unknown cookie must not block dev-loopback-unauth.
@@ -89,6 +123,7 @@ func (s *Server) authenticate(r *http.Request, skip bool) (*http.Request, app.Ac
 	if err != nil {
 		return r, app.Actor{}, err
 	}
+	r = withStreamCred(r, streamCred{kind: streamCredLoopback, remote: r.RemoteAddr})
 	return r, actorOf(p, "rest"), nil
 }
 

@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-10-07 (SSE session revoke, unknown JSON fields, delete generation body)
+Last reviewed: 2026-10-08 (SSE credential recheck)
 Related ADRs: 0004, 0005, 0007, 0008, 0009
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
@@ -167,7 +167,7 @@ event: store.wiped
 data: {"storeGeneration":21}
 ```
 
-Heartbeat comment every 15s. The handler registers the store subscriber **before** writing and flushing the 200 so a client that observes an open stream cannot miss a later insert (events are not replayed). A stream opened by a cookie session (no `Authorization` header) re-checks that cookie with a non-sliding session view before each event and on the heartbeat. Deleting the session, or losing `mail.read`, stops the stream without a further `mail.received`. An open stream does not extend the 4h idle window. Bearer and dev-loopback streams are not tied to a cookie. MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
+Heartbeat comment every 15s. The handler registers the store subscriber **before** writing and flushing the 200 so a client that observes an open stream cannot miss a later insert (events are not replayed). Before each event and on each heartbeat the handler re-authenticates the credential that opened the stream and requires `mail.read` on the live principal (`mail.admin` satisfies it). A bearer secret or Basic credential is checked against the live verifier. A cookie session uses the non-sliding view of the cookie Lookup accepted, so deleting that session after authentication and before the stream's first check still ends the stream, and an open stream does not extend the 4h idle window. A `dev-loopback-unauth` stream stays open only while the live mode is still `dev-loopback-unauth` and the remote is still loopback. Failure ends the stream without a further `mail.received`. MCP `subscriptions/listen` on `labmail://messages` notifies **URI only**; clients pull bodies with `mail_messages_list`. Same handler; adapters differ only in framing.
 
 ## Preview
 

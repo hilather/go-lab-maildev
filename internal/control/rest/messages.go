@@ -1,7 +1,9 @@
 package rest
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"path"
 	"strconv"
@@ -189,9 +191,23 @@ func (s *Server) handleClear(w http.ResponseWriter, r *http.Request, instance st
 }
 
 func (s *Server) deleteIn(w http.ResponseWriter, r *http.Request, instance string) (app.DeleteIn, error) {
+	r.Body = http.MaxBytesReader(w, r.Body, s.maxBody)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		mapped := decodeError(err)
+		s.writeProblem(w, r, instance, mapped)
+		return app.DeleteIn{}, mapped
+	}
 	var body deleteRequest
-	if r.ContentLength != 0 && r.Header.Get("Content-Type") != "" {
-		if !s.decodeJSONOptional(w, r, instance, &body) {
+	if len(bytes.TrimSpace(raw)) > 0 {
+		// A missing Content-Type still decodes JSON. A present non-JSON type is 400.
+		if strings.TrimSpace(r.Header.Get("Content-Type")) != "" {
+			if err := s.checkJSONContentType(r); err != nil {
+				s.writeProblem(w, r, instance, err)
+				return app.DeleteIn{}, err
+			}
+		}
+		if !s.decodeBytes(w, r, instance, raw, &body) {
 			return app.DeleteIn{}, domainerr.ValidationFailed("invalid body")
 		}
 	}

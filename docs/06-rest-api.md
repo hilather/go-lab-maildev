@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: REST, Application
-Last reviewed: 2026-10-07 (SSE session revoke, unknown JSON fields)
+Last reviewed: 2026-10-07 (SSE session revoke, unknown JSON fields, delete generation body)
 Related ADRs: 0004, 0005, 0007, 0008, 0009
 
 Base: `/v1`. JSON unless noted. Errors: `Content-Type: application/problem+json`. Capability table: [docs/05-control-plane-and-parity.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/05-control-plane-and-parity.md). Generated OpenAPI: [api/openapi/v1.json](https://github.com/hilather/go-lab-maildev/blob/main/api/openapi/v1.json). `labmail serve` binds this listener from YAML `spec.listeners.management.address` (default `:1080`); `--management-listen ADDR|off` overrides.
@@ -73,7 +73,7 @@ Ready becomes unready as soon as SMTP `Shutdown` begins (`Accepting()` is false)
 
 Operator how-to (loopback/tunnel/Vite vs exact vs `"private"` vs `"*"`): [docs/11-deployment.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/11-deployment.md#origin-allowlist-cookbook). YAML edit + reset or restart; there is no apply op.
 
-Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Plan/apply identity is `expectedRevision` + `force` + `reason` + operations. Idempotency LRU default 256; reset clears it. REST JSON request bodies reject unknown fields (`validation_failed`). Duration and byte-size keys inside change operations are matched case-insensitively; a case-variant bare number is rejected the same way as the canonical spelling. The `state` member stays exact-match.
+Mutations accept `Idempotency-Key` and `If-Match` / body `expectedRevision` or `expectedStoreGeneration`. Plan/apply identity is `expectedRevision` + `force` + `reason` + operations. Idempotency LRU default 256; reset clears it. REST JSON request bodies reject unknown fields (`validation_failed`). Duration and byte-size keys inside change operations are matched case-insensitively; a case-variant bare number is rejected the same way as the canonical spelling. The `state` member stays exact-match. `DELETE /v1/messages/{id}` and `DELETE /v1/messages` honor `expectedStoreGeneration` in a non-empty JSON body even when `Content-Type` is absent. A present non-JSON content type is still 400. `application/json; charset=utf-8` is JSON.
 
 ## Message list (native)
 

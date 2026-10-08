@@ -29,7 +29,7 @@ This tree: `serve` binds SMTP (Memory inbox, not Null) and management HTTP (`/v1
 
 ## Hardened container
 
-Dockerfile (LabDNS shape, Go 1.26.6-alpine → scratch):
+Dockerfile (LabDNS shape, Go 1.26.8-alpine → scratch):
 
 ```
 USER 65532:65532

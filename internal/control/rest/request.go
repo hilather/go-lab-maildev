@@ -71,7 +71,7 @@ func (s *Server) decodeBytes(w http.ResponseWriter, r *http.Request, instance st
 			domainerr.FieldViolation{Path: "", Code: "invalid_value", Message: "trailing JSON is not allowed"}))
 		return false
 	}
-	if vs := config.CoerceWireTree(tree); len(vs) > 0 {
+	if vs := config.CoerceWireChange(tree); len(vs) > 0 {
 		s.writeProblem(w, r, instance, domainerr.ValidationFailed("invalid request body", vs...))
 		return false
 	}
@@ -80,11 +80,33 @@ func (s *Server) decodeBytes(w http.ResponseWriter, r *http.Request, instance st
 		s.writeProblem(w, r, instance, domainerr.Internal("internal error"))
 		return false
 	}
-	if err := json.Unmarshal(rewritten, dst); err != nil {
-		s.writeProblem(w, r, instance, decodeError(err))
+	strict := json.NewDecoder(bytes.NewReader(rewritten))
+	strict.DisallowUnknownFields()
+	if err := strict.Decode(dst); err != nil {
+		s.writeProblem(w, r, instance, mapStrictJSONError(err))
 		return false
 	}
 	return true
+}
+
+// mapStrictJSONError names an unknown field the way config decode does.
+// The problem code stays validation_failed.
+func mapStrictJSONError(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "unknown field") {
+		field := msg
+		if i := strings.Index(msg, `"`); i >= 0 {
+			if j := strings.LastIndex(msg, `"`); j > i {
+				field = msg[i+1 : j]
+			}
+		}
+		return domainerr.ValidationFailed("unknown fields",
+			domainerr.FieldViolation{Path: field, Code: "unknown_field", Message: "unknown field"})
+	}
+	return decodeError(err)
 }
 
 func (s *Server) checkJSONContentType(r *http.Request) error {

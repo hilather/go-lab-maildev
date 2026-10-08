@@ -2,7 +2,7 @@
 
 Status: Proposed normative behavior
 Owners: Configuration, Application
-Last reviewed: 2026-08-20 (SEC-002 originAllowlist sentinels)
+Last reviewed: 2026-10-07 (change-operation key case)
 Related ADRs: 0003, 0008
 
 Desired state is YAML. The inbox is not. Config revision is a content hash of the canonical spec. Message store has its own monotonic `storeGeneration`. Reset reloads YAML **and** wipes mail. See [docs/adr/0003-ephemeral-inbox-and-gitops.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/adr/0003-ephemeral-inbox-and-gitops.md).
@@ -233,6 +233,8 @@ Envelope (LabDNS-shaped):
 | `replaceSMTPBehavior` | `behavior`: `{greetingDelay, commandDelay, dropOnConnect, closeAfterVerb, replies}` | `behavior` is required. `{}` clears scripting back to stock SMTP. Omitted/empty fields inside a present object are the runtime no-op. Delays max 30s. Not a random chaos engine (D16). Live on the next command. |
 
 `:plan` is dry-run (same validate/compile, no swap). `:apply` requires `expectedRevision`. Idempotency: key + identity (`expectedRevision` + `force` + `reason` + canonical operations). Failures are not cached. `revision_conflict` → 409. `idempotency_conflict` → 409 when the same key is reused with a different identity. `store_over_new_cap` → 400, `code: store_over_new_cap` (not `validation_failed`). Success returns `{ previousRevision, runtimeRevision, generation, diff }`.
+
+Duration and byte-size keys inside REST change-operation JSON bodies are matched case-insensitively. A case-variant bare number (`GreetingDelay`, `MaxBytes`) is the same rejection as the canonical spelling. A case-variant string (`GreetingDelay: "30s"`, `MaxBytes: "10MiB"`) is the canonical value. Config documents and the `state` raw document stay exact: `GreetingDelay` there is an unknown field. YAML key case stays strict.
 
 Fine-grained record CRUD is unnecessary. Agents that need a different sink posture should change YAML and reset, or apply one of the above.
 

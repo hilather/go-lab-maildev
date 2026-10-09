@@ -2,7 +2,7 @@ module github.com/hilather/go-lab-maildev
 
 go 1.26
 
-toolchain go1.26.8
+toolchain go1.26.9
 
 require (
 	github.com/emersion/go-message v0.18.2

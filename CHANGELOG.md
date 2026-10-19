@@ -10,6 +10,26 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Changed
 
+- None.
+
+### Fixed
+
+- None.
+
+### Removed or deprecated
+
+- None.
+
+## 1.0.0-rc.5
+
+Fifth candidate. Tag only on a green CI SHA via the Release `tag-gate`. Notes: [docs/releases/v1.0.0-rc.5.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.5.md). Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Receive-only; no Compose.
+
+### Added
+
+- None.
+
+### Changed
+
 - Go toolchain pinned to go1.26.9 (go.mod `toolchain`, CI `GO_VERSION`, Dockerfile); 1.26.0–1.26.8 lack current stdlib security fixes (GO-2026-6603..6617).
 - Web development dependency `source-map-js` updates from 1.2.1 to 1.2.2 (GHSA-68fv-2mgg-jv7q, high: event-loop denial of service through indexed source-map section offsets). Lockfile only; the built web assets are byte-identical.
 - Web development dependency `undici` updates from 8.10.0 to 8.10.2 (via jsdom; GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3 and GHSA-vp8m-p9jh-q5pm high, plus eight moderate or low undici advisories) and `vitest` / `@vitest/*` (including `@vitest/mocker`) from 4.1.10 to 4.1.11 (GHSA-82fw-gwwq-j7x9, moderate). Lockfile only; the built web assets are byte-identical.

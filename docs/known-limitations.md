@@ -2,7 +2,7 @@
 
 Honest residual for LabMail 1.0, last reviewed against this tree’s **v1.0.0-rc.5** notes. These are not defects hidden from the notes. They are out-of-scope product bounds, documented deltas versus maildev 2.2.1, or work that is **not** claimed here.
 
-Last reviewed: 2026-10-07 (tag-gate accepts only the tag push CI run)
+Last reviewed: 2026-10-19 (tag-gate accepts only the tag push CI run)
 
 This file is the operator-facing residual list. The numbered pack still wins on conflict: [docs/01-architecture.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/01-architecture.md#residual-limitations-10). Release notes: [docs/releases/v1.0.0-rc.5.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.5.md).
 

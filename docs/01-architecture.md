@@ -317,7 +317,7 @@ STA-001 implements `internal/app.Service` (HTTP-less) plus `internal/snapshot` a
 
 ## Residual limitations (1.0)
 
-Operator-facing copy of this list: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Current notes: [docs/releases/v1.0.0-rc.4.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.4.md). LabMail is a lab sink, not a public MTA.
+Operator-facing copy of this list: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Current notes: [docs/releases/v1.0.0-rc.5.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.5.md). LabMail is a lab sink, not a public MTA.
 
 - Not a complete MTA. No DSN, CHUNKING, PIPELINING, Sieve, quotas per recipient, or greylisting.
 - MIME parse of pathological messages may yield empty text/html with `parseWarning`; raw is still stored.

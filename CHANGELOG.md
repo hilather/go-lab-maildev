@@ -10,7 +10,7 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Changed
 
-- None.
+- Go toolchain 1.26.9 → 1.26.10 (`go.mod` `toolchain`, CI `GO_VERSION` in `.github/workflows/ci.yml` and `.github/workflows/release.yml`, Dockerfile `golang:1.26.10-alpine`, `docs/11-deployment.md`); 1.26.9 lacks the crypto/x509 fix for GO-2026-6809.
 
 ### Fixed
 

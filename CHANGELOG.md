@@ -10,6 +10,26 @@ All notable user-visible and operator-visible changes are recorded here. This fi
 
 ### Changed
 
+- None.
+
+### Fixed
+
+- None.
+
+### Removed or deprecated
+
+- None.
+
+## 1.0.0-rc.6 - 2026-10-26
+
+Sixth candidate: Go toolchain go1.26.10 (GO-2026-6809) only. Tag only on a green CI SHA via the Release `tag-gate`. Notes: [docs/releases/v1.0.0-rc.6.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/releases/v1.0.0-rc.6.md). Residuals: [docs/known-limitations.md](https://github.com/hilather/go-lab-maildev/blob/main/docs/known-limitations.md). Receive-only; no Compose.
+
+### Added
+
+- None.
+
+### Changed
+
 - Go toolchain 1.26.9 → 1.26.10 (`go.mod` `toolchain`, CI `GO_VERSION` in `.github/workflows/ci.yml` and `.github/workflows/release.yml`, Dockerfile `golang:1.26.10-alpine`, `docs/11-deployment.md`); 1.26.9 lacks the crypto/x509 fix for GO-2026-6809.
 
 ### Fixed
